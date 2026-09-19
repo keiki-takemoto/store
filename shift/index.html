@@ -68,10 +68,11 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 .dh .cnt.short{color:var(--warn);border-color:var(--warn)}
 .dh .cnt.full{color:var(--ok);border-color:var(--ok)}
 .asg{display:flex;flex-direction:column;gap:0}
-.who{display:block;border-radius:5px;padding:0 clamp(1px,0.4vw,4px);font-size:clamp(9px,2.1vw,15px);font-weight:700;
-  color:var(--c,var(--ink));line-height:1.45;letter-spacing:0;
-  word-break:keep-all;overflow-wrap:normal}
-.who .t{font-size:clamp(8px,1.7vw,13px);font-weight:700;opacity:.85}
+.who{display:block;border-radius:5px;padding:0 clamp(1px,0.4vw,4px);
+  font-size:var(--wf,clamp(9px,2.1vw,15px));font-weight:700;
+  color:var(--c,var(--ink));line-height:1.5;letter-spacing:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who .t{font-size:.86em;font-weight:700;opacity:.85}
 .who[data-act]{cursor:pointer}
 .who[data-act]:hover{background:var(--surface-2)}
 .offbig{flex:1;display:flex;align-items:center;justify-content:center;font-size:clamp(13px,3.4vw,28px);
@@ -447,11 +448,11 @@ function buildMonth(mode){
       if(lack) short++;
       rows=asg.map(function(a){
         var st=staffById(a.s); if(!st) return null;
-        return {c:st.color,name:st.name,label:(a.label==="終日"?"":lb(a.label)),s:a.s};
+        return {c:st.color,name:st.name,label:(a.label==="終日"?"":calLabel(a.label)),s:a.s};
       }).filter(Boolean);
     }else{
       rows=avail(d,false).filter(function(c){ return c.kind!=="none" }).map(function(c){
-        return {c:(staffById(c.id)||{}).color,name:c.name,label:c.mark,s:c.id};
+        return {c:(staffById(c.id)||{}).color,name:c.name,label:calLabel(c.mark),s:c.id};
       });
     }
     html+='<div class="day s'+dow+(closed?" closed":"")+'" data-d="'+d+'">'+
@@ -472,7 +473,7 @@ function buildMonth(mode){
       if(mode==="shift"){
         html+='<div class="cands">'+cands(d).map(function(c){
           return '<button class="cand" data-act="add" data-s="'+c.id+'" data-k="'+c.kind+'" title="'+esc(c.title)+'">'+
-            esc(c.name)+(c.mark?' '+esc(c.mark):'')+'</button>';
+            esc(c.name)+(c.mark?' '+esc(calLabel(c.mark)):'')+'</button>';
         }).join("")+'</div>';
       }
     }
@@ -480,11 +481,40 @@ function buildMonth(mode){
   }
   return {html:html,total:total,short:short};
 }
+/* 「森川 AM」が2行に折り返さないよう、いちばん長いものに合わせて全体を縮める。
+   マスごとにばらばらの大きさにすると読みにくいので、カレンダー全体で1つの大きさにする。 */
+function fitNames(box){
+  if(!box) return;
+  box.style.removeProperty("--wf");
+  var els=box.querySelectorAll(".who");
+  if(!els.length) return;
+  var size=parseFloat(getComputedStyle(els[0]).fontSize)||13;
+  /* 一度の計算では端数でわずかにはみ出すことがあるので、収まるまで数回つめる */
+  for(var pass=0;pass<4;pass++){
+    var worst=1;
+    for(var i=0;i<els.length;i++){
+      var el=els[i], avail=el.clientWidth, need=el.scrollWidth;
+      if(avail>0&&need>avail) worst=Math.min(worst,avail/need);
+    }
+    if(worst>=1) break;
+    size=Math.max(6,Math.floor(size*worst*20)/20-0.05);
+    box.style.setProperty("--wf",size+"px");
+    if(size<=6) break;
+  }
+}
+var fitTimer=null;
+function fitAll(){
+  fitNames($("#cal")); fitNames($("#calReq"));
+}
+window.addEventListener("resize",function(){
+  clearTimeout(fitTimer); fitTimer=setTimeout(fitAll,150);
+});
 function renderCal(){
   $("#monthLbl").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
   var r=buildMonth("shift");
   $("#cal").innerHTML=r.html;
   $("#calReq").innerHTML=buildMonth("req").html;
+  requestAnimationFrame(fitAll);
   $("#stat").innerHTML='のべ <b>'+r.total+'</b> 人 ・ '+
     (r.short?'<span class="short">足りない日 <b>'+r.short+'</b></span>':'<span>過不足なし</span>');
 }
@@ -510,6 +540,16 @@ function avail(d,skipTaken){
 }
 /* 前に「午前／午後」で保存したものも AM／PM で見せる */
 function lb(x){ return x==="午前"?"AM":(x==="午後"?"PM":(x||"")) }
+/* カレンダーのマスは狭いので、時間は短く出す（13:00-17:00 → 13-17、13:00から → 13〜） */
+function shortT(x){
+  var m=String(x||"").match(/^(\d{1,2}):(\d{2})(?:-(\d{1,2}):(\d{2})|[-〜~])?(から)?$/);
+  if(!m) return x;
+  var f=(m[2]==="00")?String(+m[1]):(+m[1])+":"+m[2];
+  if(!m[3]) return f+"〜";
+  var t=(m[4]==="00")?String(+m[3]):(+m[3])+":"+m[4];
+  return f+"-"+t;
+}
+function calLabel(x){ return shortT(lb(x)) }
 function labelFor(sid,d){
   var r=mon(ym()).req[sid];
   var c=r?(r.days[String(d)]||"ok"):"ok";
@@ -743,6 +783,7 @@ document.querySelector(".tabs").addEventListener("click",function(e){
     renderStaff(); renderNeed(); renderSyncUI();
   }
   if(b.dataset.v==="req") pull(true);
+  if(b.dataset.v!=="cfg") requestAnimationFrame(fitAll);
   window.scrollTo({top:0});
 });
 var toastEl=null,tt=null;
