@@ -462,7 +462,7 @@ function buildMonth(mode){
         (mode==="shift"
           ? (closed?'<span class="cnt">休</span>'
                    :'<span class="cnt '+(lack?"short":(rows.length>=need?"full":""))+'" data-act="need">'+rows.length+"/"+need+'</span>')
-          : (closed?'':'<span class="cnt">'+rows.length+'人</span>'))+
+          : '')+
       '</div>';
     if(closed){ html+='<div class="offbig">off</div>' }
     else{
