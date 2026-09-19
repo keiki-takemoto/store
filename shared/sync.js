@@ -34,16 +34,14 @@
 
   async function rpc(fn, args) {
     if (!isOn()) throw err("not_configured");
+    /* 新しい形式のキー（sb_publishable_…）はJWTではないので、Authorization には載せない。
+       古い形式（eyJ… のJWT）のときだけ Bearer を付ける。 */
+    var h = { "Content-Type": "application/json", "apikey": CFG.anon };
+    if (/^ey/.test(CFG.anon)) h["Authorization"] = "Bearer " + CFG.anon;
     var res;
     try {
       res = await fetch(CFG.url + "/rest/v1/rpc/" + fn, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "apikey": CFG.anon,
-          "Authorization": "Bearer " + CFG.anon
-        },
-        body: JSON.stringify(args || {})
+        method: "POST", headers: h, body: JSON.stringify(args || {})
       });
     } catch (e) { throw err("offline", messageFor("offline")) }
 
