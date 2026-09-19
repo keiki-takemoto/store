@@ -42,26 +42,27 @@
   function codeLabel(code) { return isTime(code) ? timeText(code) : (LABEL[code] || "") }
 
   /* ---- 書く ---- */
-  /* days は {"3":"ng","5":"am","9":"13:00-17:00"} 。ok の日は書かない。 */
+  /* days に入っているのが「出られる日」。入っていない日は出られない。
+     {"1":"ok","5":"am","9":"13:00-17:00"} のかたち。 */
   function buildRequestText(o) {
     var name = (o.name || "").trim();
     var ym = o.month || "";                            // "2026-10"
     var p = ym.split("-");
     var head = "【シフト希望】" + (p[0] ? p[0] + "年" : "") + (p[1] ? (+p[1]) + "月" : "");
-    var g = { ng: [], am: [], pm: [] }, times = [];
+    var g = { ok: [], am: [], pm: [] }, times = [];
     Object.keys(o.days || {}).map(Number).sort(function (a, b) { return a - b }).forEach(function (d) {
       var c = o.days[String(d)];
-      if (!c || c === "ok") return;
+      if (!c || c === "ng") return;
       if (isTime(c)) times.push(d + "日 " + timeText(c));
       else if (g[c]) g[c].push(d);
     });
     var lines = [head, "名前：" + name, ""];
-    if (g.ng.length) lines.push("× " + g.ng.join(", "));
+    if (g.ok.length) lines.push("終日 " + g.ok.join(", "));
     if (g.am.length) lines.push("AM " + g.am.join(", "));
     if (g.pm.length) lines.push("PM " + g.pm.join(", "));
     times.forEach(function (t) { lines.push("時間 " + t) });
-    if (!g.ng.length && !g.am.length && !g.pm.length && !times.length) lines.push("すべて終日OK");
-    else lines.push("ほかの日は終日OK");
+    if (!g.ok.length && !g.am.length && !g.pm.length && !times.length) lines.push("出られる日はありません");
+    else lines.push("ほかの日は出られません");
     if ((o.note || "").trim()) { lines.push("", "メモ：" + o.note.trim()) }
     return lines.join("\n");
   }
@@ -94,6 +95,21 @@
     return blocks;
   }
 
+  function daysInMonth(ym) {
+    var m = /^(\d{4})-(\d{2})$/.exec(ym || "");
+    return m ? new Date(+m[1], +m[2], 0).getDate() : 31;
+  }
+  /* 古い書き方（×で出られない日を書き、ほかは出勤可）を、いまの形（出られる日を並べる）に直す */
+  function flipOld(res) {
+    var n = daysInMonth(res.month), out = {};
+    for (var d = 1; d <= n; d++) {
+      var c = res.days[String(d)];
+      if (c === "ng") continue;
+      out[String(d)] = c || "ok";
+    }
+    res.days = out;
+    return res;
+  }
   function parseBlock(lines, year) {
     var res = { name: "", month: "", days: {}, note: "" };
     var mon = "";
@@ -113,6 +129,7 @@
       var m;
       /* まとめ書き： × 3, 7, 12 ／ 午前のみ 5,6 */
       if ((m = s.match(/^(?:×|✕|x|X|休み?|NG|ng|不可|出られません)\s*[:：]?\s*([\d,\s日]+)$/))) return setDays(res, m[1], "ng");
+      if ((m = s.match(/^(?:終日|○|◯|OK|ok)\s*[:：]?\s*([\d,\s日]+)$/))) return setDays(res, m[1], "ok");
       if ((m = s.match(/^(?:午前(?:のみ)?|am|AM)\s*[:：]?\s*([\d,\s日]+)$/))) return setDays(res, m[1], "am");
       if ((m = s.match(/^(?:午後(?:のみ)?|pm|PM)\s*[:：]?\s*([\d,\s日]+)$/))) return setDays(res, m[1], "pm");
       /* 時間 9日 13:00-17:00 */
@@ -130,7 +147,10 @@
         if (c3) res.days[String(d)] = c3;
       }
     });
-    return res;
+    var text = lines.join("\n");
+    var old = /ほかの日は終日OK|すべて終日OK|書いていない日/.test(text);
+    if (!old) for (var k in res.days) if (res.days[k] === "ng") { old = true; break }
+    return old ? flipOld(res) : res;
   }
 
   function setDays(res, list, code) {

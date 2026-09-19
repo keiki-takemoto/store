@@ -131,8 +131,8 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <section class="view" id="v-req">
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="calReq"></div>
-    <p class="note noprint">その日に出られる人です。<span style="color:var(--ng)">×</span>の人は出ません。
-      名前の横は希望の時間帯。②に切り替えると、ここから選んでシフトを決められます。</p>
+    <p class="note noprint">スタッフが「出られる」と出した日です。名前の横は希望の時間帯。
+      ②に切り替えると、ここから選んでシフトを決められます。</p>
     <div class="card" style="margin-top:16px">
       <div class="card-h"><h2>届いた希望</h2><span class="hint" id="reqHint"></span></div>
       <div id="reqList"></div>
@@ -265,6 +265,25 @@ var DB=load();
   }
   if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
   if(typeof DB.need!=="number") DB.need=2;
+  /* 希望の持ち方も「出られる日を並べる」形に統一する */
+  var moved=false;
+  Object.keys(DB.months||{}).forEach(function(ymk){
+    var mm=/^(\d{4})-(\d{2})$/.exec(ymk); if(!mm) return;
+    var last=new Date(+mm[1],+mm[2],0).getDate(), req=DB.months[ymk].req||{};
+    Object.keys(req).forEach(function(sid){
+      var days=req[sid].days||{}, hasNg=false;
+      Object.keys(days).forEach(function(k){ if(days[k]==="ng") hasNg=true });
+      if(!hasNg) return;
+      var out={};
+      for(var d=1;d<=last;d++){
+        var c=days[String(d)];
+        if(c==="ng") continue;
+        out[String(d)]=c||"ok";
+      }
+      req[sid].days=out; moved=true;
+    });
+  });
+  if(moved){ try{ localStorage.setItem(KEY,JSON.stringify(DB)) }catch(e){} }
 })();
 function load(){
   try{ var v=JSON.parse(localStorage.getItem(KEY)); if(v&&v.staff) return v }catch(e){}
@@ -301,18 +320,18 @@ function isClosed(d){
 
 /* ================= ① 届いた希望 ================= */
 function summaryOf(days){
-  var g={ng:[],am:[],pm:[]}, tm=[];
+  var g={ok:[],am:[],pm:[]}, tm=[];
   Object.keys(days||{}).map(Number).sort(function(a,b){return a-b}).forEach(function(d){
     var c=days[String(d)];
-    if(!c||c==="ok") return;
+    if(!c||c==="ng") return;
     if(F.isTime(c)) tm.push(d+"日 "+F.timeText(c)); else if(g[c]) g[c].push(d);
   });
   var out=[];
-  if(g.ng.length) out.push({k:"ng",t:"× "+g.ng.join(",")});
+  if(g.ok.length) out.push({k:"ok",t:"終日 "+g.ok.join(",")});
   if(g.am.length) out.push({k:"am",t:"AM "+g.am.join(",")});
   if(g.pm.length) out.push({k:"pm",t:"PM "+g.pm.join(",")});
   tm.forEach(function(t){ out.push({k:"tm",t:t}) });
-  if(!out.length) out.push({k:"ok",t:"すべて終日OK"});
+  if(!out.length) out.push({k:"ng",t:"出られる日なし"});
   return out;
 }
 function renderReq(){
@@ -526,8 +545,8 @@ function avail(d,skipTaken){
     if(taken[s.id]) return;
     var r=M.req[s.id];
     if(!r){ out.push({id:s.id,name:s.name,kind:"none",mark:"?",title:"希望が未提出"}); return }
-    var c=r.days[key]||"ok";
-    if(c==="ng") return;
+    var c=r.days[key];
+    if(!c||c==="ng") return;          /* 入っていない日＝出られない */
     if(F.isTime(c)) out.push({id:s.id,name:s.name,kind:"tm",mark:F.timeText(c),title:F.timeText(c)});
     else if(c==="am") out.push({id:s.id,name:s.name,kind:"am",mark:"AM",title:"AMのみ"});
     else if(c==="pm") out.push({id:s.id,name:s.name,kind:"pm",mark:"PM",title:"PMのみ"});
@@ -606,8 +625,8 @@ function renderOut(){
     if(isClosed(d)) continue;
     var key=String(d);
     DB.staff.forEach(function(s){
-      var r=M.req[s.id];
-      if(r && (r.days[key]||"ok")!=="ng") t[s.id].sub++;
+      var r=M.req[s.id], c=r&&r.days[key];
+      if(c&&c!=="ng") t[s.id].sub++;
     });
     (M.assign[key]||[]).forEach(function(a){ if(t[a.s]) t[a.s].dec++ });
   }
