@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>はじめの設定</title>
+<meta name="theme-color" content="#FAF8F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141410" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+main{max-width:760px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:20px;margin-bottom:6px}
+.lead{color:var(--ink-2);font-size:14px;margin:0 0 22px}
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:0}
+ol.steps>li{counter-increment:s;position:relative;padding:0 0 22px 42px;border-left:2px solid var(--line);margin-left:13px}
+ol.steps>li:last-child{border-left-color:transparent;padding-bottom:0}
+ol.steps>li::before{content:counter(s);position:absolute;left:-15px;top:-2px;width:28px;height:28px;border-radius:50%;
+  background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700}
+ol.steps h2{font-size:15px;margin-bottom:5px}
+ol.steps p{margin:0 0 8px;font-size:13.5px;color:var(--ink-2);line-height:1.85}
+code.k{font-family:var(--mono);background:var(--surface-3);padding:2px 7px;border-radius:5px;font-size:13px;
+  user-select:all;word-break:break-all}
+pre.code{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:11.5px;
+  font-family:var(--mono);line-height:1.6;overflow:auto;max-height:340px;margin:0}
+.keys{display:grid;gap:8px;margin:10px 0}
+.keys div{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.warn{background:var(--warn-bg);border:1px solid var(--warn);border-radius:10px;padding:12px 14px;font-size:13px;
+  color:var(--ink);margin-top:22px;line-height:1.8}
+.pick{font-weight:700}
+</style>
+</head>
+<body>
+<main>
+  <h1>はじめの設定</h1>
+  <p class="lead">スタッフが出した希望が、店長の画面に自動で出るようにします。Googleのスプレッドシートを置き場所として使います。無料です。10分ほどで終わります。</p>
+
+  <ol class="steps">
+    <li>
+      <h2>スプレッドシートを作る</h2>
+      <p><a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> を開くと、新しいスプレッドシートができます。名前を「シフト」などにしておいてください。表の中身は空のままで大丈夫です。</p>
+    </li>
+    <li>
+      <h2>Apps Script を開く</h2>
+      <p>スプレッドシートの上のメニューから <span class="pick">拡張機能 → Apps Script</span> を選びます。別のタブでコードの画面が開きます。</p>
+    </li>
+    <li>
+      <h2>下のコードを貼り付ける</h2>
+      <p>コード画面にもとから入っている <code class="k">function myFunction() {}</code> を全部消してから、下のコードを貼り付けて保存（⌘S）してください。</p>
+      <div class="row" style="margin-bottom:8px"><button class="btn sm" id="copyCode">コードをコピー</button></div>
+      <pre class="code" id="code">/**
+ * シフト管理の置き場所（Google Apps Script）
+ *
+ * スタッフが出した希望をスプレッドシートに貯め、店長の画面に渡す。
+ * 確定したシフトを受け取って、スタッフの画面に返す。
+ *
+ * 使い方はアプリの「はじめの設定」ページに書いてある。
+ * この2つの合言葉は、この店だけのもの。他人に見せないこと。
+ */
+var STAFF_CODE = &#x27;87dduya6ac&#x27;;   // スタッフ用（希望を出す・確定シフトを見る）
+var ADMIN_KEY  = &#x27;ztstdlprjg6iyhy2uaios7&#x27;;   // 店長用（希望を全部見る・シフトを公開する）
+
+var SH_REQ = &#x27;希望&#x27;;
+var SH_SFT = &#x27;確定シフト&#x27;;
+
+function doGet(e) {
+  var p = (e &amp;&amp; e.parameter) || {};
+  try {
+    switch (p.action) {
+      case &#x27;ping&#x27;:     return json({ ok: true, at: now() });
+      case &#x27;requests&#x27;: return json(listRequests(p));
+      case &#x27;shift&#x27;:    return json(getShift(p));
+      default:         return json({ ok: false, error: &#x27;unknown_action&#x27; });
+    }
+  } catch (err) {
+    return json({ ok: false, error: String(err) });
+  }
+}
+
+function doPost(e) {
+  var body = {};
+  try { body = JSON.parse((e &amp;&amp; e.postData &amp;&amp; e.postData.contents) || &#x27;{}&#x27;) } catch (err) {}
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(20000);
+    switch (body.action) {
+      case &#x27;submitRequest&#x27;: return json(submitRequest(body));
+      case &#x27;publishShift&#x27;:  return json(publishShift(body));
+      default:              return json({ ok: false, error: &#x27;unknown_action&#x27; });
+    }
+  } catch (err) {
+    return json({ ok: false, error: String(err) });
+  } finally {
+    try { lock.releaseLock() } catch (err2) {}
+  }
+}
+
+/* ---------- スタッフ：希望を出す ---------- */
+function submitRequest(b) {
+  if (b.code !== STAFF_CODE) return { ok: false, error: &#x27;bad_code&#x27; };
+  var name = String(b.name || &#x27;&#x27;).trim();
+  var month = String(b.month || &#x27;&#x27;).trim();
+  if (!name || !/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: &#x27;bad_input&#x27; };
+
+  var sh = sheet(SH_REQ, [&#x27;受信日時&#x27;, &#x27;月&#x27;, &#x27;名前&#x27;, &#x27;希望(JSON)&#x27;, &#x27;メモ&#x27;]);
+  var vals = sh.getDataRange().getValues();
+  var row = 0;
+  for (var i = 1; i &lt; vals.length; i++) {
+    if (String(vals[i][1]) === month &amp;&amp; String(vals[i][2]).trim() === name) { row = i + 1; break }
+  }
+  var rec = [now(), month, name, JSON.stringify(b.days || {}), String(b.note || &#x27;&#x27;)];
+  if (row) sh.getRange(row, 1, 1, rec.length).setValues([rec]);
+  else sh.appendRow(rec);
+  return { ok: true, at: rec[0] };
+}
+
+/* ---------- 店長：希望を受け取る ---------- */
+function listRequests(p) {
+  if (p.key !== ADMIN_KEY) return { ok: false, error: &#x27;bad_key&#x27; };
+  var sh = sheet(SH_REQ, [&#x27;受信日時&#x27;, &#x27;月&#x27;, &#x27;名前&#x27;, &#x27;希望(JSON)&#x27;, &#x27;メモ&#x27;]);
+  var vals = sh.getDataRange().getValues();
+  var out = [];
+  for (var i = 1; i &lt; vals.length; i++) {
+    var r = vals[i];
+    if (!r[2]) continue;
+    if (p.month &amp;&amp; String(r[1]) !== p.month) continue;
+    var days = {};
+    try { days = JSON.parse(r[3] || &#x27;{}&#x27;) } catch (e) {}
+    out.push({ at: String(r[0]), month: String(r[1]), name: String(r[2]).trim(), days: days, note: String(r[4] || &#x27;&#x27;) });
+  }
+  return { ok: true, items: out };
+}
+
+/* ---------- 店長：確定シフトを公開する ---------- */
+function publishShift(b) {
+  if (b.key !== ADMIN_KEY) return { ok: false, error: &#x27;bad_key&#x27; };
+  var month = String(b.month || &#x27;&#x27;);
+  if (!/^\d{4}-\d{2}$/.test(month)) return { ok: false, error: &#x27;bad_input&#x27; };
+  var sh = sheet(SH_SFT, [&#x27;月&#x27;, &#x27;内容(JSON)&#x27;, &#x27;公開日時&#x27;]);
+  var vals = sh.getDataRange().getValues();
+  var row = 0;
+  for (var i = 1; i &lt; vals.length; i++) if (String(vals[i][0]) === month) { row = i + 1; break }
+  var rec = [month, JSON.stringify({ days: b.days || {}, closed: b.closed || [] }), now()];
+  if (row) sh.getRange(row, 1, 1, rec.length).setValues([rec]);
+  else sh.appendRow(rec);
+  return { ok: true, at: rec[2] };
+}
+
+/* ---------- スタッフ：確定シフトを見る ---------- */
+function getShift(p) {
+  if (p.code !== STAFF_CODE &amp;&amp; p.key !== ADMIN_KEY) return { ok: false, error: &#x27;bad_code&#x27; };
+  var sh = sheet(SH_SFT, [&#x27;月&#x27;, &#x27;内容(JSON)&#x27;, &#x27;公開日時&#x27;]);
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i &lt; vals.length; i++) {
+    if (String(vals[i][0]) === String(p.month)) {
+      var d = { days: {}, closed: [] };
+      try { d = JSON.parse(vals[i][1] || &#x27;{}&#x27;) } catch (e) {}
+      return { ok: true, month: String(p.month), days: d.days || {}, closed: d.closed || [], publishedAt: String(vals[i][2]) };
+    }
+  }
+  return { ok: true, month: String(p.month), days: null, closed: [], publishedAt: &#x27;&#x27; };
+}
+
+/* ---------- 小物 ---------- */
+function sheet(name, header) {
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.appendRow(header);
+    sh.getRange(1, 1, 1, header.length).setFontWeight(&#x27;bold&#x27;);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function now() { return Utilities.formatDate(new Date(), &#x27;Asia/Tokyo&#x27;, &#x27;yyyy-MM-dd HH:mm:ss&#x27;) }
+function json(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}
+</pre>
+    </li>
+    <li>
+      <h2>ウェブアプリとして公開する</h2>
+      <p>右上の <span class="pick">デプロイ → 新しいデプロイ</span>。歯車から種類に <span class="pick">ウェブアプリ</span> を選び、</p>
+      <p>・次のユーザーとして実行： <span class="pick">自分</span><br>
+         ・アクセスできるユーザー： <span class="pick">全員</span></p>
+      <p>にして <span class="pick">デプロイ</span>。初回は許可を求められます。「詳細」→「（安全でないページ）に移動」→「許可」で進めてください。自分で作ったプログラムなので問題ありません。</p>
+      <p>最後に出てくる <span class="pick">ウェブアプリのURL</span>（<code class="k">https://script.google.com/macros/s/…/exec</code>）をコピーします。</p>
+    </li>
+    <li>
+      <h2>管理者ページに貼る</h2>
+      <p><a href="./" target="_blank" rel="noopener">管理者ページ</a> の <span class="pick">⚙設定</span> を開き、いちばん上に URL と下の2つの合言葉を貼って「保存してつなぐ」。「つながりました」と出れば完了です。</p>
+      <div class="keys">
+        <div><span class="lbl" style="min-width:9em">合言葉（スタッフ用）</span><code class="k" id="k1">87dduya6ac</code><button class="btn sm ghost" data-copy="k1">コピー</button></div>
+        <div><span class="lbl" style="min-width:9em">管理用キー（店長用）</span><code class="k" id="k2">ztstdlprjg6iyhy2uaios7</code><button class="btn sm ghost" data-copy="k2">コピー</button></div>
+      </div>
+    </li>
+    <li>
+      <h2>スタッフにURLを配る</h2>
+      <p>⚙設定の <span class="pick">「スタッフに送るURLをコピー」</span> を押すと、合言葉が入ったURLができます。これをLINEでスタッフに送ってください。スタッフはそれを開いて、ホーム画面に追加して使います。</p>
+      <p>スタッフが希望を送ると、店長の画面に1分以内に出ます。届いた希望はスプレッドシートの「希望」タブにも溜まります。</p>
+    </li>
+  </ol>
+
+  <div class="warn">
+    <b>この2つの合言葉は、この店だけのものです。</b>
+    管理用キーは店長だけが持ってください。スタッフに配るURLには、スタッフ用の合言葉しか入りません。
+    合言葉を変えたいときは、Apps Script のコードの上の方にある2行を書き換えて、もう一度デプロイしてください。
+  </div>
+</main>
+<script>
+document.getElementById("copyCode").addEventListener("click",async function(){
+  try{ await navigator.clipboard.writeText(document.getElementById("code").textContent); this.textContent="コピーしました" }
+  catch(e){ this.textContent="コピーできません。手で選んでください" }
+  var b=this; setTimeout(function(){ b.textContent="コードをコピー" },2500);
+});
+document.querySelectorAll("[data-copy]").forEach(function(b){
+  b.addEventListener("click",async function(){
+    try{ await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); b.textContent="コピー済" }
+    catch(e){}
+    setTimeout(function(){ b.textContent="コピー" },2000);
+  });
+});
+</script>
+</body>
+</html>

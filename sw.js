@@ -1,7 +1,9 @@
 /* オフラインでも開けるようにする。直したら番号を1つ上げること。 */
-const CACHE = "store-v3";
+const CACHE = "store-v4";
 const SHELL = ["./","./index.html","./manifest.webmanifest","./icons/icon-192.png","./icons/icon-512.png",
-  "./icons/apple-touch-icon.png","./icons/favicon-32.png"];
+  "./icons/apple-touch-icon.png","./icons/favicon-32.png",
+  "./shift/","./shift/index.html","./shift/setup.html",
+  "./shared/theme.css","./shared/shift-format.js","./shared/sync.js"];
 self.addEventListener("install",(e)=>{e.waitUntil(caches.open(CACHE)
   .then((c)=>Promise.all(SHELL.map((u)=>c.add(u).catch(()=>null)))).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",(e)=>{e.waitUntil(caches.keys()

@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>シフトを組む</title>
+<meta name="description" content="スタッフから届いたシフト希望を取り込んで、月のシフトを組むための店長用ページ。">
+<meta name="theme-color" content="#FAF8F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141410" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+@media print{.homebar{display:none}}
+.top{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px}
+.top-in{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top h1{font-size:16px;white-space:nowrap}
+.top .sub{font-size:11.5px;color:var(--ink-3)}
+.tabs{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.tab{border:1px solid transparent;background:transparent;border-radius:9px;padding:7px 13px;cursor:pointer;font-size:13.5px;color:var(--ink-2)}
+.tab:hover{background:var(--surface-2)}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+main{max-width:1400px;margin:0 auto;padding:16px}
+.view[data-off]{display:none}
+
+.monthbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.monthbar button.nav{border:1px solid var(--line-2);background:var(--surface);border-radius:8px;width:36px;height:32px;cursor:pointer}
+#monthLbl{font-size:17px;font-weight:700;min-width:8.5em;text-align:center}
+.spacer{flex:1}
+.stat{font-size:12px;color:var(--ink-2);font-family:var(--mono)}
+.stat b{font-size:14px}
+.stat .short{color:var(--warn)}
+
+/* カレンダー */
+.dows{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:5px}
+.dows span{text-align:center;font-size:11.5px;color:var(--ink-3);padding:3px 0}
+.dows .s0{color:var(--sun)} .dows .s6{color:var(--sat)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.day{border:1px solid var(--line);border-radius:10px;background:var(--surface);min-height:132px;padding:6px;
+  display:flex;flex-direction:column;gap:4px;min-width:0}
+.day.blank{border:none;background:transparent;min-height:0}
+.day.closed{background:var(--surface-2);opacity:.75}
+.dh{display:flex;align-items:center;gap:5px}
+.dh .n{font-size:13px;font-family:var(--mono);color:var(--ink-2)}
+.dh .dw{display:none;font-size:11px;margin-left:2px}
+@media (max-width:640px){.dh .dw{display:inline}}
+.day.s0 .dh .n{color:var(--sun)} .day.s6 .dh .n{color:var(--sat)}
+.dh .today{background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:0 6px}
+.dh .cnt{margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--ink-3);cursor:pointer;
+  border:1px solid var(--line);border-radius:6px;padding:0 5px}
+.dh .cnt.short{color:var(--warn);border-color:var(--warn)}
+.dh .cnt.full{color:var(--ok);border-color:var(--ok)}
+.asg{display:flex;flex-direction:column;gap:3px}
+.who{display:flex;align-items:center;gap:4px;border-radius:7px;padding:2px 6px;font-size:12px;cursor:pointer;
+  background:var(--surface-2);border-left:3px solid var(--c,var(--line-2));line-height:1.45}
+.who:hover{background:var(--surface-3)}
+.who .t{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--ink-3)}
+.cands{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto;padding-top:4px;border-top:1px dashed var(--line)}
+.cand{border:1px solid var(--line);background:transparent;border-radius:6px;padding:1px 5px;font-size:10.5px;
+  cursor:pointer;color:var(--ink-3);white-space:nowrap}
+.cand:hover{background:var(--surface-2);color:var(--ink)}
+.cand[data-k="am"]{color:var(--am);border-color:var(--am-bg)}
+.cand[data-k="pm"]{color:var(--pm);border-color:var(--pm-bg)}
+.cand[data-k="tm"]{color:var(--tm);border-color:var(--tm-bg)}
+.cand[data-k="none"]{opacity:.6;border-style:dashed}
+.closedlbl{font-size:12px;color:var(--ink-3);text-align:center;padding:14px 0}
+
+/* 取り込み */
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;
+  font-family:var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.75;max-height:50vh;overflow:auto}
+.prow{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.prow:last-child{border-bottom:none}
+.prow .nm{font-weight:700;min-width:5em}
+.prow .sm{font-size:12px;color:var(--ink-2)}
+.badge{font-size:11px;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;letter-spacing:.08em;color:var(--ink-3);font-weight:500;
+  padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:8px 9px;border-bottom:1px solid var(--line)}
+.tbl tr:last-child td{border-bottom:none}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:-1px}
+
+/* シート */
+.sheet{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;background:rgba(20,16,8,.45)}
+.sheet-in{background:var(--bg);width:100%;max-width:560px;max-height:86vh;overflow-y:auto;border-radius:14px;border:1px solid var(--line)}
+.sheet-h{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.sheet-h h2{font-size:15px}
+.sec{padding:16px}
+.sec+.sec{border-top:1px solid var(--line)}
+.sec h3{font-size:12px;letter-spacing:.07em;color:var(--ink-3);margin-bottom:9px;font-weight:500}
+.note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:8px 0 0}
+.needrow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.needrow label{font-size:11px;color:var(--ink-3);text-align:center;display:block}
+.needrow input{width:100%;text-align:center;padding:7px 2px}
+
+@media print{
+  .top,.tabs,.cands,.monthbar .nav,.noprint{display:none!important}
+  body{background:#fff;color:#000}
+  .day{min-height:110px;break-inside:avoid;border-color:#bbb}
+  main{padding:0;max-width:none}
+}
+/* 電話の幅では、7列のカレンダーをやめて日ごとの縦並びにする */
+@media (max-width:640px){
+  .dows{display:none}
+  .cal{grid-template-columns:1fr;gap:6px}
+  .day.blank{display:none}
+  .day{min-height:0;flex-direction:row;flex-wrap:wrap;align-items:flex-start;padding:9px 11px}
+  .day .dh{width:62px;flex:none;flex-direction:column;align-items:flex-start;gap:2px}
+  .day .dh .n{font-size:15px}
+  .day .dh .cnt{margin-left:0}
+  .day .asg{flex:1;min-width:150px}
+  .day .cands{width:100%;margin-top:6px;padding-top:6px}
+  .day.closed .closedlbl{padding:2px 0;text-align:left}
+  .monthbar{position:sticky;top:0;background:var(--bg);z-index:10;padding:6px 0;margin-bottom:8px}
+  #monthLbl{font-size:16px;min-width:auto}
+  .grid2{gap:12px}
+}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
+<header class="top"><div class="top-in">
+  <h1>シフトを組む</h1><span class="sub">店長用</span>
+  <div class="tabs">
+    <button class="tab" data-v="in" aria-selected="false">① 希望を取り込む</button>
+    <button class="tab" data-v="cal" aria-selected="true">② シフトを組む</button>
+    <button class="tab" data-v="out" aria-selected="false">③ 書き出し・集計</button>
+    <button class="tab" id="openCfg" aria-selected="false">⚙ 設定</button>
+  </div>
+</div></header>
+
+<main>
+  <!-- ① 取り込み -->
+  <section class="view" id="v-in" data-off>
+    <div class="card" id="onlineCard" style="margin-bottom:16px" hidden>
+      <div class="card-h"><h2>スタッフから直接届いた希望</h2><span class="hint" id="onlineAt"></span></div>
+      <div class="card-b"><div class="row">
+        <button class="btn" id="pullBtn">今すぐ取り込む</button>
+        <span class="lbl" id="onlineMsg">1分ごとに自動で取り込みます。</span>
+      </div></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-h"><h2>LINEで届いた希望を貼り付ける</h2><span class="hint">何人ぶんまとめてでもOK</span></div>
+        <div class="card-b">
+          <textarea id="pasteIn" rows="12" placeholder="【シフト希望】2026年10月&#10;名前：田中&#10;&#10;× 3, 7&#10;午前のみ 5&#10;&#10;【シフト希望】2026年10月&#10;名前：佐藤&#10;すべて終日OK"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="readBtn">読み込む</button>
+            <button class="btn ghost sm" id="clearIn">消す</button>
+            <span class="lbl" id="inHint"></span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-h"><h2>読み取り結果</h2><span class="hint" id="readCount"></span></div>
+        <div class="card-b">
+          <div id="readList"><p class="note">左に貼り付けて「読み込む」を押してください。</p></div>
+          <div class="row" style="margin-top:12px" id="applyRow" hidden>
+            <button class="btn primary" id="applyBtn">この内容で登録する</button>
+            <span class="lbl">同じ人・同じ月の希望は上書きされます</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-h"><h2>提出の状況</h2><span class="hint" id="subMonth"></span></div>
+      <div class="card-b"><div id="subList"></div></div>
+    </div>
+  </section>
+
+  <!-- ② カレンダー -->
+  <section class="view" id="v-cal">
+    <div class="monthbar">
+      <button class="nav" id="prevM">←</button>
+      <span id="monthLbl" class="mono"></span>
+      <button class="nav" id="nextM">→</button>
+      <div class="spacer"></div>
+      <span class="stat" id="calStat"></span>
+      <button class="btn sm noprint" id="closeMode" aria-pressed="false">休業日を決める</button>
+      <button class="btn sm noprint" id="printBtn">印刷</button>
+    </div>
+    <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
+    <div class="cal" id="cal"></div>
+    <p class="note noprint">下の小さなボタンが希望を出している人です。押すとその日に入ります。入った名前をもう一度押すと外れます。
+      右上の数字は「入っている人数／必要な人数」。押すとその日だけ必要人数を変えられます。</p>
+  </section>
+
+  <!-- ③ 書き出し -->
+  <section class="view" id="v-out" data-off>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-h"><h2>LINEで配る文章</h2><button class="btn sm" id="copyShift" style="margin-left:auto">コピー</button></div>
+        <div class="card-b"><pre class="out" id="shiftText"></pre></div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-h"><h2>人ごとの集計</h2><span class="hint" id="sumMonth"></span></div>
+          <div class="card-b" style="padding:0 0 4px"><table class="tbl" id="sumTbl"></table></div>
+        </div>
+        <div class="card" style="margin-top:16px" id="pubCard" hidden>
+          <div class="card-h"><h2>スタッフに公開する</h2><span class="hint" id="pubAt"></span></div>
+          <div class="card-b"><div class="row">
+            <button class="btn primary" id="pubBtn">この月のシフトを公開</button>
+            <span class="lbl">スタッフのページの「確定シフト」に出ます</span>
+          </div></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-h"><h2>表計算ソフトに出す</h2></div>
+          <div class="card-b"><div class="row">
+            <button class="btn" id="csvBtn">CSVで書き出す</button>
+            <span class="lbl">Excel・スプレッドシートで開けます</span>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 設定 -->
+<div class="sheet" id="cfg" hidden><div class="sheet-in" role="dialog" aria-modal="true" aria-label="設定">
+  <div class="sheet-h"><h2>設定</h2><button class="btn sm ghost" id="cfgClose" style="margin-left:auto">閉じる</button></div>
+  <div class="sec">
+    <h3>スタッフから自動で受け取る</h3>
+    <div style="display:grid;gap:8px">
+      <div><div class="lbl">置き場所のURL（Apps Scriptのウェブアプリ）</div>
+        <input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%" spellcheck="false"></div>
+      <div class="row">
+        <div style="flex:1"><div class="lbl">合言葉（スタッフ用）</div><input type="text" id="cfgCode" style="width:100%" spellcheck="false"></div>
+        <div style="flex:1"><div class="lbl">管理用キー（店長用）</div><input type="text" id="cfgKey" style="width:100%" spellcheck="false"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn sm" id="cfgSave">保存してつなぐ</button>
+      <button class="btn sm ghost" id="cfgTest">つながるか試す</button>
+      <span class="lbl" id="cfgState"></span>
+    </div>
+    <p class="note">まだ置き場所を作っていない場合は <a href="./setup.html" target="_blank" rel="noopener">はじめの設定</a> を開いてください（10分ほど）。
+      空のままでも、LINEの貼り付けだけで使えます。</p>
+  </div>
+  <div class="sec">
+    <h3>スタッフ</h3>
+    <div id="staffList"></div>
+    <div class="row" style="margin-top:10px">
+      <input type="text" id="newStaff" placeholder="名前を入れて追加" style="flex:1">
+      <button class="btn sm" id="addStaff">追加</button>
+    </div>
+    <p class="note">希望を取り込むと、知らない名前は自動で追加されます。</p>
+  </div>
+  <div class="sec">
+    <h3>必要な人数（曜日ごとの既定）</h3>
+    <div class="needrow" id="needRow"></div>
+    <p class="note">0にした曜日は定休日として扱います。日ごとの調整はカレンダーの数字から。</p>
+  </div>
+  <div class="sec">
+    <h3>申請者ページ</h3>
+    <div class="row">
+      <button class="btn sm" id="copyStaffUrl">スタッフに送るURLをコピー</button>
+      <button class="btn sm ghost" id="copyAnn">お願いの文面をコピー</button>
+    </div>
+    <p class="note">このURLをLINEでスタッフに配ってください。スタッフはそこで希望を入力して、出てきた文章を送り返します。</p>
+  </div>
+  <div class="sec">
+    <h3>データ</h3>
+    <div class="row">
+      <button class="btn sm" id="backup">バックアップを保存</button>
+      <button class="btn sm" id="restoreBtn">読み込む</button>
+      <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+      <button class="btn sm danger" id="wipe">全部消す</button>
+    </div>
+    <p class="note">このパソコンのブラウザの中だけに保存されています。ときどきバックアップを取ってください。</p>
+  </div>
+</div></div>
+
+<script src="../shared/shift-format.js"></script>
+<script src="../shared/sync.js"></script>
+<script>
+(function(){
+"use strict";
+var F=window.ShiftFormat;
+var $=function(s){return document.querySelector(s)};
+var KEY="shiftadmin.v1";
+var DOWN=["日","月","火","水","木","金","土"];
+var COLORS=["#C4703A","#2F7A55","#4F5FA6","#9C3C5E","#7A4E95","#1F7A82","#8A6D1F","#B3352C","#3F6297","#5F7A2F"];
+function pad(n){return String(n).padStart(2,"0")}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function uid(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+
+var DB=load();
+function load(){
+  try{ var v=JSON.parse(localStorage.getItem(KEY)); if(v&&v.staff) return v }catch(e){}
+  return {staff:[],needDow:[0,2,2,2,2,2,2],months:{},sync:null};
+}
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(DB)) }catch(e){ toast("保存できませんでした") } }
+function mon(ym){ if(!DB.months[ym]) DB.months[ym]={need:{},closed:{},req:{},assign:{}}; return DB.months[ym] }
+function staffById(id){ return DB.staff.filter(function(s){return s.id===id})[0] }
+function staffByName(n){
+  var k=String(n).replace(/\s|　/g,"");
+  return DB.staff.filter(function(s){return s.name.replace(/\s|　/g,"")===k})[0];
+}
+function addStaff(name){
+  var s={id:uid(),name:String(name).trim(),color:COLORS[DB.staff.length%COLORS.length]};
+  DB.staff.push(s); return s;
+}
+
+if(DB.sync&&DB.sync.url&&window.Sync) Sync.configure(DB.sync);
+function syncOn(){ return !!(window.Sync&&Sync.isOn()) }
+
+var today=new Date();
+var view=new Date(today.getFullYear(),today.getMonth(),1);
+if(/^\d{4}-\d{2}$/.test(DB.lastYm||"")){ var lp=DB.lastYm.split("-"); view=new Date(+lp[0],+lp[1]-1,1) }
+function ym(){ return view.getFullYear()+"-"+pad(view.getMonth()+1) }
+function rememberMonth(){ DB.lastYm=ym(); save() }
+function needOf(d){
+  var m=mon(ym()), k=String(d);
+  if(m.need[k]!==undefined) return m.need[k];
+  return DB.needDow[new Date(view.getFullYear(),view.getMonth(),d).getDay()];
+}
+function isClosed(d){
+  var m=mon(ym());
+  if(m.closed[String(d)]!==undefined) return !!m.closed[String(d)];
+  return needOf(d)===0;
+}
+
+/* ================= ② カレンダー ================= */
+var closeMode=false;
+function renderCal(){
+  $("#monthLbl").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
+  var y=view.getFullYear(), m=view.getMonth();
+  var first=new Date(y,m,1).getDay(), last=new Date(y,m+1,0).getDate();
+  var M=mon(ym()), html="", short=0, total=0;
+  for(var i=0;i<first;i++) html+='<div class="day blank"></div>';
+  for(var d=1;d<=last;d++){
+    var dow=new Date(y,m,d).getDay(), key=String(d);
+    var closed=isClosed(d), need=needOf(d);
+    var asg=M.assign[key]||[];
+    total+=asg.length;
+    var lack=!closed&&asg.length<need;
+    if(lack) short++;
+    var isToday=(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate());
+    html+='<div class="day s'+dow+(closed?" closed":"")+(lack?" short":"")+'" data-d="'+d+'">'+
+      '<div class="dh"><span class="n'+(isToday?" today":"")+'">'+d+'<span class="dw">('+DOWN[dow]+')</span></span>'+
+        (closed?'<span class="cnt">休</span>'
+               :'<span class="cnt '+(lack?"short":(asg.length>=need?"full":""))+'" data-act="need">'+asg.length+"/"+need+'</span>')+
+      '</div>';
+    if(closed){ html+='<div class="closedlbl">休業</div>' }
+    else{
+      html+='<div class="asg">'+asg.map(function(a){
+        var st=staffById(a.s); if(!st) return "";
+        return '<span class="who" style="--c:'+st.color+'" data-act="del" data-s="'+a.s+'">'+
+          esc(st.name)+'<span class="t">'+esc(a.label)+'</span></span>';
+      }).join("")+'</div>';
+      html+='<div class="cands">'+cands(d).map(function(c){
+        return '<button class="cand" data-act="add" data-s="'+c.id+'" data-k="'+c.kind+'" title="'+esc(c.title)+'">'+
+          esc(c.name)+(c.mark?'<span> '+c.mark+'</span>':'')+'</button>';
+      }).join("")+'</div>';
+    }
+    html+='</div>';
+  }
+  $("#cal").innerHTML=html;
+  $("#calStat").innerHTML='のべ <b>'+total+'</b> 人 ・ '+
+    (short?'<span class="short">人手が足りない日 <b>'+short+'</b></span>':'<span>過不足なし</span>');
+}
+/* その日に入れられる人 */
+function cands(d){
+  var M=mon(ym()), key=String(d);
+  var taken={}; (M.assign[key]||[]).forEach(function(a){ taken[a.s]=1 });
+  var out=[];
+  DB.staff.forEach(function(s){
+    if(taken[s.id]) return;
+    var r=M.req[s.id];
+    if(!r){ out.push({id:s.id,name:s.name,kind:"none",mark:"?",title:"希望が未提出"}); return }
+    var c=r.days[key]||"ok";
+    if(c==="ng") return;
+    if(F.isTime(c)) out.push({id:s.id,name:s.name,kind:"tm",mark:F.timeText(c),title:F.timeText(c)});
+    else if(c==="am") out.push({id:s.id,name:s.name,kind:"am",mark:"午前",title:"午前のみ"});
+    else if(c==="pm") out.push({id:s.id,name:s.name,kind:"pm",mark:"午後",title:"午後のみ"});
+    else out.push({id:s.id,name:s.name,kind:"ok",mark:"",title:"終日OK"});
+  });
+  return out;
+}
+function labelFor(sid,d){
+  var r=mon(ym()).req[sid];
+  var c=r?(r.days[String(d)]||"ok"):"ok";
+  if(F.isTime(c)) return F.timeText(c);
+  return c==="am"?"午前":c==="pm"?"午後":"終日";
+}
+$("#cal").addEventListener("click",function(e){
+  var day=e.target.closest(".day[data-d]"); if(!day) return;
+  var d=+day.dataset.d, M=mon(ym()), key=String(d);
+  if(closeMode){
+    M.closed[key]=!isClosed(d); save(); renderCal(); return;
+  }
+  var el=e.target.closest("[data-act]"); if(!el) return;
+  var act=el.dataset.act;
+  if(act==="add"){
+    (M.assign[key]=M.assign[key]||[]).push({s:el.dataset.s,label:labelFor(el.dataset.s,d)});
+    save(); renderCal(); return;
+  }
+  if(act==="del"){
+    M.assign[key]=(M.assign[key]||[]).filter(function(a){return a.s!==el.dataset.s});
+    save(); renderCal(); return;
+  }
+  if(act==="need"){
+    var v=prompt((view.getMonth()+1)+"月"+d+"日に必要な人数",String(needOf(d)));
+    if(v===null) return;
+    var n=parseInt(v,10);
+    if(isNaN(n)||n<0){ toast("数字を入れてください"); return }
+    M.need[key]=n; save(); renderCal(); return;
+  }
+});
+$("#prevM").addEventListener("click",function(){ view.setMonth(view.getMonth()-1); rememberMonth(); renderAll() });
+$("#nextM").addEventListener("click",function(){ view.setMonth(view.getMonth()+1); rememberMonth(); renderAll() });
+$("#closeMode").addEventListener("click",function(){
+  closeMode=!closeMode; this.setAttribute("aria-pressed",String(closeMode));
+  this.textContent=closeMode?"終わる（日を押すと休業）":"休業日を決める";
+});
+$("#printBtn").addEventListener("click",function(){ window.print() });
+
+/* ================= ① 取り込み ================= */
+var parsed=[];
+$("#readBtn").addEventListener("click",function(){
+  var t=$("#pasteIn").value.trim();
+  if(!t){ toast("LINEの文章を貼り付けてください"); return }
+  parsed=F.parseRequests(t,view.getFullYear());
+  renderParsed();
+});
+$("#clearIn").addEventListener("click",function(){ $("#pasteIn").value=""; parsed=[]; renderParsed() });
+function renderParsed(){
+  var box=$("#readList");
+  if(!parsed.length){ box.innerHTML='<p class="note">読み取れませんでした。名前の行（名前：◯◯）が入っているか確かめてください。</p>';
+    $("#applyRow").hidden=true; $("#readCount").textContent=""; return }
+  box.innerHTML=parsed.map(function(p,i){
+    var n={ng:0,am:0,pm:0,tm:0};
+    Object.keys(p.days).forEach(function(k){var c=p.days[k];if(F.isTime(c))n.tm++;else if(n[c]!==undefined)n[c]++});
+    var known=staffByName(p.name);
+    var mm=p.month||ym();
+    return '<div class="prow">'+
+      '<span class="nm">'+esc(p.name||"（名前なし）")+'</span>'+
+      '<span class="badge '+(known?"c-ok":"c-am")+'">'+(known?"登録済み":"新しい人")+'</span>'+
+      '<span class="sm mono">'+esc(mm.replace("-","年")+"月")+'</span>'+
+      '<span class="sm">×'+n.ng+' 午前'+n.am+' 午後'+n.pm+' 時間'+n.tm+'</span>'+
+      (p.note?'<span class="sm" style="width:100%">メモ：'+esc(p.note)+'</span>':'')+
+      (p.name?'':'<span class="sm" style="color:var(--warn);width:100%">名前が読み取れません。この人は登録できません。</span>')+
+    '</div>';
+  }).join("");
+  $("#readCount").textContent=parsed.length+"人ぶん";
+  $("#applyRow").hidden=false;
+}
+$("#applyBtn").addEventListener("click",function(){
+  var n=0, tally={};
+  parsed.forEach(function(p){
+    if(!p.name) return;
+    var st=staffByName(p.name)||addStaff(p.name);
+    var mk=p.month||ym();
+    mon(mk).req[st.id]={days:p.days,note:p.note||"",at:new Date().toISOString()};
+    tally[mk]=(tally[mk]||0)+1; n++;
+  });
+  /* いちばん多かった月に画面を合わせる（別の月を見ていて気づかない、を防ぐ） */
+  var top="", best=0;
+  Object.keys(tally).forEach(function(k){ if(tally[k]>best){best=tally[k];top=k} });
+  var moved=false;
+  if(top && top!==ym()){ var p2=top.split("-"); view=new Date(+p2[0],+p2[1]-1,1); moved=true }
+  DB.lastYm=ym(); save(); parsed=[]; $("#pasteIn").value=""; renderParsed(); renderAll();
+  toast(n+"人ぶんを登録しました"+(moved?"（"+(view.getMonth()+1)+"月の画面に切り替えました）":""));
+});
+function renderSubmissions(){
+  var M=mon(ym());
+  $("#subMonth").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
+  if(!DB.staff.length){ $("#subList").innerHTML='<p class="note">まだスタッフがいません。希望を取り込むか、⚙設定から追加してください。</p>'; return }
+  var rows=DB.staff.map(function(s){
+    var r=M.req[s.id];
+    var n=0; if(r) Object.keys(r.days).forEach(function(k){ if(r.days[k]==="ng") n++ });
+    return '<tr><td><span class="dot" style="background:'+s.color+'"></span>'+esc(s.name)+'</td>'+
+      '<td>'+(r?'<span class="badge c-ok">提出ずみ</span>':'<span class="badge c-ng">未提出</span>')+'</td>'+
+      '<td class="mono">'+(r?"×"+n+"日":"—")+'</td>'+
+      '<td class="sm">'+(r&&r.note?esc(r.note):"")+'</td></tr>';
+  }).join("");
+  $("#subList").innerHTML='<table class="tbl"><tr><th>名前</th><th>提出</th><th>出られない日</th><th>メモ</th></tr>'+rows+'</table>';
+}
+
+/* ================= ③ 書き出し ================= */
+function shiftLines(){
+  var y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate(), M=mon(ym());
+  var out=[];
+  for(var d=1;d<=last;d++){
+    var dow=DOWN[new Date(y,m,d).getDay()];
+    if(isClosed(d)){ out.push(d+"日("+dow+") 休業"); continue }
+    var a=(M.assign[String(d)]||[]).map(function(x){
+      var st=staffById(x.s); return st?st.name+(x.label&&x.label!=="終日"?"("+x.label+")":""):"";
+    }).filter(Boolean);
+    out.push(d+"日("+dow+") "+(a.length?a.join("、"):"—"));
+  }
+  return out;
+}
+function renderOut(){
+  $("#sumMonth").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
+  $("#shiftText").textContent="【"+view.getFullYear()+"年"+(view.getMonth()+1)+"月のシフト】\n"+shiftLines().join("\n");
+  var M=mon(ym()), y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate();
+  var tally={};
+  DB.staff.forEach(function(s){ tally[s.id]={d:0,am:0,pm:0,tm:0} });
+  for(var d=1;d<=last;d++) (M.assign[String(d)]||[]).forEach(function(a){
+    var t=tally[a.s]; if(!t) return;
+    t.d++;
+    if(a.label==="午前") t.am++; else if(a.label==="午後") t.pm++; else if(/\d/.test(a.label)) t.tm++;
+  });
+  $("#sumTbl").innerHTML='<tr><th>名前</th><th>出勤</th><th>午前</th><th>午後</th><th>時間指定</th></tr>'+
+    DB.staff.map(function(s){
+      var t=tally[s.id];
+      return '<tr><td><span class="dot" style="background:'+s.color+'"></span>'+esc(s.name)+'</td>'+
+        '<td class="mono">'+t.d+'日</td><td class="mono">'+t.am+'</td><td class="mono">'+t.pm+'</td><td class="mono">'+t.tm+'</td></tr>';
+    }).join("");
+}
+$("#copyShift").addEventListener("click",async function(){
+  try{ await navigator.clipboard.writeText($("#shiftText").textContent); toast("コピーしました") }
+  catch(e){ toast("コピーできませんでした") }
+});
+function download(name,text,type){
+  var url=URL.createObjectURL(new Blob([text],{type:type||"text/plain;charset=utf-8"}));
+  var a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove() },1500);
+}
+$("#csvBtn").addEventListener("click",function(){
+  var y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate(), M=mon(ym());
+  var q=function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"'};
+  var rows=[["日付","曜日","状態","スタッフ","時間帯"].map(q).join(",")];
+  for(var d=1;d<=last;d++){
+    var date=y+"-"+pad(m+1)+"-"+pad(d), dow=DOWN[new Date(y,m,d).getDay()];
+    if(isClosed(d)){ rows.push([date,dow,"休業","",""].map(q).join(",")); continue }
+    var a=M.assign[String(d)]||[];
+    if(!a.length){ rows.push([date,dow,"未割当","",""].map(q).join(",")); continue }
+    a.forEach(function(x){ var st=staffById(x.s); rows.push([date,dow,"出勤",st?st.name:"",x.label].map(q).join(",")) });
+  }
+  download("シフト_"+y+"-"+pad(m+1)+".csv","﻿"+rows.join("\r\n"),"text/csv;charset=utf-8");
+  toast("CSVを書き出しました");
+});
+
+/* ================= 設定 ================= */
+function renderStaff(){
+  if(!DB.staff.length){ $("#staffList").innerHTML='<p class="note">まだ登録がありません。</p>'; return }
+  $("#staffList").innerHTML='<table class="tbl">'+DB.staff.map(function(s){
+    return '<tr><td><span class="dot" style="background:'+s.color+'"></span>'+esc(s.name)+'</td>'+
+      '<td style="text-align:right"><button class="btn sm ghost" data-ren="'+s.id+'">名前</button>'+
+      '<button class="btn sm ghost" data-del="'+s.id+'">削除</button></td></tr>';
+  }).join("")+'</table>';
+}
+$("#staffList").addEventListener("click",function(e){
+  var r=e.target.closest("[data-ren]"), d=e.target.closest("[data-del]");
+  if(r){ var s=staffById(r.dataset.ren); var v=prompt("名前",s.name); if(v&&v.trim()){ s.name=v.trim(); save(); renderAll() } }
+  if(d){ var st=staffById(d.dataset.del);
+    if(!confirm(st.name+" さんを削除します。この人の希望と割り当ても消えます。よろしいですか？")) return;
+    DB.staff=DB.staff.filter(function(x){return x.id!==st.id});
+    Object.keys(DB.months).forEach(function(k){
+      delete DB.months[k].req[st.id];
+      Object.keys(DB.months[k].assign).forEach(function(d2){
+        DB.months[k].assign[d2]=DB.months[k].assign[d2].filter(function(a){return a.s!==st.id});
+      });
+    });
+    save(); renderAll();
+  }
+});
+$("#addStaff").addEventListener("click",function(){
+  var v=$("#newStaff").value.trim(); if(!v) return;
+  if(staffByName(v)){ toast("同じ名前の人がいます"); return }
+  addStaff(v); $("#newStaff").value=""; save(); renderAll();
+});
+function renderNeed(){
+  $("#needRow").innerHTML=DOWN.map(function(w,i){
+    return '<div><label>'+w+'</label><input type="text" inputmode="numeric" data-dow="'+i+'" value="'+DB.needDow[i]+'"></div>';
+  }).join("");
+}
+$("#needRow").addEventListener("change",function(e){
+  var el=e.target.closest("[data-dow]"); if(!el) return;
+  var n=parseInt(el.value,10); if(isNaN(n)||n<0) n=0;
+  DB.needDow[+el.dataset.dow]=n; el.value=n; save(); renderCal();
+});
+$("#openCfg").addEventListener("click",function(){
+  renderStaff(); renderNeed();
+  $("#cfgUrl").value=(DB.sync&&DB.sync.url)||"";
+  $("#cfgCode").value=(DB.sync&&DB.sync.code)||"";
+  $("#cfgKey").value=(DB.sync&&DB.sync.key)||"";
+  renderSyncUI(); $("#cfg").hidden=false;
+});
+$("#cfgClose").addEventListener("click",function(){ $("#cfg").hidden=true });
+$("#cfg").addEventListener("click",function(e){ if(e.target===this) this.hidden=true });
+/* スタッフが希望を出すページ。別アプリとして /shift/ に置いてある。 */
+var STAFF_APP="https://keiki-takemoto.github.io/shift/";
+function staffUrl(){
+  var base=(location.hostname==="localhost")
+    ? location.origin+"/"                       /* 手元で試すとき */
+    : STAFF_APP;
+  if(DB.sync&&DB.sync.url){
+    try{ return base+"?c="+encodeURIComponent(btoa(JSON.stringify({u:DB.sync.url,c:DB.sync.code||""}))) }catch(e){}
+  }
+  return base;
+}
+$("#copyStaffUrl").addEventListener("click",async function(){
+  var u=staffUrl();
+  try{ await navigator.clipboard.writeText(u); toast("コピーしました") }catch(e){ prompt("このURLをコピーしてください",u) }
+});
+$("#copyAnn").addEventListener("click",async function(){
+  var u=staffUrl();
+  var nm=new Date(view.getFullYear(),view.getMonth()+1,1);
+  var t="【"+(nm.getMonth()+1)+"月のシフト希望】\nこちらから入力して、出てきた文章をこのトークに送ってください。\n"+u+"\n\n締切：今月20日まで";
+  try{ await navigator.clipboard.writeText(t); toast("コピーしました") }catch(e){ prompt("コピーしてください",t) }
+});
+$("#backup").addEventListener("click",function(){
+  download("シフト_バックアップ_"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(DB,null,1),"application/json");
+  toast("バックアップを保存しました");
+});
+$("#restoreBtn").addEventListener("click",function(){ $("#restoreFile").click() });
+$("#restoreFile").addEventListener("change",function(){
+  var f=this.files&&this.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var d=JSON.parse(r.result);
+      if(!d||!Array.isArray(d.staff)) throw new Error("形式が違います");
+      if(!confirm("今のデータを、読み込んだ内容で置き換えます。よろしいですか？")) return;
+      DB=d; if(!DB.months) DB.months={}; if(!DB.needDow) DB.needDow=[0,2,2,2,2,2,2];
+      save(); renderAll(); renderStaff(); renderNeed(); toast("読み込みました");
+    }catch(e){ toast("読み込めませんでした") }
+  };
+  r.readAsText(f); this.value="";
+});
+$("#wipe").addEventListener("click",function(){
+  if(!confirm("スタッフも希望もシフトも、全部消します。取り消せません。よろしいですか？")) return;
+  DB={staff:[],needDow:[0,2,2,2,2,2,2],months:{}}; save(); renderAll(); renderStaff(); renderNeed(); toast("消しました");
+});
+
+/* ================= オンライン受信 ================= */
+var lastPull=0, pulling=false;
+async function pull(silent){
+  if(!syncOn()||pulling) return;
+  pulling=true;
+  if(!silent) $("#onlineMsg").textContent="取り込んでいます…";
+  try{
+    /* 月を絞らずに全部取りにいく。別の月を見ていても取りこぼさないため。 */
+    var r=await Sync.listRequests("");
+    var changed=[], others={};
+    (r.items||[]).forEach(function(it){
+      if(!it.name||!/^\d{4}-\d{2}$/.test(it.month||"")) return;
+      var st=staffByName(it.name)||addStaff(it.name);
+      var m=mon(it.month), cur=m.req[st.id];
+      if(cur&&cur.at===it.at) return;
+      m.req[st.id]={days:it.days||{},note:it.note||"",at:it.at};
+      changed.push(st.name+(it.month===ym()?"":"（"+(+it.month.split("-")[1])+"月）"));
+      if(it.month!==ym()) others[it.month]=1;
+    });
+    lastPull=Date.now();
+    if(changed.length){
+      save(); renderAll();
+      var ks=Object.keys(others);
+      toast(changed.join("、")+" の希望が届きました"+(ks.length?"（"+ks.map(function(k){return (+k.split("-")[1])+"月"}).join("・")+"の画面で見られます）":""));
+    }
+    $("#onlineAt").textContent="最終確認 "+new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"});
+    $("#onlineMsg").textContent=changed.length?changed.length+"人ぶん取り込みました。":"新しい希望はありません。1分ごとに自動で確認します。";
+  }catch(e){
+    $("#onlineMsg").textContent=(e&&e.code==="offline")?"つながりませんでした。ネットワークを確認してください。"
+      :((e&&e.message)||"取り込めませんでした");
+  }finally{ pulling=false }
+}
+$("#pullBtn").addEventListener("click",function(){ pull(false) });
+setInterval(function(){
+  if(syncOn()&&document.visibilityState==="visible"&&Date.now()-lastPull>55000) pull(true);
+},60000);
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible"&&syncOn()&&Date.now()-lastPull>30000) pull(true);
+});
+
+/* 公開 */
+$("#pubBtn").addEventListener("click",async function(){
+  if(!syncOn()){ toast("先に⚙設定で置き場所をつないでください"); return }
+  var b=this; b.disabled=true; b.textContent="公開しています…";
+  try{
+    var M=mon(ym()), y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate();
+    var days={}, closed=[];
+    for(var d=1;d<=last;d++){
+      if(isClosed(d)){ closed.push(d); continue }
+      var a=(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:x.label}:null }).filter(Boolean);
+      if(a.length) days[String(d)]=a;
+    }
+    await Sync.publishShift(ym(),days,closed);
+    $("#pubAt").textContent="公開ずみ "+new Date().toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+    toast("スタッフに公開しました");
+  }catch(e){ toast((e&&e.message)||"公開できませんでした") }
+  finally{ b.disabled=false; b.textContent="この月のシフトを公開" }
+});
+
+/* 接続の設定 */
+function renderSyncUI(){
+  var on=syncOn();
+  $("#onlineCard").hidden=!on;
+  $("#pubCard").hidden=!on;
+  $("#cfgState").textContent=on?"つないでいます":"未接続（LINEの貼り付けのみ）";
+}
+$("#cfgSave").addEventListener("click",function(){
+  var u=$("#cfgUrl").value.trim();
+  DB.sync=u?{url:u,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()}:null;
+  save(); if(window.Sync) Sync.configure(DB.sync);
+  renderSyncUI(); toast(u?"保存しました":"接続をやめました");
+  if(u) pull(false);
+});
+$("#cfgTest").addEventListener("click",async function(){
+  var u=$("#cfgUrl").value.trim();
+  if(!u){ toast("URLを入れてください"); return }
+  var keep=DB.sync;
+  if(window.Sync) Sync.configure({url:u,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()});
+  $("#cfgState").textContent="試しています…";
+  try{
+    await Sync.ping();
+    await Sync.listRequests(ym());
+    $("#cfgState").textContent="つながりました";
+  }catch(e){
+    $("#cfgState").textContent=(e&&e.message)||"つながりませんでした";
+    if(window.Sync) Sync.configure(keep);
+  }
+});
+
+/* ================= タブ・共通 ================= */
+document.querySelector(".tabs").addEventListener("click",function(e){
+  var b=e.target.closest(".tab[data-v]"); if(!b) return;
+  ["in","cal","out"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  this.querySelectorAll(".tab[data-v]").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
+  if(b.dataset.v==="out") renderOut();
+  if(b.dataset.v==="in") renderSubmissions();
+});
+var toastEl=null,tt=null;
+function toast(m){
+  if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }
+  toastEl.textContent=m; toastEl.hidden=false;
+  clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3200);
+}
+function renderAll(){ renderCal(); renderSubmissions(); renderOut(); }
+renderAll(); renderSyncUI();
+if(syncOn()) pull(true);
+if("serviceWorker" in navigator) window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+})();
+</script>
+</body>
+</html>

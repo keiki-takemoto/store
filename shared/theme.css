@@ -1,0 +1,88 @@
+/* 申請者ページと管理者ページで共通の見た目 */
+:root{
+  --bg:#FAF8F4; --surface:#FFFFFF; --surface-2:#F3F0E9; --surface-3:#E9E4D9;
+  --line:#E4DFD4; --line-2:#CFC8B8;
+  --ink:#1B1A17; --ink-2:#57534A; --ink-3:#8B857A;
+  --accent:#27496D; --accent-ink:#FFFFFF; --accent-2:#E3EAF2;
+  --ok:#2F7A55;   --ok-bg:#E1EFE6;
+  --am:#A9631A;   --am-bg:#F7E9D8;
+  --pm:#4F5FA6;   --pm-bg:#E4E7F6;
+  --tm:#7A4E95;   --tm-bg:#EFE4F4;
+  --ng:#AE322A;   --ng-bg:#F7E1DF;
+  --sun:#B5443C;  --sat:#3F6297;
+  --warn:#B85C22; --warn-bg:#FBEADC;
+  --shadow:0 1px 2px rgba(40,34,20,.06),0 8px 22px rgba(40,34,20,.05);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+  --ui:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#141410; --surface:#1C1B17; --surface-2:#24231D; --surface-3:#2D2C24;
+  --line:#37352C; --line-2:#4A4739;
+  --ink:#F0EBDF; --ink-2:#ACA696; --ink-3:#847E70;
+  --accent:#8DB4DA; --accent-ink:#10202F; --accent-2:#22323F;
+  --ok:#7CC49B; --ok-bg:#1C3227;
+  --am:#DFA164; --am-bg:#37281A;
+  --pm:#96A3E0; --pm-bg:#232742;
+  --tm:#C29BDA; --tm-bg:#332740;
+  --ng:#E8857C; --ng-bg:#3A221F;
+  --sun:#E08880; --sat:#8FADDD;
+  --warn:#E09256; --warn-bg:#3A2A1B;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 22px rgba(0,0,0,.3);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#141410; --surface:#1C1B17; --surface-2:#24231D; --surface-3:#2D2C24;
+  --line:#37352C; --line-2:#4A4739;
+  --ink:#F0EBDF; --ink-2:#ACA696; --ink-3:#847E70;
+  --accent:#8DB4DA; --accent-ink:#10202F; --accent-2:#22323F;
+  --ok:#7CC49B; --ok-bg:#1C3227; --am:#DFA164; --am-bg:#37281A;
+  --pm:#96A3E0; --pm-bg:#232742; --tm:#C29BDA; --tm-bg:#332740;
+  --ng:#E8857C; --ng-bg:#3A221F; --sun:#E08880; --sat:#8FADDD;
+  --warn:#E09256; --warn-bg:#3A2A1B; color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.7;
+  -webkit-text-size-adjust:100%}
+h1,h2,h3{margin:0;font-weight:700;line-height:1.35;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.btn{border:1px solid var(--line-2);background:var(--surface);border-radius:9px;padding:9px 15px;cursor:pointer;
+  font-size:14px;font-weight:500}
+a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center;justify-content:center}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink-2)}
+.btn.ghost:hover{background:var(--surface-2);color:var(--ink)}
+.btn.sm{padding:6px 11px;font-size:13px;border-radius:8px}
+.btn.danger{color:var(--ng);border-color:var(--ng)}
+.chip{border:1px solid var(--line-2);background:transparent;border-radius:999px;padding:5px 12px;font-size:13px;
+  cursor:pointer;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;gap:9px;padding:12px 15px;border-bottom:1px solid var(--line)}
+.card-h h2{font-size:14px}
+.card-h .hint{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
+.card-b{padding:14px 15px 16px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lbl{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+input[type=text],input[type=time],select,textarea{border:1px solid var(--line-2);background:var(--surface-2);
+  border-radius:9px;padding:9px 11px;font-size:16px;max-width:100%}
+textarea{width:100%;line-height:1.7;resize:vertical}
+
+/* 希望の状態 */
+.c-ok{color:var(--ok);background:var(--ok-bg)}
+.c-am{color:var(--am);background:var(--am-bg)}
+.c-pm{color:var(--pm);background:var(--pm-bg)}
+.c-tm{color:var(--tm);background:var(--tm-bg)}
+.c-ng{color:var(--ng);background:var(--ng-bg)}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 96px);
+  background:var(--ink);color:var(--bg);padding:10px 17px;border-radius:999px;font-size:13.5px;z-index:90;
+  box-shadow:var(--shadow);max-width:92vw;text-align:center}

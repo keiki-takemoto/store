@@ -11,6 +11,18 @@
   `TILES` に `url` があるタイルはリンクになる。
 - 携帯で見る前提。2列固定で、広い画面では中央に寄せる。
 
+## 中身があるもの
+
+- `shift/` … シフト管理（店長用）。もとは shift リポジトリの `admin/` にあったものを引っ越した。
+  - `shared/` の3ファイル（theme.css / shift-format.js / sync.js）は
+    スタッフ用アプリ（github.com/keiki-takemoto/shift）と**同じものを両方に置いてある**。
+    書式や通信を直すときは両方直すこと。
+  - スタッフが希望を出すページは別アプリのまま（https://keiki-takemoto.github.io/shift/ ）。
+    その場所は `shift/index.html` の `STAFF_APP` に書いてある。
+  - 置き場所（Googleスプレッドシート＋Apps Script）の手順は `shift/setup.html`、
+    サーバーのコードは `server/Code.gs`。
+  - 電話の幅（640px以下）では7列のカレンダーをやめ、日ごとの縦並びに切り替わる。
+
 ## これから作るとき
 
 - タイルを増やす・名前を変えるのは `index.html` の `TILES` の並びだけ。
