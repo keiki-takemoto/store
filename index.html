@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>店舗管理</title>
+<meta name="description" content="売上・経費・在庫・予約・レジをまとめて見るための店舗管理アプリ。">
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#2BA55F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="店舗管理">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
+<style>
+:root{
+  --green:#2BA55F; --green-d:#218B4F; --green-ink:#FFFFFF;
+  --bg:#F2F2F2; --card:#FFFFFF; --line:#E6E6E6;
+  --ink:#1B1B1B; --ink-2:#6B6B6B; --ink-3:#9A9A9A;
+  --shadow:0 1px 3px rgba(0,0,0,.07), 0 1px 1px rgba(0,0,0,.04);
+  --ui:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --green:#248F53; --green-d:#1C7443;
+  --bg:#121212; --card:#1D1D1D; --line:#2C2C2C;
+  --ink:#F0F0F0; --ink-2:#A8A8A8; --ink-3:#7A7A7A;
+  --shadow:0 1px 3px rgba(0,0,0,.5);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --green:#248F53; --green-d:#1C7443; --bg:#121212; --card:#1D1D1D; --line:#2C2C2C;
+  --ink:#F0F0F0; --ink-2:#A8A8A8; --ink-3:#7A7A7A; --shadow:0 1px 3px rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--ui);font-size:15px;line-height:1.6;
+  -webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:3px solid var(--green);outline-offset:2px;border-radius:10px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ヘッダー */
+.top{background:var(--green);color:var(--green-ink);
+  padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 14px;position:sticky;top:0;z-index:20}
+.top-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:10px;min-height:38px}
+.top h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.02em;
+  position:absolute;left:50%;transform:translateX(-50%);pointer-events:none}
+@media (max-width:420px){.top h1{font-size:19px}}
+.seg{margin-left:auto;display:flex;gap:2px;background:rgba(255,255,255,.22);border-radius:999px;padding:3px;position:relative}
+.seg button{border:none;background:transparent;color:rgba(255,255,255,.92);border-radius:999px;
+  padding:6px 14px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--green);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+@media (max-width:440px){.seg{padding:2px}.seg button{padding:5px 10px;font-size:12.5px}}
+@media (max-width:360px){.top h1{font-size:18px}.seg button{padding:5px 8px;font-size:12px}}
+
+/* タイル */
+main{max-width:1180px;margin:0 auto;
+  padding:18px 14px calc(env(safe-area-inset-bottom,0px) + 36px)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+body[data-size="ipad"] .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+body[data-size="pc"] .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:520px){ body[data-size="ipad"] .grid,body[data-size="pc"] .grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+  padding:26px 14px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  cursor:pointer;text-align:center;min-height:168px;transition:transform .12s, box-shadow .12s}
+.tile:hover{box-shadow:0 4px 14px rgba(0,0,0,.09)}
+.tile:active{transform:scale(.985)}
+.tile .ic{font-size:40px;line-height:1.1;margin-bottom:6px}
+.tile .nm{color:var(--green);font-weight:700;font-size:19px;letter-spacing:.01em}
+.tile .ds{color:var(--ink-2);font-size:13.5px;line-height:1.5;word-break:auto-phrase}
+body[data-size="pc"] .tile{min-height:150px;padding:22px 12px 18px}
+body[data-size="pc"] .tile .ic{font-size:34px}
+body[data-size="pc"] .tile .nm{font-size:17px}
+
+/* これから作る、の知らせ */
+.sheet{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(0,0,0,.4)}
+.sheet-in{background:var(--card);width:100%;max-width:520px;border-radius:18px 18px 0 0;
+  padding:22px 20px calc(env(safe-area-inset-bottom,0px) + 22px);text-align:center}
+@media (min-width:640px){.sheet{align-items:center}.sheet-in{border-radius:18px}}
+.sheet-in .ic{font-size:44px;line-height:1}
+.sheet-in h2{margin:10px 0 4px;font-size:19px;color:var(--green)}
+.sheet-in p{margin:0 0 4px;color:var(--ink-2);font-size:14px}
+.sheet-in .soon{display:inline-block;margin-top:14px;background:var(--bg);color:var(--ink-2);
+  border-radius:999px;padding:5px 14px;font-size:12.5px}
+.sheet-in button{margin-top:18px;width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;
+  padding:13px;font-size:16px;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body data-size="mobile">
+<header class="top">
+  <div class="top-in">
+    <h1>ホーム</h1>
+    <div class="seg" id="seg" role="group" aria-label="表示の大きさ">
+      <button data-size="mobile" aria-pressed="true">携帯</button>
+      <button data-size="ipad" aria-pressed="false">iPad</button>
+      <button data-size="pc" aria-pressed="false">PC</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-in" role="dialog" aria-modal="true" aria-labelledby="sTitle">
+    <div class="ic" id="sIcon"></div>
+    <h2 id="sTitle"></h2>
+    <p id="sDesc"></p>
+    <span class="soon">この画面はこれから作ります</span>
+    <button id="sClose">閉じる</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var TILES=[
+  {k:"sum",   ic:"📋", nm:"集計",       ds:"日別の売上集計"},
+  {k:"cost",  ic:"💰", nm:"経費",       ds:"変動費・固定費・お給料"},
+  {k:"pl",    ic:"📊", nm:"収支表",     ds:"売上・利益の集計"},
+  {k:"stock", ic:"📦", nm:"在庫管理",   ds:"商品の在庫・発注管理"},
+  {k:"book",  ic:"📅", nm:"予約管理",   ds:"テーブル予約の登録・管理"},
+  {k:"pos",   ic:"🧾", nm:"takeレジ",   ds:"注文・会計・メニュー・QR発行"},
+  {k:"export",ic:"📤", nm:"エクスポート", ds:"税理士・確定申告用の出力"},
+  {k:"cfg",   ic:"⚙️", nm:"設定",       ds:"各種設定"}
+];
+var K_SIZE="store.size.v1";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+$("#grid").innerHTML=TILES.map(function(t){
+  return '<button class="tile" data-k="'+t.k+'">'+
+    '<span class="ic">'+t.ic+'</span>'+
+    '<span class="nm">'+esc(t.nm)+'</span>'+
+    '<span class="ds">'+esc(t.ds)+'</span></button>';
+}).join("");
+
+$("#grid").addEventListener("click",function(e){
+  var b=e.target.closest(".tile"); if(!b) return;
+  var t=TILES.filter(function(x){return x.k===b.dataset.k})[0]; if(!t) return;
+  $("#sIcon").textContent=t.ic; $("#sTitle").textContent=t.nm; $("#sDesc").textContent=t.ds;
+  $("#sheet").hidden=false;
+});
+$("#sClose").addEventListener("click",function(){ $("#sheet").hidden=true });
+$("#sheet").addEventListener("click",function(e){ if(e.target===this) this.hidden=true });
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") $("#sheet").hidden=true });
+
+/* 表示の大きさ（携帯／iPad／PC）。選んだものを覚える。 */
+function setSize(s){
+  document.body.dataset.size=s;
+  $("#seg").querySelectorAll("button").forEach(function(b){ b.setAttribute("aria-pressed",String(b.dataset.size===s)) });
+  try{ localStorage.setItem(K_SIZE,s) }catch(e){}
+}
+$("#seg").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-size]"); if(b) setSize(b.dataset.size);
+});
+var saved=null; try{ saved=localStorage.getItem(K_SIZE) }catch(e){}
+setSize(saved==="ipad"||saved==="pc"?saved:(window.innerWidth>=1100?"pc":(window.innerWidth>=760?"ipad":"mobile")));
+
+if("serviceWorker" in navigator) window.addEventListener("load",function(){ navigator.serviceWorker.register("./sw.js").catch(function(){}) });
+})();
+</script>
+</body>
+</html>
