@@ -160,16 +160,14 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <section class="view" id="v-cal" data-off>
     <div class="row noprint" style="margin-bottom:10px">
       <button class="btn sm" id="closeMode" aria-pressed="false">休業日を決める</button>
-      <button class="btn sm" id="copyShift">LINEに貼る文をコピー</button>
-      <button class="btn sm" id="csvBtn">CSV</button>
-      <button class="btn sm" id="printBtn">印刷</button>
-      <button class="btn sm primary" id="pubBtn" hidden>スタッフに公開</button>
+      <button class="btn sm primary" id="pubBtn">確定</button>
       <span class="lbl" id="pubAt"></span>
     </div>
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="cal"></div>
     <p class="note noprint">小さなボタンが希望を出している人です。押すとその日に入り、入った名前をもう一度押すと外れます。
-      日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。</p>
+      日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。<br>
+      決まったら<b>「確定」</b>を押すと、スタッフのページの「確定シフト」に出ます。直して押し直せば上書きされます。</p>
 
     <div class="card noprint" style="margin-top:16px">
       <div class="card-h"><h2>人ごとの集計</h2><span class="hint" id="sumMonth"></span></div>
@@ -569,28 +567,10 @@ $("#closeMode").addEventListener("click",function(){
   closeMode=!closeMode; this.setAttribute("aria-pressed",String(closeMode));
   this.textContent=closeMode?"終わる（日を押すと休業）":"休業日を決める";
 });
-$("#printBtn").addEventListener("click",function(){ window.print() });
 
-function shiftLines(){
-  var y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate(), M=mon(ym());
-  var out=[];
-  for(var d=1;d<=last;d++){
-    var dow=DOWN[new Date(y,m,d).getDay()];
-    if(isClosed(d)){ out.push(d+"日("+dow+") 休業"); continue }
-    var a=(M.assign[String(d)]||[]).map(function(x){
-      var st=staffById(x.s); return st?st.name+(x.label&&x.label!=="終日"?"("+lb(x.label)+")":"") : "";
-    }).filter(Boolean);
-    out.push(d+"日("+dow+") "+(a.length?a.join("、"):"—"));
-  }
-  return out;
-}
-function shiftTextValue(){
-  return "【"+view.getFullYear()+"年"+(view.getMonth()+1)+"月のシフト】\n"+shiftLines().join("\n");
-}
 /* 人ごとに、出せると言った日／実際に入った日／外れた日 を数える。休業日は除く。 */
 function renderOut(){
   $("#sumMonth").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
-  $("#pubBtn").hidden=!syncOn();
   var M=mon(ym()), y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate();
   var t={};
   DB.staff.forEach(function(s){ t[s.id]={sub:0,dec:0,has:!!M.req[s.id]} });
@@ -613,32 +593,15 @@ function renderOut(){
         '<td class="mono"'+(off?' style="color:var(--warn)"':'')+'>'+(x.has?off+"日":"—")+'</td></tr>';
     }).join("");
 }
-$("#copyShift").addEventListener("click",async function(){
-  try{ await navigator.clipboard.writeText(shiftTextValue()); toast("コピーしました") }
-  catch(e){ prompt("コピーしてください",shiftTextValue()) }
-});
 function download(name,text,type){
   var url=URL.createObjectURL(new Blob([text],{type:type||"text/plain;charset=utf-8"}));
   var a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); a.remove() },1500);
 }
-$("#csvBtn").addEventListener("click",function(){
-  var y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate(), M=mon(ym());
-  var q=function(v){return '"'+String(v==null?"":v).replace(/"/g,'""')+'"'};
-  var rows=[["日付","曜日","状態","スタッフ","時間帯"].map(q).join(",")];
-  for(var d=1;d<=last;d++){
-    var date=y+"-"+pad(m+1)+"-"+pad(d), dow=DOWN[new Date(y,m,d).getDay()];
-    if(isClosed(d)){ rows.push([date,dow,"休業","",""].map(q).join(",")); continue }
-    var a=M.assign[String(d)]||[];
-    if(!a.length){ rows.push([date,dow,"未割当","",""].map(q).join(",")); continue }
-    a.forEach(function(x){ var st=staffById(x.s); rows.push([date,dow,"出勤",st?st.name:"",lb(x.label)].map(q).join(",")) });
-  }
-  download("シフト_"+y+"-"+pad(m+1)+".csv","﻿"+rows.join("\r\n"),"text/csv;charset=utf-8");
-  toast("CSVを書き出しました");
-});
 $("#pubBtn").addEventListener("click",async function(){
-  if(!syncOn()){ toast("先に③設定でつないでください"); return }
-  var b=this; b.disabled=true; b.textContent="公開しています…";
+  if(!syncOn()){ toast("③設定で置き場所につなぐと、スタッフの画面に反映できます"); return }
+  if(!confirm((view.getMonth()+1)+"月のシフトを確定して、スタッフの画面に出します。よろしいですか？")) return;
+  var b=this; b.disabled=true; b.textContent="反映しています…";
   try{
     var M=mon(ym()), y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate();
     var days={}, closed=[];
@@ -648,10 +611,10 @@ $("#pubBtn").addEventListener("click",async function(){
       if(a.length) days[String(d)]=a;
     }
     await Sync.publishShift(ym(),days,closed);
-    $("#pubAt").textContent="公開ずみ "+new Date().toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-    toast("スタッフに公開しました");
-  }catch(e){ toast((e&&e.message)||"公開できませんでした") }
-  finally{ b.disabled=false; b.textContent="スタッフに公開" }
+    $("#pubAt").textContent="確定ずみ "+new Date().toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
+    toast("スタッフの画面に反映しました");
+  }catch(e){ toast((e&&e.message)||"反映できませんでした") }
+  finally{ b.disabled=false; b.textContent="確定" }
 });
 
 /* ================= ③ 設定 ================= */
@@ -696,7 +659,6 @@ $("#needRow").addEventListener("change",function(e){
 });
 function renderSyncUI(){
   $("#cfgState").textContent=syncOn()?"つないでいます":"未接続（LINEの貼り付けのみ）";
-  $("#pubBtn").hidden=!syncOn();
 }
 $("#cfgSave").addEventListener("click",function(){
   var u=$("#cfgUrl").value.trim();
