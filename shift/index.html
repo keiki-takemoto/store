@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -49,31 +49,42 @@ main{max-width:1400px;margin:0 auto;padding:14px}
 .dows span{text-align:center;font-size:11.5px;color:var(--ink-3);padding:3px 0}
 .dows .s0{color:var(--sun)} .dows .s6{color:var(--sat)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
-.day{border:1px solid var(--line);border-radius:10px;background:var(--surface);min-height:130px;padding:6px;
-  display:flex;flex-direction:column;gap:4px;min-width:0}
+.day{border:1px solid var(--line);border-radius:10px;background:var(--surface);min-height:132px;padding:7px 8px;
+  display:flex;flex-direction:column;gap:3px;min-width:0}
 .day.blank{border:none;background:transparent;min-height:0}
 .day.closed{background:var(--surface-2);opacity:.75}
 .dh{display:flex;align-items:center;gap:5px}
-.dh .n{font-size:13px;font-family:var(--mono);color:var(--ink-2)}
-.dh .dw{display:none;font-size:11px;margin-left:2px}
+.dh .n{font-size:13px;font-family:var(--mono);color:var(--ink-3)}
+.hol{font-size:10px;color:var(--sat);background:var(--accent-2);border-radius:4px;padding:0 5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:7.5em}
+.dh .dw{display:none;font-size:11px;color:var(--ink-3)}
 .day.s0 .dh .n{color:var(--sun)} .day.s6 .dh .n{color:var(--sat)}
-.dh .today{background:var(--accent);color:var(--accent-ink);border-radius:999px;padding:0 6px}
+.dh .n.today,.day.s0 .dh .n.today,.day.s6 .dh .n.today{background:var(--ng);color:#fff;border-radius:999px;
+  min-width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}
 .dh .cnt{margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--ink-3);cursor:pointer;
   border:1px solid var(--line);border-radius:6px;padding:0 5px}
 .dh .cnt.short{color:var(--warn);border-color:var(--warn)}
 .dh .cnt.full{color:var(--ok);border-color:var(--ok)}
-.asg{display:flex;flex-direction:column;gap:3px}
-.who{display:flex;align-items:center;gap:4px;border-radius:7px;padding:2px 6px;font-size:12px;cursor:pointer;
-  background:var(--surface-2);border-left:3px solid var(--c,var(--line-2));line-height:1.45}
-.who:hover{background:var(--surface-3)}
-.who .t{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--ink-3)}
-.cands{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto;padding-top:4px;border-top:1px dashed var(--line)}
+.asg{display:flex;flex-direction:column;gap:1px}
+.who{display:block;border-radius:6px;padding:1px 4px;font-size:15px;font-weight:700;
+  color:var(--c,var(--ink));line-height:1.55;letter-spacing:.01em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who .t{font-size:13px;font-weight:700;opacity:.85;margin-left:5px}
+@media (max-width:1100px){.who{font-size:14px}.who .t{font-size:12px;margin-left:4px}}
+@media (max-width:860px){.who{font-size:13px;padding:1px 2px}.who .t{font-size:11px;margin-left:3px}}
+.who[data-act]{cursor:pointer}
+.who[data-act]:hover{background:var(--surface-2)}
+.offbig{flex:1;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;
+  color:var(--ink-3);letter-spacing:.06em}
+.day.closed{background:var(--surface-2);opacity:1}
+.day.closed .offbig{color:var(--ink-3);opacity:.55}
+.cands{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto;padding-top:5px;border-top:1px dashed var(--line)}
 .cand{border:1px solid var(--line);background:transparent;border-radius:6px;padding:1px 5px;font-size:10.5px;
   cursor:pointer;color:var(--ink-3);white-space:nowrap}
 .cand:hover{background:var(--surface-2);color:var(--ink)}
 .cand[data-k="am"]{color:var(--am)} .cand[data-k="pm"]{color:var(--pm)} .cand[data-k="tm"]{color:var(--tm)}
 .cand[data-k="none"]{opacity:.6;border-style:dashed}
-.closedlbl{font-size:12px;color:var(--ink-3);text-align:center;padding:12px 0}
+
 pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;
   font-family:var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.75;max-height:36vh;overflow:auto}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -103,7 +114,9 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   .day .dh .n{font-size:15px} .dh .dw{display:inline} .day .dh .cnt{margin-left:0}
   .day .asg{flex:1;min-width:150px}
   .day .cands{width:100%;margin-top:6px;padding-top:6px}
-  .day.closed .closedlbl{padding:2px 0;text-align:left}
+  .offbig{flex:none;font-size:20px;justify-content:flex-start;padding:2px 0}
+  .who{font-size:16px;padding:1px 4px}
+  .who .t{font-size:13px;margin-left:6px}
 }
 @media print{
   .homebar,.top,.noprint{display:none!important}
@@ -133,7 +146,11 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
 
   <!-- ① 届いた希望 -->
   <section class="view" id="v-req">
-    <div class="card">
+    <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
+    <div class="cal" id="calReq"></div>
+    <p class="note noprint">その日に出られる人です。<span style="color:var(--ng)">×</span>の人は出ません。
+      名前の横は希望の時間帯。②に切り替えると、ここから選んでシフトを決められます。</p>
+    <div class="card" style="margin-top:16px">
       <div class="card-h"><h2>届いた希望</h2><span class="hint" id="reqHint"></span></div>
       <div id="reqList"></div>
       <button class="fold" id="pasteFold">＋ LINEの文章から取り込む（ネットにつながっていないとき）</button>
@@ -411,10 +428,20 @@ document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="visible"&&syncOn()&&Date.now()-lastPull>30000) pull(true);
 });
 
-/* ================= ② 確定シフト ================= */
+/* ================= カレンダー（①希望・②確定で共通） ================= */
+var HOLIDAYS={'2026-1-1':'元日','2026-1-12':'成人の日','2026-2-11':'建国記念日','2026-2-23':'天皇誕生日',
+'2026-3-20':'春分の日','2026-4-29':'昭和の日','2026-5-3':'憲法記念日','2026-5-4':'みどりの日','2026-5-5':'こどもの日',
+'2026-5-6':'振替休日','2026-7-20':'海の日','2026-8-11':'山の日','2026-9-21':'敬老の日','2026-9-23':'秋分の日',
+'2026-10-12':'スポーツの日','2026-11-3':'文化の日','2026-11-23':'勤労感謝の日',
+'2027-1-1':'元日','2027-1-11':'成人の日','2027-2-11':'建国記念日','2027-2-23':'天皇誕生日','2027-3-21':'春分の日',
+'2027-3-22':'振替休日','2027-4-29':'昭和の日','2027-5-3':'憲法記念日','2027-5-4':'みどりの日','2027-5-5':'こどもの日',
+'2027-7-19':'海の日','2027-8-11':'山の日','2027-9-20':'敬老の日','2027-9-23':'秋分の日','2027-10-11':'スポーツの日',
+'2027-11-3':'文化の日','2027-11-23':'勤労感謝の日'};
+function holidayOf(y,m,d){ return HOLIDAYS[y+"-"+(m+1)+"-"+d]||"" }
 var closeMode=false;
-function renderCal(){
-  $("#monthLbl").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
+
+/* mode:"req"=届いた希望をそのまま並べる ／ "shift"=決まったシフトを並べる */
+function buildMonth(mode){
   var y=view.getFullYear(), m=view.getMonth();
   var first=new Date(y,m,1).getDay(), last=new Date(y,m+1,0).getDate();
   var M=mon(ym()), html="", short=0, total=0;
@@ -422,37 +449,63 @@ function renderCal(){
   for(var d=1;d<=last;d++){
     var dow=new Date(y,m,d).getDay(), key=String(d);
     var closed=isClosed(d), need=needOf(d);
-    var asg=M.assign[key]||[];
-    total+=asg.length;
-    var lack=!closed&&asg.length<need;
-    if(lack) short++;
+    var hol=holidayOf(y,m,d);
     var isToday=(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate());
+    var rows, lack=false;
+    if(mode==="shift"){
+      var asg=M.assign[key]||[];
+      total+=asg.length;
+      lack=!closed&&asg.length<need;
+      if(lack) short++;
+      rows=asg.map(function(a){
+        var st=staffById(a.s); if(!st) return null;
+        return {c:st.color,name:st.name,label:(a.label==="終日"?"":a.label),s:a.s};
+      }).filter(Boolean);
+    }else{
+      rows=avail(d,false).filter(function(c){ return c.kind!=="none" }).map(function(c){
+        return {c:(staffById(c.id)||{}).color,name:c.name,label:c.mark,s:c.id};
+      });
+    }
     html+='<div class="day s'+dow+(closed?" closed":"")+'" data-d="'+d+'">'+
-      '<div class="dh"><span class="n'+(isToday?" today":"")+'">'+d+'<span class="dw">('+DOWN[dow]+')</span></span>'+
-        (closed?'<span class="cnt">休</span>'
-               :'<span class="cnt '+(lack?"short":(asg.length>=need?"full":""))+'" data-act="need">'+asg.length+"/"+need+'</span>')+
+      '<div class="dh"><span class="n'+(isToday?" today":"")+'">'+d+'</span>'+
+        '<span class="dw">('+DOWN[dow]+')</span>'+
+        (hol?'<span class="hol">★ '+esc(hol)+'</span>':'')+
+        (mode==="shift"
+          ? (closed?'<span class="cnt">休</span>'
+                   :'<span class="cnt '+(lack?"short":(rows.length>=need?"full":""))+'" data-act="need">'+rows.length+"/"+need+'</span>')
+          : (closed?'':'<span class="cnt">'+rows.length+'人</span>'))+
       '</div>';
-    if(closed){ html+='<div class="closedlbl">休業</div>' }
+    if(closed){ html+='<div class="offbig">off</div>' }
     else{
-      html+='<div class="asg">'+asg.map(function(a){
-        var st=staffById(a.s); if(!st) return "";
-        return '<span class="who" style="--c:'+st.color+'" data-act="del" data-s="'+a.s+'">'+
-          esc(st.name)+'<span class="t">'+esc(a.label)+'</span></span>';
+      html+='<div class="asg">'+rows.map(function(r){
+        return '<span class="who" style="--c:'+(r.c||"var(--ink)")+'"'+(mode==="shift"?' data-act="del" data-s="'+r.s+'"':'')+'>'+
+          esc(r.name)+(r.label?'<span class="t">'+esc(r.label)+'</span>':'')+'</span>';
       }).join("")+'</div>';
-      html+='<div class="cands">'+cands(d).map(function(c){
-        return '<button class="cand" data-act="add" data-s="'+c.id+'" data-k="'+c.kind+'" title="'+esc(c.title)+'">'+
-          esc(c.name)+(c.mark?' '+esc(c.mark):'')+'</button>';
-      }).join("")+'</div>';
+      if(mode==="shift"){
+        html+='<div class="cands">'+cands(d).map(function(c){
+          return '<button class="cand" data-act="add" data-s="'+c.id+'" data-k="'+c.kind+'" title="'+esc(c.title)+'">'+
+            esc(c.name)+(c.mark?' '+esc(c.mark):'')+'</button>';
+        }).join("")+'</div>';
+      }
     }
     html+='</div>';
   }
-  $("#cal").innerHTML=html;
-  $("#stat").innerHTML='のべ <b>'+total+'</b> 人 ・ '+
-    (short?'<span class="short">足りない日 <b>'+short+'</b></span>':'<span>過不足なし</span>');
+  return {html:html,total:total,short:short};
 }
-function cands(d){
+function renderCal(){
+  $("#monthLbl").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
+  var r=buildMonth("shift");
+  $("#cal").innerHTML=r.html;
+  $("#calReq").innerHTML=buildMonth("req").html;
+  $("#stat").innerHTML='のべ <b>'+r.total+'</b> 人 ・ '+
+    (r.short?'<span class="short">足りない日 <b>'+r.short+'</b></span>':'<span>過不足なし</span>');
+}
+function cands(d){ return avail(d,true) }
+/* skipTaken=true … すでにその日に入っている人を除く（②の候補ボタン用） */
+function avail(d,skipTaken){
   var M=mon(ym()), key=String(d);
-  var taken={}; (M.assign[key]||[]).forEach(function(a){ taken[a.s]=1 });
+  var taken={};
+  if(skipTaken) (M.assign[key]||[]).forEach(function(a){ taken[a.s]=1 });
   var out=[];
   DB.staff.forEach(function(s){
     if(taken[s.id]) return;
