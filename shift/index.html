@@ -620,23 +620,52 @@ $("#addStaff").addEventListener("click",function(){
   if(staffByName(v)){ toast("同じ名前の人がいます"); return }
   addStaff(v); $("#newStaff").value=""; save(); renderAll(); renderStaff();
 });
-function renderSyncUI(){
-  $("#cfgState").textContent=syncOn()?"つないでいます":"まだつないでいません";
+function cfgFields(){
+  return { url:$("#cfgUrl").value.trim(), anon:$("#cfgAnon").value.trim(),
+           code:$("#cfgCode").value.trim(), key:$("#cfgKey").value.trim() };
 }
+function fillCfg(){
+  var d=DB.cfgDraft||DB.sync||{};
+  $("#cfgUrl").value=d.url||""; $("#cfgAnon").value=d.anon||"";
+  $("#cfgCode").value=d.code||""; $("#cfgKey").value=d.key||"";
+}
+/* 打ちかけでも消えないよう、入力のたびに控える。
+   URLとキーがそろっていれば、そのまま接続先として使う（押し忘れで消えないように）。 */
+function stashCfg(){
+  var c=cfgFields();
+  DB.cfgDraft=c;
+  if(c.url&&c.anon){ DB.sync=c; if(window.Sync) Sync.configure(DB.sync); }
+  save(); renderSyncUI();
+}
+function renderSyncUI(){
+  var t="まだつないでいません";
+  if(syncOn()) t="つないでいます（保存ずみ）";
+  else{ var d=DB.cfgDraft||{}; if(d.url||d.anon) t="入力中（ここまでは控えてあります）" }
+  $("#cfgState").textContent=t;
+}
+["#cfgUrl","#cfgAnon","#cfgCode","#cfgKey"].forEach(function(sel){
+  $(sel).addEventListener("input",stashCfg);
+  $(sel).addEventListener("change",stashCfg);
+});
 $("#cfgSave").addEventListener("click",function(){
-  var u=$("#cfgUrl").value.trim(), a=$("#cfgAnon").value.trim();
-  DB.sync=(u&&a)?{url:u,anon:a,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()}:null;
+  var c=cfgFields();
+  DB.cfgDraft=c;
+  DB.sync=(c.url&&c.anon)?c:null;
   save(); if(window.Sync) Sync.configure(DB.sync);
   renderSyncUI(); renderReq(); toast(DB.sync?"保存しました":"接続をやめました");
   if(DB.sync) pull(false);
 });
 $("#cfgTest").addEventListener("click",async function(){
-  var u=$("#cfgUrl").value.trim(), a=$("#cfgAnon").value.trim();
-  if(!u||!a){ toast("URLとanonキーを入れてください"); return }
+  var c=cfgFields();
+  if(!c.url||!c.anon){ toast("URLとanonキーを入れてください"); return }
   var keep=DB.sync;
-  if(window.Sync) Sync.configure({url:u,anon:a,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()});
+  if(window.Sync) Sync.configure(c);
   $("#cfgState").textContent="試しています…";
-  try{ await Sync.ping(); await Sync.listRequests(""); $("#cfgState").textContent="つながりました" }
+  try{
+    await Sync.ping(); await Sync.listRequests("");
+    DB.cfgDraft=c; DB.sync=c; save();           /* つながったらそのまま保存する */
+    $("#cfgState").textContent="つながりました（保存しました）";
+  }
   catch(e){ $("#cfgState").textContent=(e&&e.message)||"つながりませんでした"; if(window.Sync) Sync.configure(keep) }
 });
 function staffUrl(){
@@ -681,16 +710,16 @@ $("#restoreFile").addEventListener("change",function(){
       if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
       if(typeof DB.need!=="number") DB.need=2;
       save(); if(DB.sync&&window.Sync) Sync.configure(DB.sync);
-      renderAll(); renderStaff(); renderSyncUI(); toast("読み込みました");
+      fillCfg(); renderAll(); renderStaff(); renderSyncUI(); toast("読み込みました");
     }catch(e){ toast("読み込めませんでした") }
   };
   r.readAsText(f); this.value="";
 });
 $("#wipe").addEventListener("click",function(){
   if(!confirm("スタッフも希望もシフトも、全部消します。取り消せません。よろしいですか？")) return;
-  DB={staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null}; save();
+  DB={staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null,cfgDraft:null}; save();
   if(window.Sync) Sync.configure(null);
-  renderAll(); renderStaff(); renderSyncUI(); toast("消しました");
+  fillCfg(); renderAll(); renderStaff(); renderSyncUI(); toast("消しました");
 });
 
 /* ================= 共通 ================= */
@@ -703,11 +732,7 @@ document.querySelector(".tabs").addEventListener("click",function(e){
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   $("#monthbar").hidden=(b.dataset.v==="cfg");
   if(b.dataset.v==="cfg"){
-    $("#cfgUrl").value=(DB.sync&&DB.sync.url)||"";
-    $("#cfgAnon").value=(DB.sync&&DB.sync.anon)||"";
-    $("#cfgCode").value=(DB.sync&&DB.sync.code)||"";
-    $("#cfgKey").value=(DB.sync&&DB.sync.key)||"";
-    renderStaff(); renderSyncUI();
+    fillCfg(); renderStaff(); renderSyncUI();
   }
   if(b.dataset.v==="req") pull(true);
   renderStat(); renderReq();
@@ -721,7 +746,7 @@ function toast(m){
   clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3200);
 }
 function renderAll(){ renderCal(); renderReq(); renderOut(); }
-renderAll(); renderSyncUI();
+fillCfg(); renderAll(); renderSyncUI();
 if(syncOn()) pull(true);
 if("serviceWorker" in navigator) window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
 })();
