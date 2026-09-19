@@ -611,7 +611,7 @@ $("#pubBtn").addEventListener("click",async function(){
     var days={}, closed=[];
     for(var d=1;d<=last;d++){
       if(isClosed(d)){ closed.push(d); continue }
-      var a=(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:lb(x.label)}:null }).filter(Boolean);
+      var a=(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:lb(x.label),c:st.color}:null }).filter(Boolean);
       if(a.length) days[String(d)]=a;
     }
     await Sync.publishShift(ym(),days,closed);
