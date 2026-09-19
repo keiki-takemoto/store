@@ -183,24 +183,9 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
           <span class="lbl" id="cfgState"></span>
         </div>
         <p class="note">まだ置き場所を作っていない場合は <a href="./setup.html" target="_blank" rel="noopener">はじめの設定</a>（10分ほど）。
-          空のままでも、LINEの貼り付けだけで使えます。</p>
+          つなぐまで、スタッフの希望は届きません。</p>
         <p class="note">Supabaseの <b>Project Settings → API</b> にある Project URL と anon public key を貼ってください。
           合言葉の2つは、はじめの設定のページに書いてあります。</p>
-      </div>
-      <div class="sec">
-        <h3>LINEの文章から取り込む</h3>
-        <p class="note" style="margin:0 0 9px">置き場所につないでいないときや、スタッフが直接LINEで送ってきたときに使います。</p>
-        <textarea id="pasteIn" rows="6" placeholder="【シフト希望】2026年10月&#10;名前：森川&#10;終日 1, 2, 3&#10;AM 5"></textarea>
-        <div class="row" style="margin-top:9px">
-          <button class="btn sm" id="readBtn">読み込む</button>
-          <button class="btn ghost sm" id="clearIn">消す</button>
-          <span class="lbl" id="readCount"></span>
-        </div>
-        <div id="readList"></div>
-        <div class="row" style="margin-top:10px" id="applyRow" hidden>
-          <button class="btn primary sm" id="applyBtn">この内容で登録する</button>
-          <span class="lbl">同じ人・同じ月は上書きされます</span>
-        </div>
       </div>
       <div class="sec">
         <h3>スタッフ</h3>
@@ -317,86 +302,6 @@ function isClosed(d){
 }
 
 /* ================= ① 届いた希望 ================= */
-function summaryOf(days){
-  var g={ok:[],am:[],pm:[]}, tm=[];
-  Object.keys(days||{}).map(Number).sort(function(a,b){return a-b}).forEach(function(d){
-    var c=days[String(d)];
-    if(!c||c==="ng") return;
-    if(F.isTime(c)) tm.push(d+"日 "+F.timeText(c)); else if(g[c]) g[c].push(d);
-  });
-  var out=[];
-  if(g.ok.length) out.push({k:"ok",t:"終日 "+g.ok.join(",")});
-  if(g.am.length) out.push({k:"am",t:"AM "+g.am.join(",")});
-  if(g.pm.length) out.push({k:"pm",t:"PM "+g.pm.join(",")});
-  tm.forEach(function(t){ out.push({k:"tm",t:t}) });
-  if(!out.length) out.push({k:"ng",t:"出られる日なし"});
-  return out;
-}
-var curTab="req", lastShift={total:0,short:0};
-/* 月の行の右側。①のときは提出の数、②のときはのべ人数と足りない日。 */
-function renderStat(){
-  if(curTab==="cal"){
-    $("#stat").innerHTML='のべ <b>'+lastShift.total+'</b> 人 ・ '+
-      (lastShift.short?'<span class="short">足りない日 <b>'+lastShift.short+'</b></span>':'<span>過不足なし</span>');
-    return;
-  }
-  var M=mon(ym()), n=0;
-  DB.staff.forEach(function(s){ if(M.req[s.id]) n++ });
-  $("#stat").innerHTML= DB.staff.length
-    ? '提出 <b>'+n+'</b>／'+DB.staff.length+'人'+(n<DB.staff.length?' <span class="short">未提出 '+(DB.staff.length-n)+'</span>':'')
-    : '<span class="short">スタッフがいません</span>';
-}
-function renderReq(){
-  var M=mon(ym()), memo=[];
-  DB.staff.forEach(function(s){
-    var r=M.req[s.id];
-    if(r&&r.note) memo.push(s.name+"："+r.note);
-  });
-  $("#memoRow").innerHTML=memo.map(function(t){return '<span class="memo">'+esc(t)+'</span>'}).join("");
-  $("#memoRow").hidden=!memo.length;
-  renderStat();
-}
-var parsed=[];
-$("#readBtn").addEventListener("click",function(){
-  var t=$("#pasteIn").value.trim();
-  if(!t){ toast("LINEの文章を貼り付けてください"); return }
-  parsed=F.parseRequests(t,view.getFullYear()); renderParsed();
-});
-$("#clearIn").addEventListener("click",function(){ $("#pasteIn").value=""; parsed=[]; renderParsed() });
-function renderParsed(){
-  if(!parsed.length){ $("#readList").innerHTML=""; $("#applyRow").hidden=true; $("#readCount").textContent=""; return }
-  $("#readList").innerHTML='<div style="margin-top:10px">'+parsed.map(function(p){
-    var known=staffByName(p.name);
-    return '<div class="person" style="padding:8px 0">'+
-      '<div class="p-head"><span class="nm">'+esc(p.name||"（名前なし）")+'</span>'+
-      '<span class="badge '+(known?"c-ok":"c-am")+'">'+(known?"登録済み":"新しい人")+'</span>'+
-      '<span class="lbl">'+esc((p.month||ym()).replace("-","年")+"月")+'</span></div>'+
-      '<div class="days">'+summaryOf(p.days).map(function(x){
-        return '<span class="c-'+x.k+'">'+esc(x.t)+'</span>' }).join("")+'</div>'+
-      (p.name?'':'<div class="memo" style="color:var(--warn)">名前が読み取れないので登録できません</div>')+
-      '</div>';
-  }).join("")+'</div>';
-  $("#readCount").textContent=parsed.length+"人ぶん";
-  $("#applyRow").hidden=false;
-}
-$("#applyBtn").addEventListener("click",function(){
-  var n=0, top="", tally={};
-  parsed.forEach(function(p){
-    if(!p.name) return;
-    var st=staffByName(p.name)||addStaff(p.name);
-    var mk=p.month||ym();
-    mon(mk).req[st.id]={days:p.days,note:p.note||"",at:new Date().toISOString().slice(0,16).replace("T"," ")};
-    tally[mk]=(tally[mk]||0)+1; n++;
-  });
-  var best=0;
-  Object.keys(tally).forEach(function(k){ if(tally[k]>best){best=tally[k];top=k} });
-  var moved=false;
-  if(top&&top!==ym()){ var p2=top.split("-"); view=new Date(+p2[0],+p2[1]-1,1); moved=true }
-  DB.lastYm=ym(); save();
-  parsed=[]; $("#pasteIn").value=""; renderParsed(); renderAll();
-  toast(n+"人ぶんを登録しました"+(moved?"（"+(view.getMonth()+1)+"月に切り替えました）":""));
-});
-
 /* オンライン受信 */
 var lastPull=0, pulling=false;
 async function pull(silent){
@@ -691,7 +596,7 @@ $("#addStaff").addEventListener("click",function(){
   addStaff(v); $("#newStaff").value=""; save(); renderAll(); renderStaff();
 });
 function renderSyncUI(){
-  $("#cfgState").textContent=syncOn()?"つないでいます":"未接続（LINEの貼り付けのみ）";
+  $("#cfgState").textContent=syncOn()?"つないでいます":"まだつないでいません";
 }
 $("#cfgSave").addEventListener("click",function(){
   var u=$("#cfgUrl").value.trim(), a=$("#cfgAnon").value.trim();
