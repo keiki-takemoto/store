@@ -82,7 +82,6 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
   font-size:clamp(8px,1.6vw,10.5px);cursor:pointer;color:var(--ink-3);white-space:nowrap;line-height:1.5}
 .cand:hover{background:var(--surface-2);color:var(--ink)}
 .cand[data-k="am"]{color:var(--am)} .cand[data-k="pm"]{color:var(--pm)} .cand[data-k="tm"]{color:var(--tm)}
-.cand[data-k="none"]{opacity:.6;border-style:dashed}
 
 pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;
   font-family:var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.75;max-height:36vh;overflow:auto}
@@ -371,7 +370,7 @@ function buildMonth(mode){
         return {c:st.color,name:st.name,label:(a.label==="終日"?"":calLabel(a.label)),s:a.s};
       }).filter(Boolean);
     }else{
-      rows=avail(d,false).filter(function(c){ return c.kind!=="none" }).map(function(c){
+      rows=avail(d,false).map(function(c){
         return {c:(staffById(c.id)||{}).color,name:c.name,label:calLabel(c.mark),s:c.id};
       });
     }
@@ -445,7 +444,7 @@ function avail(d,skipTaken){
   DB.staff.forEach(function(s){
     if(taken[s.id]) return;
     var r=M.req[s.id];
-    if(!r){ out.push({id:s.id,name:s.name,kind:"none",mark:"?",title:"希望が未提出"}); return }
+    if(!r) return;                    /* 希望を出していない人は出さない */
     var c=r.days[key];
     if(!c||c==="ng") return;          /* 入っていない日＝出られない */
     if(F.isTime(c)) out.push({id:s.id,name:s.name,kind:"tm",mark:F.timeText(c),title:F.timeText(c)});
