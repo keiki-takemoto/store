@@ -63,10 +63,7 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 .day.s0 .dh .n{color:var(--sun)} .day.s6 .dh .n{color:var(--sat)}
 .dh .n.today,.day.s0 .dh .n.today,.day.s6 .dh .n.today{background:var(--ng);color:#fff;border-radius:999px;
   min-width:19px;height:19px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}
-.dh .cnt{margin-left:auto;font-size:clamp(8px,1.6vw,11px);font-family:var(--mono);color:var(--ink-3);cursor:pointer;
-  border:1px solid var(--line);border-radius:5px;padding:0 clamp(2px,0.5vw,5px)}
-.dh .cnt.short{color:var(--warn);border-color:var(--warn)}
-.dh .cnt.full{color:var(--ok);border-color:var(--ok)}
+.dh .n[data-act]{cursor:pointer}
 .asg{display:flex;flex-direction:column;gap:0}
 .who{display:block;border-radius:5px;padding:0 clamp(1px,0.4vw,4px);
   font-size:var(--wf,clamp(9px,2.1vw,15px));font-weight:700;
@@ -168,7 +165,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="cal"></div>
     <p class="note noprint">小さなボタンが希望を出している人です。押すとその日に入り、入った名前をもう一度押すと外れます。
-      右上は「入っている人数／必要な人数」。押すとその日だけ必要人数を変えられます。</p>
+      日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。</p>
 
     <div class="grid2 noprint" style="margin-top:16px">
       <div class="card">
@@ -456,13 +453,10 @@ function buildMonth(mode){
       });
     }
     html+='<div class="day s'+dow+(closed?" closed":"")+'" data-d="'+d+'">'+
-      '<div class="dh"><span class="n'+(isToday?" today":"")+'">'+d+'</span>'+
+      '<div class="dh"><span class="n'+(isToday?" today":"")+'"'+
+        (mode==="shift"?' data-act="need" title="押すとこの日の必要人数を変えられます"':'')+'>'+d+'</span>'+
         '<span class="dw">('+DOWN[dow]+')</span>'+
         (hol?'<span class="hol">★ '+esc(hol)+'</span>':'')+
-        (mode==="shift"
-          ? (closed?'<span class="cnt">休</span>'
-                   :'<span class="cnt '+(lack?"short":(rows.length>=need?"full":""))+'" data-act="need">'+rows.length+"/"+need+'</span>')
-          : '')+
       '</div>';
     if(closed){ html+='<div class="offbig">off</div>' }
     else{
