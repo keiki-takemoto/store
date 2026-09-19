@@ -4,8 +4,8 @@
 (function (root) {
   "use strict";
 
-  var LABEL = { ok: "終日OK", am: "午前のみ", pm: "午後のみ", ng: "×" };
-  var SHORT = { ok: "○", am: "午前", pm: "午後", ng: "×" };
+  var LABEL = { ok: "終日OK", am: "AMのみ", pm: "PMのみ", ng: "×" };
+  var SHORT = { ok: "○", am: "AM", pm: "PM", ng: "×" };
 
   function z2h(s) {                       // 全角の数字・記号を半角に
     return String(s == null ? "" : s)
@@ -57,8 +57,8 @@
     });
     var lines = [head, "名前：" + name, ""];
     if (g.ng.length) lines.push("× " + g.ng.join(", "));
-    if (g.am.length) lines.push("午前のみ " + g.am.join(", "));
-    if (g.pm.length) lines.push("午後のみ " + g.pm.join(", "));
+    if (g.am.length) lines.push("AM " + g.am.join(", "));
+    if (g.pm.length) lines.push("PM " + g.pm.join(", "));
     times.forEach(function (t) { lines.push("時間 " + t) });
     if (!g.ng.length && !g.am.length && !g.pm.length && !times.length) lines.push("すべて終日OK");
     else lines.push("ほかの日は終日OK");

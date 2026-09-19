@@ -143,7 +143,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
       <div id="reqList"></div>
       <button class="fold" id="pasteFold">＋ LINEの文章から取り込む（ネットにつながっていないとき）</button>
       <div class="card-b" id="pasteBox" hidden>
-        <textarea id="pasteIn" rows="7" placeholder="【シフト希望】2026年10月&#10;名前：田中&#10;× 3, 7&#10;午前のみ 5"></textarea>
+        <textarea id="pasteIn" rows="7" placeholder="【シフト希望】2026年10月&#10;名前：田中&#10;× 3, 7&#10;AM 5"></textarea>
         <div class="row" style="margin-top:9px">
           <button class="btn sm" id="readBtn">読み込む</button>
           <button class="btn ghost sm" id="clearIn">消す</button>
@@ -308,8 +308,8 @@ function summaryOf(days){
   });
   var out=[];
   if(g.ng.length) out.push({k:"ng",t:"× "+g.ng.join(",")});
-  if(g.am.length) out.push({k:"am",t:"午前 "+g.am.join(",")});
-  if(g.pm.length) out.push({k:"pm",t:"午後 "+g.pm.join(",")});
+  if(g.am.length) out.push({k:"am",t:"AM "+g.am.join(",")});
+  if(g.pm.length) out.push({k:"pm",t:"PM "+g.pm.join(",")});
   tm.forEach(function(t){ out.push({k:"tm",t:t}) });
   if(!out.length) out.push({k:"ok",t:"すべて終日OK"});
   return out;
@@ -447,7 +447,7 @@ function buildMonth(mode){
       if(lack) short++;
       rows=asg.map(function(a){
         var st=staffById(a.s); if(!st) return null;
-        return {c:st.color,name:st.name,label:(a.label==="終日"?"":a.label),s:a.s};
+        return {c:st.color,name:st.name,label:(a.label==="終日"?"":lb(a.label)),s:a.s};
       }).filter(Boolean);
     }else{
       rows=avail(d,false).filter(function(c){ return c.kind!=="none" }).map(function(c){
@@ -502,17 +502,19 @@ function avail(d,skipTaken){
     var c=r.days[key]||"ok";
     if(c==="ng") return;
     if(F.isTime(c)) out.push({id:s.id,name:s.name,kind:"tm",mark:F.timeText(c),title:F.timeText(c)});
-    else if(c==="am") out.push({id:s.id,name:s.name,kind:"am",mark:"午前",title:"午前のみ"});
-    else if(c==="pm") out.push({id:s.id,name:s.name,kind:"pm",mark:"午後",title:"午後のみ"});
+    else if(c==="am") out.push({id:s.id,name:s.name,kind:"am",mark:"AM",title:"AMのみ"});
+    else if(c==="pm") out.push({id:s.id,name:s.name,kind:"pm",mark:"PM",title:"PMのみ"});
     else out.push({id:s.id,name:s.name,kind:"ok",mark:"",title:"終日OK"});
   });
   return out;
 }
+/* 前に「午前／午後」で保存したものも AM／PM で見せる */
+function lb(x){ return x==="午前"?"AM":(x==="午後"?"PM":(x||"")) }
 function labelFor(sid,d){
   var r=mon(ym()).req[sid];
   var c=r?(r.days[String(d)]||"ok"):"ok";
   if(F.isTime(c)) return F.timeText(c);
-  return c==="am"?"午前":c==="pm"?"午後":"終日";
+  return c==="am"?"AM":c==="pm"?"PM":"終日";
 }
 $("#cal").addEventListener("click",function(e){
   var day=e.target.closest(".day[data-d]"); if(!day) return;
@@ -549,7 +551,7 @@ function shiftLines(){
     var dow=DOWN[new Date(y,m,d).getDay()];
     if(isClosed(d)){ out.push(d+"日("+dow+") 休業"); continue }
     var a=(M.assign[String(d)]||[]).map(function(x){
-      var st=staffById(x.s); return st?st.name+(x.label&&x.label!=="終日"?"("+x.label+")":"") : "";
+      var st=staffById(x.s); return st?st.name+(x.label&&x.label!=="終日"?"("+lb(x.label)+")":"") : "";
     }).filter(Boolean);
     out.push(d+"日("+dow+") "+(a.length?a.join("、"):"—"));
   }
@@ -565,9 +567,10 @@ function renderOut(){
   for(var d=1;d<=last;d++) (M.assign[String(d)]||[]).forEach(function(a){
     var t=tally[a.s]; if(!t) return;
     t.d++;
-    if(a.label==="午前") t.am++; else if(a.label==="午後") t.pm++; else if(/\d/.test(a.label)) t.tm++;
+    var L=lb(a.label);
+    if(L==="AM") t.am++; else if(L==="PM") t.pm++; else if(/\d/.test(L)) t.tm++;
   });
-  $("#sumTbl").innerHTML='<tr><th>名前</th><th>出勤</th><th>午前</th><th>午後</th><th>時間指定</th></tr>'+
+  $("#sumTbl").innerHTML='<tr><th>名前</th><th>出勤</th><th>AM</th><th>PM</th><th>時間指定</th></tr>'+
     DB.staff.map(function(s){
       var t=tally[s.id];
       return '<tr><td><span class="dot" style="background:'+s.color+';margin-right:6px"></span>'+esc(s.name)+'</td>'+
@@ -592,7 +595,7 @@ $("#csvBtn").addEventListener("click",function(){
     if(isClosed(d)){ rows.push([date,dow,"休業","",""].map(q).join(",")); continue }
     var a=M.assign[String(d)]||[];
     if(!a.length){ rows.push([date,dow,"未割当","",""].map(q).join(",")); continue }
-    a.forEach(function(x){ var st=staffById(x.s); rows.push([date,dow,"出勤",st?st.name:"",x.label].map(q).join(",")) });
+    a.forEach(function(x){ var st=staffById(x.s); rows.push([date,dow,"出勤",st?st.name:"",lb(x.label)].map(q).join(",")) });
   }
   download("シフト_"+y+"-"+pad(m+1)+".csv","﻿"+rows.join("\r\n"),"text/csv;charset=utf-8");
   toast("CSVを書き出しました");
@@ -605,7 +608,7 @@ $("#pubBtn").addEventListener("click",async function(){
     var days={}, closed=[];
     for(var d=1;d<=last;d++){
       if(isClosed(d)){ closed.push(d); continue }
-      var a=(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:x.label}:null }).filter(Boolean);
+      var a=(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:lb(x.label)}:null }).filter(Boolean);
       if(a.length) days[String(d)]=a;
     }
     await Sync.publishShift(ym(),days,closed);
