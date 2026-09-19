@@ -99,9 +99,6 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
 .sec+.sec{border-top:1px solid var(--line)}
 .sec h3{font-size:12px;letter-spacing:.07em;color:var(--ink-3);margin-bottom:9px;font-weight:500}
 .note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:8px 0 0}
-.needrow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
-.needrow label{font-size:11px;color:var(--ink-3);text-align:center;display:block}
-.needrow input{width:100%;text-align:center;padding:7px 2px}
 .field{display:grid;gap:8px}
 
 @media print{
@@ -163,6 +160,11 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
       <button class="btn sm primary" id="pubBtn">確定</button>
       <span class="lbl" id="pubAt"></span>
     </div>
+    <div class="row noprint" id="dowRow" hidden style="margin:-4px 0 10px;padding:9px 11px;background:var(--surface-2);border-radius:10px">
+      <span class="lbl">毎週の定休日</span>
+      <span id="dowBtns" class="row" style="gap:5px"></span>
+      <span class="lbl" style="width:100%">日を押すと、その月のその日だけ休業にできます。</span>
+    </div>
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="cal"></div>
     <p class="note noprint">小さなボタンが希望を出している人です。押すとその日に入り、入った名前をもう一度押すと外れます。
@@ -212,11 +214,6 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
         <p class="note">希望を受け取ると、知らない名前は自動で追加されます。</p>
       </div>
       <div class="sec">
-        <h3>必要な人数（曜日ごとの既定）</h3>
-        <div class="needrow" id="needRow"></div>
-        <p class="note">0にした曜日は定休日として扱います。日ごとの調整は②のカレンダーの数字から。</p>
-      </div>
-      <div class="sec">
         <h3>スタッフに配るもの</h3>
         <div class="row">
           <button class="btn sm" id="copyStaffUrl">希望を出すページのURLをコピー</button>
@@ -257,9 +254,21 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return
 function uid(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 
 var DB=load();
+/* 前は「必要人数0＝定休日」で持っていたので、いまの形に移し替える */
+(function(){
+  if(DB.needDow && !DB.closedDow){
+    DB.closedDow=DB.needDow.map(function(v){ return v===0 });
+    var nz=DB.needDow.filter(function(v){ return v>0 });
+    DB.need=nz.length?nz[0]:2;
+    delete DB.needDow;
+    try{ localStorage.setItem(KEY,JSON.stringify(DB)) }catch(e){}
+  }
+  if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
+  if(typeof DB.need!=="number") DB.need=2;
+})();
 function load(){
   try{ var v=JSON.parse(localStorage.getItem(KEY)); if(v&&v.staff) return v }catch(e){}
-  return {staff:[],needDow:[0,2,2,2,2,2,2],months:{},sync:null};
+  return {staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null};
 }
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(DB)) }catch(e){ toast("保存できませんでした") } }
 function mon(ym){ if(!DB.months[ym]) DB.months[ym]={need:{},closed:{},req:{},assign:{}}; return DB.months[ym] }
@@ -282,13 +291,12 @@ function ym(){ return view.getFullYear()+"-"+pad(view.getMonth()+1) }
 function rememberMonth(){ DB.lastYm=ym(); save() }
 function needOf(d){
   var m=mon(ym()), k=String(d);
-  if(m.need[k]!==undefined) return m.need[k];
-  return DB.needDow[new Date(view.getFullYear(),view.getMonth(),d).getDay()];
+  return (m.need[k]!==undefined) ? m.need[k] : DB.need;
 }
 function isClosed(d){
   var m=mon(ym());
   if(m.closed[String(d)]!==undefined) return !!m.closed[String(d)];
-  return needOf(d)===0;
+  return !!DB.closedDow[new Date(view.getFullYear(),view.getMonth(),d).getDay()];
 }
 
 /* ================= ① 届いた希望 ================= */
@@ -567,9 +575,25 @@ $("#cal").addEventListener("click",function(e){
     M.need[key]=n; save(); renderCal();
   }
 });
+function renderDowBtns(){
+  $("#dowBtns").innerHTML=DOWN.map(function(w,i){
+    return '<button class="chip" data-dow="'+i+'" aria-pressed="'+(DB.closedDow[i]?"true":"false")+'">'+w+'</button>';
+  }).join("");
+}
+$("#dowBtns").addEventListener("click",function(e){
+  var b=e.target.closest("[data-dow]"); if(!b) return;
+  var i=+b.dataset.dow;
+  DB.closedDow[i]=!DB.closedDow[i];
+  /* その月に個別で決めた休みは、曜日の設定より優先されるので消しておく */
+  var M=mon(ym()), y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate();
+  for(var d=1;d<=last;d++) if(new Date(y,m,d).getDay()===i) delete M.closed[String(d)];
+  save(); renderDowBtns(); renderCal(); renderOut();
+});
 $("#closeMode").addEventListener("click",function(){
   closeMode=!closeMode; this.setAttribute("aria-pressed",String(closeMode));
-  this.textContent=closeMode?"終わる（日を押すと休業）":"休業日を決める";
+  this.textContent=closeMode?"終わる":"休業日を決める";
+  $("#dowRow").hidden=!closeMode;
+  if(closeMode) renderDowBtns();
 });
 
 /* 人ごとに、出せると言った日／実際に入った日／外れた日 を数える。休業日は除く。 */
@@ -651,16 +675,6 @@ $("#addStaff").addEventListener("click",function(){
   if(staffByName(v)){ toast("同じ名前の人がいます"); return }
   addStaff(v); $("#newStaff").value=""; save(); renderAll(); renderStaff();
 });
-function renderNeed(){
-  $("#needRow").innerHTML=DOWN.map(function(w,i){
-    return '<div><label>'+w+'</label><input type="text" inputmode="numeric" data-dow="'+i+'" value="'+DB.needDow[i]+'"></div>';
-  }).join("");
-}
-$("#needRow").addEventListener("change",function(e){
-  var el=e.target.closest("[data-dow]"); if(!el) return;
-  var n=parseInt(el.value,10); if(isNaN(n)||n<0) n=0;
-  DB.needDow[+el.dataset.dow]=n; el.value=n; save(); renderCal(); renderOut();
-});
 function renderSyncUI(){
   $("#cfgState").textContent=syncOn()?"つないでいます":"未接続（LINEの貼り付けのみ）";
 }
@@ -716,18 +730,22 @@ $("#restoreFile").addEventListener("change",function(){
       var d=JSON.parse(r.result);
       if(!d||!Array.isArray(d.staff)) throw new Error("形式が違います");
       if(!confirm("今のデータを、読み込んだ内容で置き換えます。よろしいですか？")) return;
-      DB=d; if(!DB.months) DB.months={}; if(!DB.needDow) DB.needDow=[0,2,2,2,2,2,2];
+      DB=d; if(!DB.months) DB.months={};
+      if(DB.needDow&&!DB.closedDow){ DB.closedDow=DB.needDow.map(function(v){return v===0});
+        var nz=DB.needDow.filter(function(v){return v>0}); DB.need=nz.length?nz[0]:2; delete DB.needDow }
+      if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
+      if(typeof DB.need!=="number") DB.need=2;
       save(); if(DB.sync&&window.Sync) Sync.configure(DB.sync);
-      renderAll(); renderStaff(); renderNeed(); renderSyncUI(); toast("読み込みました");
+      renderAll(); renderStaff(); renderSyncUI(); toast("読み込みました");
     }catch(e){ toast("読み込めませんでした") }
   };
   r.readAsText(f); this.value="";
 });
 $("#wipe").addEventListener("click",function(){
   if(!confirm("スタッフも希望もシフトも、全部消します。取り消せません。よろしいですか？")) return;
-  DB={staff:[],needDow:[0,2,2,2,2,2,2],months:{},sync:null}; save();
+  DB={staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null}; save();
   if(window.Sync) Sync.configure(null);
-  renderAll(); renderStaff(); renderNeed(); renderSyncUI(); toast("消しました");
+  renderAll(); renderStaff(); renderSyncUI(); toast("消しました");
 });
 
 /* ================= 共通 ================= */
@@ -743,7 +761,7 @@ document.querySelector(".tabs").addEventListener("click",function(e){
     $("#cfgAnon").value=(DB.sync&&DB.sync.anon)||"";
     $("#cfgCode").value=(DB.sync&&DB.sync.code)||"";
     $("#cfgKey").value=(DB.sync&&DB.sync.key)||"";
-    renderStaff(); renderNeed(); renderSyncUI();
+    renderStaff(); renderSyncUI();
   }
   if(b.dataset.v==="req") pull(true);
   if(b.dataset.v!=="cfg") requestAnimationFrame(fitAll);
