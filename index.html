@@ -53,7 +53,7 @@ button{font:inherit;color:inherit}
 main{max-width:560px;margin:0 auto;
   padding:18px 14px calc(env(safe-area-inset-bottom,0px) + 36px)}
 .grid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
+.tile{text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);
   padding:26px 14px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
   cursor:pointer;text-align:center;min-height:168px;transition:transform .12s, box-shadow .12s}
 .tile:hover{box-shadow:0 4px 14px rgba(0,0,0,.09)}
@@ -104,7 +104,8 @@ var TILES=[
   {k:"cost",  ic:"💰", nm:"経費",       ds:"変動費・固定費・お給料"},
   {k:"pl",    ic:"📊", nm:"収支表",     ds:"売上・利益の集計"},
   {k:"stock", ic:"📦", nm:"在庫管理",   ds:"商品の在庫・発注管理"},
-  {k:"book",  ic:"📅", nm:"予約管理",   ds:"テーブル予約の登録・管理"},
+  {k:"shift", ic:"🗓️", nm:"シフト管理", ds:"スタッフの希望・シフト作成",
+   url:"https://keiki-takemoto.github.io/shift/admin/"},
   {k:"pos",   ic:"🧾", nm:"takeレジ",   ds:"注文・会計・メニュー・QR発行"},
   {k:"export",ic:"📤", nm:"エクスポート", ds:"税理士・確定申告用の出力"},
   {k:"cfg",   ic:"⚙️", nm:"設定",       ds:"各種設定"}
@@ -113,15 +114,18 @@ var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 
 $("#grid").innerHTML=TILES.map(function(t){
-  return '<button class="tile" data-k="'+t.k+'">'+
-    '<span class="ic">'+t.ic+'</span>'+
+  var inner='<span class="ic">'+t.ic+'</span>'+
     '<span class="nm">'+esc(t.nm)+'</span>'+
-    '<span class="ds">'+esc(t.ds)+'</span></button>';
+    '<span class="ds">'+esc(t.ds)+'</span>';
+  return t.url
+    ? '<a class="tile" href="'+esc(t.url)+'" data-k="'+t.k+'">'+inner+'</a>'
+    : '<button class="tile" data-k="'+t.k+'">'+inner+'</button>';
 }).join("");
 
 $("#grid").addEventListener("click",function(e){
   var b=e.target.closest(".tile"); if(!b) return;
   var t=TILES.filter(function(x){return x.k===b.dataset.k})[0]; if(!t) return;
+  if(t.url) return;                      /* リンクのタイルはそのまま飛ばす */
   $("#sIcon").textContent=t.ic; $("#sTitle").textContent=t.nm; $("#sDesc").textContent=t.ds;
   $("#sheet").hidden=false;
 });
