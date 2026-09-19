@@ -301,6 +301,32 @@ function isClosed(d){
 }
 
 /* ================= ① 届いた希望 ================= */
+var curTab="req", lastShift={total:0,short:0};
+/* 月の行の右側。①のときは提出の数、②のときはのべ人数と足りない日。 */
+function renderStat(){
+  if(curTab==="cal"){
+    $("#stat").innerHTML='のべ <b>'+lastShift.total+'</b> 人 ・ '+
+      (lastShift.short?'<span class="short">足りない日 <b>'+lastShift.short+'</b></span>':'<span>過不足なし</span>');
+    return;
+  }
+  var M=mon(ym()), n=0;
+  DB.staff.forEach(function(s){ if(M.req[s.id]) n++ });
+  $("#stat").innerHTML= DB.staff.length
+    ? '提出 <b>'+n+'</b>／'+DB.staff.length+'人'+(n<DB.staff.length?' <span class="short">未提出 '+(DB.staff.length-n)+'</span>':'')
+    : '<span class="short">スタッフがいません</span>';
+}
+/* スタッフのメモを①のカレンダーの下に出す */
+function renderReq(){
+  var M=mon(ym()), memo=[];
+  DB.staff.forEach(function(s){
+    var r=M.req[s.id];
+    if(r&&r.note) memo.push(s.name+"："+r.note);
+  });
+  $("#memoRow").innerHTML=memo.map(function(t){return '<span class="memo">'+esc(t)+'</span>'}).join("");
+  $("#memoRow").hidden=!memo.length;
+  renderStat();
+}
+
 /* オンライン受信 */
 var lastPull=0, pulling=false;
 async function pull(silent){
