@@ -181,10 +181,12 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <section class="view" id="v-cfg" data-off>
     <div class="card">
       <div class="sec">
-        <h3>スタッフから自動で受け取る</h3>
+        <h3>スタッフから自動で受け取る（Supabase）</h3>
         <div class="field">
-          <div><div class="lbl">置き場所のURL（Apps Scriptのウェブアプリ）</div>
-            <input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%" spellcheck="false"></div>
+          <div><div class="lbl">Project URL</div>
+            <input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" style="width:100%" spellcheck="false"></div>
+          <div><div class="lbl">anon public key</div>
+            <input type="text" id="cfgAnon" placeholder="eyJhbGciOi…" style="width:100%" spellcheck="false"></div>
           <div class="row">
             <div style="flex:1;min-width:150px"><div class="lbl">合言葉（スタッフ用）</div><input type="text" id="cfgCode" style="width:100%" spellcheck="false"></div>
             <div style="flex:1;min-width:150px"><div class="lbl">管理用キー（店長用）</div><input type="text" id="cfgKey" style="width:100%" spellcheck="false"></div>
@@ -197,6 +199,8 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
         </div>
         <p class="note">まだ置き場所を作っていない場合は <a href="./setup.html" target="_blank" rel="noopener">はじめの設定</a>（10分ほど）。
           空のままでも、LINEの貼り付けだけで使えます。</p>
+        <p class="note">Supabaseの <b>Project Settings → API</b> にある Project URL と anon public key を貼ってください。
+          合言葉の2つは、はじめの設定のページに書いてあります。</p>
       </div>
       <div class="sec">
         <h3>スタッフ</h3>
@@ -661,25 +665,25 @@ function renderSyncUI(){
   $("#cfgState").textContent=syncOn()?"つないでいます":"未接続（LINEの貼り付けのみ）";
 }
 $("#cfgSave").addEventListener("click",function(){
-  var u=$("#cfgUrl").value.trim();
-  DB.sync=u?{url:u,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()}:null;
+  var u=$("#cfgUrl").value.trim(), a=$("#cfgAnon").value.trim();
+  DB.sync=(u&&a)?{url:u,anon:a,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()}:null;
   save(); if(window.Sync) Sync.configure(DB.sync);
-  renderSyncUI(); renderReq(); toast(u?"保存しました":"接続をやめました");
-  if(u) pull(false);
+  renderSyncUI(); renderReq(); toast(DB.sync?"保存しました":"接続をやめました");
+  if(DB.sync) pull(false);
 });
 $("#cfgTest").addEventListener("click",async function(){
-  var u=$("#cfgUrl").value.trim();
-  if(!u){ toast("URLを入れてください"); return }
+  var u=$("#cfgUrl").value.trim(), a=$("#cfgAnon").value.trim();
+  if(!u||!a){ toast("URLとanonキーを入れてください"); return }
   var keep=DB.sync;
-  if(window.Sync) Sync.configure({url:u,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()});
+  if(window.Sync) Sync.configure({url:u,anon:a,code:$("#cfgCode").value.trim(),key:$("#cfgKey").value.trim()});
   $("#cfgState").textContent="試しています…";
   try{ await Sync.ping(); await Sync.listRequests(""); $("#cfgState").textContent="つながりました" }
   catch(e){ $("#cfgState").textContent=(e&&e.message)||"つながりませんでした"; if(window.Sync) Sync.configure(keep) }
 });
 function staffUrl(){
   var base=(location.hostname==="localhost")? location.origin+"/" : STAFF_APP;
-  if(DB.sync&&DB.sync.url){
-    try{ return base+"?c="+encodeURIComponent(btoa(JSON.stringify({u:DB.sync.url,c:DB.sync.code||""}))) }catch(e){}
+  if(DB.sync&&DB.sync.url&&DB.sync.anon){
+    try{ return base+"?c="+encodeURIComponent(btoa(JSON.stringify({u:DB.sync.url,a:DB.sync.anon,c:DB.sync.code||""}))) }catch(e){}
   }
   return base;
 }
@@ -736,6 +740,7 @@ document.querySelector(".tabs").addEventListener("click",function(e){
   $("#monthbar").hidden=(b.dataset.v==="cfg");
   if(b.dataset.v==="cfg"){
     $("#cfgUrl").value=(DB.sync&&DB.sync.url)||"";
+    $("#cfgAnon").value=(DB.sync&&DB.sync.anon)||"";
     $("#cfgCode").value=(DB.sync&&DB.sync.code)||"";
     $("#cfgKey").value=(DB.sync&&DB.sync.key)||"";
     renderStaff(); renderNeed(); renderSyncUI();

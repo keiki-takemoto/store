@@ -37,9 +37,13 @@
     書式や通信を直すときは両方直すこと。
   - スタッフが希望を出すページは別アプリのまま（https://keiki-takemoto.github.io/shift/ ）。
     その場所は `shift/index.html` の `STAFF_APP` に書いてある。
-  - 置き場所（Googleスプレッドシート＋Apps Script）の手順は `shift/setup.html`、
-    サーバーのコードは `server/Code.gs`。
-  - 電話の幅（640px以下）では7列のカレンダーをやめ、日ごとの縦並びに切り替わる。
+  - **置き場所は Supabase**（2026-09-19にGoogleスプレッドシート＋Apps Scriptから移行）。
+    SQLは `server/supabase.sql`、手順ページは `shift/setup.html`。
+    表はRLSで全部拒否し、SQLで作った5つの関数（shift_ping / shift_submit_request /
+    shift_list_requests / shift_publish / shift_get）だけが中身に触れる。
+    合言葉は関数の中で確かめるので、anonキーがスタッフのURLに入っていても中身は守られる。
+    サーバー側のコードを置かずに済むぶん、Apps Scriptより設定が短い。
+
 
 ## これから作るとき
 
