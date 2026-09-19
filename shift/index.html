@@ -160,29 +160,22 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <section class="view" id="v-cal" data-off>
     <div class="row noprint" style="margin-bottom:10px">
       <button class="btn sm" id="closeMode" aria-pressed="false">休業日を決める</button>
+      <button class="btn sm" id="copyShift">LINEに貼る文をコピー</button>
+      <button class="btn sm" id="csvBtn">CSV</button>
       <button class="btn sm" id="printBtn">印刷</button>
+      <button class="btn sm primary" id="pubBtn" hidden>スタッフに公開</button>
+      <span class="lbl" id="pubAt"></span>
     </div>
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="cal"></div>
     <p class="note noprint">小さなボタンが希望を出している人です。押すとその日に入り、入った名前をもう一度押すと外れます。
       日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。</p>
 
-    <div class="grid2 noprint" style="margin-top:16px">
-      <div class="card">
-        <div class="card-h"><h2>スタッフに知らせる</h2><span class="hint" id="pubAt"></span></div>
-        <div class="card-b">
-          <div class="row">
-            <button class="btn primary" id="pubBtn" hidden>この月のシフトを公開</button>
-            <button class="btn" id="copyShift">LINEに貼る文をコピー</button>
-            <button class="btn sm" id="csvBtn">CSV</button>
-          </div>
-          <pre class="out" id="shiftText" style="margin-top:12px"></pre>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-h"><h2>人ごとの集計</h2><span class="hint" id="sumMonth"></span></div>
-        <div class="card-b" style="padding:0 0 4px"><table class="tbl" id="sumTbl"></table></div>
-      </div>
+    <div class="card noprint" style="margin-top:16px">
+      <div class="card-h"><h2>人ごとの集計</h2><span class="hint" id="sumMonth"></span></div>
+      <div class="card-b" style="padding:0 0 4px"><table class="tbl" id="sumTbl"></table></div>
+      <p class="note" style="padding:0 15px 14px;margin:0">「出せる日」は本人が出せると言った日、「入った日」は実際に入れた日、
+        「外れた日」はその差です。休業日は数えません。</p>
     </div>
   </section>
 
@@ -591,29 +584,38 @@ function shiftLines(){
   }
   return out;
 }
+function shiftTextValue(){
+  return "【"+view.getFullYear()+"年"+(view.getMonth()+1)+"月のシフト】\n"+shiftLines().join("\n");
+}
+/* 人ごとに、出せると言った日／実際に入った日／外れた日 を数える。休業日は除く。 */
 function renderOut(){
   $("#sumMonth").textContent=view.getFullYear()+"年"+(view.getMonth()+1)+"月";
-  $("#shiftText").textContent="【"+view.getFullYear()+"年"+(view.getMonth()+1)+"月のシフト】\n"+shiftLines().join("\n");
   $("#pubBtn").hidden=!syncOn();
   var M=mon(ym()), y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate();
-  var tally={};
-  DB.staff.forEach(function(s){ tally[s.id]={d:0,am:0,pm:0,tm:0} });
-  for(var d=1;d<=last;d++) (M.assign[String(d)]||[]).forEach(function(a){
-    var t=tally[a.s]; if(!t) return;
-    t.d++;
-    var L=lb(a.label);
-    if(L==="AM") t.am++; else if(L==="PM") t.pm++; else if(/\d/.test(L)) t.tm++;
-  });
-  $("#sumTbl").innerHTML='<tr><th>名前</th><th>出勤</th><th>AM</th><th>PM</th><th>時間指定</th></tr>'+
+  var t={};
+  DB.staff.forEach(function(s){ t[s.id]={sub:0,dec:0,has:!!M.req[s.id]} });
+  for(var d=1;d<=last;d++){
+    if(isClosed(d)) continue;
+    var key=String(d);
+    DB.staff.forEach(function(s){
+      var r=M.req[s.id];
+      if(r && (r.days[key]||"ok")!=="ng") t[s.id].sub++;
+    });
+    (M.assign[key]||[]).forEach(function(a){ if(t[a.s]) t[a.s].dec++ });
+  }
+  if(!DB.staff.length){ $("#sumTbl").innerHTML='<tr><td class="note">まだスタッフがいません。</td></tr>'; return }
+  $("#sumTbl").innerHTML='<tr><th>名前</th><th>出せる日</th><th>入った日</th><th>外れた日</th></tr>'+
     DB.staff.map(function(s){
-      var t=tally[s.id];
+      var x=t[s.id], off=Math.max(0,x.sub-x.dec);
       return '<tr><td><span class="dot" style="background:'+s.color+';margin-right:6px"></span>'+esc(s.name)+'</td>'+
-        '<td class="mono">'+t.d+'日</td><td class="mono">'+t.am+'</td><td class="mono">'+t.pm+'</td><td class="mono">'+t.tm+'</td></tr>';
+        '<td class="mono">'+(x.has?x.sub+"日":'<span style="color:var(--ink-3)">未提出</span>')+'</td>'+
+        '<td class="mono"><b>'+x.dec+'日</b></td>'+
+        '<td class="mono"'+(off?' style="color:var(--warn)"':'')+'>'+(x.has?off+"日":"—")+'</td></tr>';
     }).join("");
 }
 $("#copyShift").addEventListener("click",async function(){
-  try{ await navigator.clipboard.writeText($("#shiftText").textContent); toast("コピーしました") }
-  catch(e){ toast("コピーできませんでした") }
+  try{ await navigator.clipboard.writeText(shiftTextValue()); toast("コピーしました") }
+  catch(e){ prompt("コピーしてください",shiftTextValue()) }
 });
 function download(name,text,type){
   var url=URL.createObjectURL(new Blob([text],{type:type||"text/plain;charset=utf-8"}));
@@ -649,7 +651,7 @@ $("#pubBtn").addEventListener("click",async function(){
     $("#pubAt").textContent="公開ずみ "+new Date().toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
     toast("スタッフに公開しました");
   }catch(e){ toast((e&&e.message)||"公開できませんでした") }
-  finally{ b.disabled=false; b.textContent="この月のシフトを公開" }
+  finally{ b.disabled=false; b.textContent="スタッフに公開" }
 });
 
 /* ================= ③ 設定 ================= */
