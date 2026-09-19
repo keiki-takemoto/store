@@ -39,7 +39,7 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 .badge{font-size:11px;border-radius:999px;padding:2px 9px;white-space:nowrap}
 .days{display:flex;gap:6px;flex-wrap:wrap}
 .days span{font-size:12.5px;border-radius:7px;padding:2px 9px;font-family:var(--mono)}
-.memo{font-size:12.5px;color:var(--ink-2)}
+.memo{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:4px 10px}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
 .fold{border:none;background:transparent;color:var(--ink-2);font-size:13px;cursor:pointer;padding:10px 14px;
   width:100%;text-align:left;border-top:1px solid var(--line)}
@@ -131,26 +131,9 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <section class="view" id="v-req">
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="calReq"></div>
+    <div class="row" id="memoRow" hidden style="margin-top:10px"></div>
     <p class="note noprint">スタッフが「出られる」と出した日です。名前の横は希望の時間帯。
       ②に切り替えると、ここから選んでシフトを決められます。</p>
-    <div class="card" style="margin-top:16px">
-      <div class="card-h"><h2>届いた希望</h2><span class="hint" id="reqHint"></span></div>
-      <div id="reqList"></div>
-      <button class="fold" id="pasteFold">＋ LINEの文章から取り込む（ネットにつながっていないとき）</button>
-      <div class="card-b" id="pasteBox" hidden>
-        <textarea id="pasteIn" rows="7" placeholder="【シフト希望】2026年10月&#10;名前：田中&#10;× 3, 7&#10;AM 5"></textarea>
-        <div class="row" style="margin-top:9px">
-          <button class="btn sm" id="readBtn">読み込む</button>
-          <button class="btn ghost sm" id="clearIn">消す</button>
-          <span class="lbl" id="readCount"></span>
-        </div>
-        <div id="readList"></div>
-        <div class="row" style="margin-top:10px" id="applyRow" hidden>
-          <button class="btn primary sm" id="applyBtn">この内容で登録する</button>
-          <span class="lbl">同じ人・同じ月は上書きされます</span>
-        </div>
-      </div>
-    </div>
   </section>
 
   <!-- ② 確定シフト -->
@@ -203,6 +186,21 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
           空のままでも、LINEの貼り付けだけで使えます。</p>
         <p class="note">Supabaseの <b>Project Settings → API</b> にある Project URL と anon public key を貼ってください。
           合言葉の2つは、はじめの設定のページに書いてあります。</p>
+      </div>
+      <div class="sec">
+        <h3>LINEの文章から取り込む</h3>
+        <p class="note" style="margin:0 0 9px">置き場所につないでいないときや、スタッフが直接LINEで送ってきたときに使います。</p>
+        <textarea id="pasteIn" rows="6" placeholder="【シフト希望】2026年10月&#10;名前：森川&#10;終日 1, 2, 3&#10;AM 5"></textarea>
+        <div class="row" style="margin-top:9px">
+          <button class="btn sm" id="readBtn">読み込む</button>
+          <button class="btn ghost sm" id="clearIn">消す</button>
+          <span class="lbl" id="readCount"></span>
+        </div>
+        <div id="readList"></div>
+        <div class="row" style="margin-top:10px" id="applyRow" hidden>
+          <button class="btn primary sm" id="applyBtn">この内容で登録する</button>
+          <span class="lbl">同じ人・同じ月は上書きされます</span>
+        </div>
       </div>
       <div class="sec">
         <h3>スタッフ</h3>
@@ -334,32 +332,30 @@ function summaryOf(days){
   if(!out.length) out.push({k:"ng",t:"出られる日なし"});
   return out;
 }
-function renderReq(){
-  var M=mon(ym()), n=0;
-  if(!DB.staff.length){
-    $("#reqList").innerHTML='<div class="card-b"><p class="note">まだ誰も登録されていません。'+
-      '③設定でスタッフを追加するか、希望が届くと自動で増えます。</p></div>';
-    $("#reqHint").textContent=""; return;
+var curTab="req", lastShift={total:0,short:0};
+/* 月の行の右側。①のときは提出の数、②のときはのべ人数と足りない日。 */
+function renderStat(){
+  if(curTab==="cal"){
+    $("#stat").innerHTML='のべ <b>'+lastShift.total+'</b> 人 ・ '+
+      (lastShift.short?'<span class="short">足りない日 <b>'+lastShift.short+'</b></span>':'<span>過不足なし</span>');
+    return;
   }
-  $("#reqList").innerHTML=DB.staff.map(function(s){
-    var r=M.req[s.id];
-    if(r) n++;
-    return '<div class="person">'+
-      '<div class="p-head"><span class="dot" style="background:'+s.color+'"></span>'+
-        '<span class="nm">'+esc(s.name)+'</span>'+
-        (r?'<span class="badge c-ok">提出ずみ</span>':'<span class="badge c-ng">未提出</span>')+
-        (r&&r.at?'<span class="at">'+esc(String(r.at).slice(5,16))+'</span>':'')+'</div>'+
-      (r?'<div class="days">'+summaryOf(r.days).map(function(x){
-            return '<span class="c-'+x.k+'">'+esc(x.t)+'</span>' }).join("")+'</div>':'')+
-      (r&&r.note?'<div class="memo">メモ：'+esc(r.note)+'</div>':'')+
-    '</div>';
-  }).join("");
-  $("#reqHint").textContent=n+"／"+DB.staff.length+"人"+(syncOn()?"・自動":"");
+  var M=mon(ym()), n=0;
+  DB.staff.forEach(function(s){ if(M.req[s.id]) n++ });
+  $("#stat").innerHTML= DB.staff.length
+    ? '提出 <b>'+n+'</b>／'+DB.staff.length+'人'+(n<DB.staff.length?' <span class="short">未提出 '+(DB.staff.length-n)+'</span>':'')
+    : '<span class="short">スタッフがいません</span>';
 }
-$("#pasteFold").addEventListener("click",function(){
-  var b=$("#pasteBox"); b.hidden=!b.hidden;
-  this.textContent=(b.hidden?"＋":"−")+" LINEの文章から取り込む（ネットにつながっていないとき）";
-});
+function renderReq(){
+  var M=mon(ym()), memo=[];
+  DB.staff.forEach(function(s){
+    var r=M.req[s.id];
+    if(r&&r.note) memo.push(s.name+"："+r.note);
+  });
+  $("#memoRow").innerHTML=memo.map(function(t){return '<span class="memo">'+esc(t)+'</span>'}).join("");
+  $("#memoRow").hidden=!memo.length;
+  renderStat();
+}
 var parsed=[];
 $("#readBtn").addEventListener("click",function(){
   var t=$("#pasteIn").value.trim();
@@ -531,8 +527,8 @@ function renderCal(){
   $("#cal").innerHTML=r.html;
   $("#calReq").innerHTML=buildMonth("req").html;
   requestAnimationFrame(fitAll);
-  $("#stat").innerHTML='のべ <b>'+r.total+'</b> 人 ・ '+
-    (r.short?'<span class="short">足りない日 <b>'+r.short+'</b></span>':'<span>過不足なし</span>');
+  lastShift={total:r.total,short:r.short};
+  renderStat();
 }
 function cands(d){ return avail(d,true) }
 /* skipTaken=true … すでにその日に入っている人を除く（②の候補ボタン用） */
@@ -772,6 +768,7 @@ $("#prevM").addEventListener("click",function(){ view.setMonth(view.getMonth()-1
 $("#nextM").addEventListener("click",function(){ view.setMonth(view.getMonth()+1); rememberMonth(); renderAll() });
 document.querySelector(".tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
+  curTab=b.dataset.v;
   ["req","cal","cfg"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   $("#monthbar").hidden=(b.dataset.v==="cfg");
@@ -783,6 +780,7 @@ document.querySelector(".tabs").addEventListener("click",function(e){
     renderStaff(); renderSyncUI();
   }
   if(b.dataset.v==="req") pull(true);
+  renderStat(); renderReq();
   if(b.dataset.v!=="cfg") requestAnimationFrame(fitAll);
   window.scrollTo({top:0});
 });
