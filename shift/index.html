@@ -218,7 +218,12 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
           <input type="text" id="newStaff" placeholder="名前を入れて追加" style="flex:1;min-width:140px">
           <button class="btn sm" id="addStaff">追加</button>
         </div>
-        <p class="note">希望を受け取ると、知らない名前は自動で追加されます。</p>
+        <div class="row" id="hiddenRow" hidden style="margin-top:10px">
+          <span class="lbl" style="width:100%">受け取らない名前（削除した人）</span>
+          <span id="hiddenList" class="row" style="gap:6px"></span>
+        </div>
+        <p class="note">希望を受け取ると、知らない名前は自動で追加されます。
+          削除した人の名前は、あとから同じ名前で届いても取り込みません（上の「戻す」で解除できます）。</p>
       </div>
       <div class="sec">
         <h3>スタッフに配るもの</h3>
@@ -272,6 +277,7 @@ var DB=load();
   }
   if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
   if(typeof DB.need!=="number") DB.need=2;
+  if(!Array.isArray(DB.hidden)) DB.hidden=[];
   /* 希望の持ち方も「出られる日を並べる」形に統一する */
   var moved=false;
   Object.keys(DB.months||{}).forEach(function(ymk){
@@ -294,15 +300,18 @@ var DB=load();
 })();
 function load(){
   try{ var v=JSON.parse(localStorage.getItem(KEY)); if(v&&v.staff) return v }catch(e){}
-  return {staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null};
+  return {staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null,hidden:[]};
 }
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(DB)) }catch(e){ toast("保存できませんでした") } }
 function mon(ym){ if(!DB.months[ym]) DB.months[ym]={need:{},closed:{},req:{},assign:{}}; return DB.months[ym] }
 function staffById(id){ return DB.staff.filter(function(s){return s.id===id})[0] }
+function normName(n){ return String(n==null?"":n).replace(/\s|　/g,"") }
 function staffByName(n){
-  var k=String(n).replace(/\s|　/g,"");
-  return DB.staff.filter(function(s){return s.name.replace(/\s|　/g,"")===k})[0];
+  var k=normName(n);
+  return DB.staff.filter(function(s){return normName(s.name)===k})[0];
 }
+/* 削除した人の名前。あとから同じ名前で希望が届いても取り込まない */
+function isHidden(n){ return (DB.hidden||[]).indexOf(normName(n))>=0 }
 function addStaff(name){
   var s={id:uid(),name:String(name).trim(),color:COLORS[DB.staff.length%COLORS.length]};
   DB.staff.push(s); return s;
@@ -362,6 +371,7 @@ async function pull(silent){
     var changed=[], others={};
     (r.items||[]).forEach(function(it){
       if(!it.name||!/^\d{4}-\d{2}$/.test(it.month||"")) return;
+      if(isHidden(it.name)) return;        /* 削除した人はもう復活させない */
       var st=staffByName(it.name)||addStaff(it.name);
       var m=mon(it.month), cur=m.req[st.id];
       if(cur&&cur.at===it.at) return;
@@ -710,13 +720,22 @@ function renderStaff(){
       '<td style="text-align:right;white-space:nowrap"><button class="btn sm ghost" data-ren="'+s.id+'">名前</button>'+
       '<button class="btn sm ghost" data-del="'+s.id+'">削除</button></td></tr>';
   }).join("")+'</table>';
+  renderHidden();
+}
+function renderHidden(){
+  var h=DB.hidden||[];
+  $("#hiddenRow").hidden=!h.length;
+  $("#hiddenList").innerHTML=h.map(function(n){
+    return '<span class="memo">'+esc(n)+' <button class="btn sm ghost" data-unhide="'+esc(n)+'" style="margin-left:4px">戻す</button></span>';
+  }).join("");
 }
 $("#staffList").addEventListener("click",function(e){
   var r=e.target.closest("[data-ren]"), d=e.target.closest("[data-del]");
   if(r){ var s=staffById(r.dataset.ren); var v=prompt("名前",s.name); if(v&&v.trim()){ s.name=v.trim(); save(); renderAll(); renderStaff() } }
   if(d){
     var st=staffById(d.dataset.del);
-    if(!confirm(st.name+" さんを削除します。この人の希望と割り当ても消えます。よろしいですか？")) return;
+    if(!confirm(st.name+" さんを削除します。この人の希望と割り当ても消えます。\n"+
+      "これから「"+st.name+"」という名前で届く希望も、受け取らないようにします。よろしいですか？")) return;
     DB.staff=DB.staff.filter(function(x){return x.id!==st.id});
     Object.keys(DB.months).forEach(function(k){
       delete DB.months[k].req[st.id];
@@ -724,12 +743,22 @@ $("#staffList").addEventListener("click",function(e){
         DB.months[k].assign[d2]=DB.months[k].assign[d2].filter(function(a){return a.s!==st.id});
       });
     });
+    DB.hidden=DB.hidden||[];
+    if(!isHidden(st.name)) DB.hidden.push(normName(st.name));
     save(); renderAll(); renderStaff();
   }
+});
+$("#hiddenList").addEventListener("click",function(e){
+  var b=e.target.closest("[data-unhide]"); if(!b) return;
+  var n=b.dataset.unhide;
+  DB.hidden=(DB.hidden||[]).filter(function(x){return x!==n});
+  save(); renderStaff(); toast("「"+n+"」の希望をまた受け取ります");
+  if(syncOn()) pull(false);
 });
 $("#addStaff").addEventListener("click",function(){
   var v=$("#newStaff").value.trim(); if(!v) return;
   if(staffByName(v)){ toast("同じ名前の人がいます"); return }
+  DB.hidden=(DB.hidden||[]).filter(function(x){return x!==normName(v)});   /* 入れ直したら受け取る */
   addStaff(v); $("#newStaff").value=""; save(); renderAll(); renderStaff();
 });
 function cfgFields(){
@@ -788,8 +817,8 @@ function staffUrl(){
   return base;
 }
 async function copyText(t,msg){
-  try{ await navigator.clipboard.writeText(t); toast(msg||"コピーしました") }
-  catch(e){ prompt("コピーしてください",t) }
+  try{ await navigator.clipboard.writeText(t); toast(msg||"コピーしました"); return }catch(e){}
+  try{ prompt("コピーしてください",t) }catch(e){ toast("コピーできませんでした") }
 }
 $("#copyStaffUrl").addEventListener("click",function(){ copyText(staffUrl()) });
 $("#copyAnn").addEventListener("click",function(){
@@ -821,6 +850,7 @@ $("#restoreFile").addEventListener("change",function(){
         var nz=DB.needDow.filter(function(v){return v>0}); DB.need=nz.length?nz[0]:2; delete DB.needDow }
       if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
       if(typeof DB.need!=="number") DB.need=2;
+      if(!Array.isArray(DB.hidden)) DB.hidden=[];
       save(); if(DB.sync&&window.Sync) Sync.configure(DB.sync);
       fillCfg(); renderAll(); renderStaff(); renderSyncUI(); toast("読み込みました");
     }catch(e){ toast("読み込めませんでした") }
@@ -829,7 +859,7 @@ $("#restoreFile").addEventListener("change",function(){
 });
 $("#wipe").addEventListener("click",function(){
   if(!confirm("スタッフも希望もシフトも、全部消します。取り消せません。よろしいですか？")) return;
-  DB={staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null,cfgDraft:null}; save();
+  DB={staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null,cfgDraft:null,hidden:[]}; save();
   if(window.Sync) Sync.configure(null);
   fillCfg(); renderAll(); renderStaff(); renderSyncUI(); toast("消しました");
 });
