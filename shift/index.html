@@ -82,6 +82,19 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
   font-size:clamp(8px,1.6vw,10.5px);cursor:pointer;color:var(--ink-3);white-space:nowrap;line-height:1.5}
 .cand:hover{background:var(--surface-2);color:var(--ink)}
 .cand[data-k="am"]{color:var(--am)} .cand[data-k="pm"]{color:var(--pm)} .cand[data-k="tm"]{color:var(--tm)}
+/* 終日OKの人は「名前｜AM｜PM」の3つに分かれたボタンにする */
+/* 名前を上の段、AM／PMを下の段に。マスが狭くても名前が潰れないようにする */
+.cand.grp{display:flex;flex-wrap:wrap;flex:1 0 100%;padding:0;overflow:hidden}
+.cand.grp .cp:first-child{flex:1 0 100%;text-align:left;overflow:hidden;text-overflow:ellipsis;
+  border-bottom:1px solid var(--line)}
+.cp.h{flex:1;text-align:center}
+.cp.h[data-k="pm"]{border-left:1px solid var(--line)}
+.cand.grp:hover{background:transparent}
+.cp{border:0;background:transparent;font:inherit;color:inherit;cursor:pointer;line-height:1.5;
+  padding:0 clamp(2px,0.5vw,5px);white-space:nowrap}
+.cp:hover{background:var(--surface-2);color:var(--ink)}
+.cp.h{font-weight:700}
+.cp.h[data-k="am"]{color:var(--am)} .cp.h[data-k="pm"]{color:var(--pm)}
 
 pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;
   font-family:var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.75;max-height:36vh;overflow:auto}
@@ -150,6 +163,8 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="cal"></div>
     <p class="note noprint">小さなボタンが希望を出している人です。押すとその日に入り、入った名前をもう一度押すと外れます。
+      <b>終日OKの人のボタンは、上が名前・下がAMとPMの3つに分かれています。</b>名前を押すと終日、AM・PMを押すとその半日だけ入ります。
+      AMに入れたあと同じ人のPMも押すと、自動で終日にまとまります。入った人は<b>AMが上、PMが下</b>の順に並びます。<br>
       日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。<br>
       決まったら<b>「確定」</b>を押すと、スタッフのページの「確定シフト」に出ます。直して押し直せば上書きされます。</p>
 
@@ -387,7 +402,7 @@ function buildMonth(mode){
     var isToday=(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate());
     var rows, lack=false;
     if(mode==="shift"){
-      var asg=M.assign[key]||[];
+      var asg=sortAsg(M.assign[key]||[]);
       total+=asg.length;
       lack=!closed&&asg.length<need;
       if(lack) short++;
@@ -396,9 +411,10 @@ function buildMonth(mode){
         return {c:st.color,name:st.name,label:(a.label==="終日"?"":calLabel(a.label)),s:a.s};
       }).filter(Boolean);
     }else{
-      rows=avail(d,false).map(function(c){
-        return {c:(staffById(c.id)||{}).color,name:c.name,label:calLabel(c.mark),s:c.id};
-      });
+      rows=avail(d,false).sort(function(p,q){ return slotRank(p.mark)-slotRank(q.mark) })
+        .map(function(c){
+          return {c:(staffById(c.id)||{}).color,name:c.name,label:calLabel(c.mark),s:c.id};
+        });
     }
     html+='<div class="day s'+dow+(closed?" closed":"")+'" data-d="'+d+'">'+
       '<div class="dh"><span class="n'+(isToday?" today":"")+'"'+
@@ -414,6 +430,12 @@ function buildMonth(mode){
       }).join("")+'</div>';
       if(mode==="shift"){
         html+='<div class="cands">'+cands(d).map(function(c){
+          if(c.split){   /* 終日OKの人：名前＝終日、AM／PM＝半日だけ */
+            return '<span class="cand grp">'+
+              '<button class="cp" data-act="add" data-s="'+c.id+'" data-k="ok" title="終日で入れる">'+esc(c.name)+'</button>'+
+              '<button class="cp h" data-act="add" data-s="'+c.id+'" data-k="am" title="AMだけ入れる">AM</button>'+
+              '<button class="cp h" data-act="add" data-s="'+c.id+'" data-k="pm" title="PMだけ入れる">PM</button></span>';
+          }
           return '<button class="cand" data-act="add" data-s="'+c.id+'" data-k="'+c.kind+'" title="'+esc(c.title)+'">'+
             esc(c.name)+(c.mark?' '+esc(calLabel(c.mark)):'')+'</button>';
         }).join("")+'</div>';
@@ -460,7 +482,29 @@ function renderCal(){
   lastShift={total:r.total,short:r.short};
   renderStat();
 }
-function cands(d){ return avail(d,true) }
+/* ②の候補ボタン。すでにAMだけ入っている人には、残りのPMだけを出す。 */
+function cands(d){
+  var M=mon(ym()), key=String(d), got={};
+  (M.assign[key]||[]).forEach(function(a){
+    var g=got[a.s]=got[a.s]||{}, x=lb(a.label);
+    if(x==="AM") g.am=1; else if(x==="PM") g.pm=1; else g.full=1;
+  });
+  var out=[];
+  DB.staff.forEach(function(s){
+    var r=M.req[s.id]; if(!r) return;
+    var c=r.days[key];
+    if(!c||c==="ng") return;
+    var g=got[s.id]||{};
+    if(g.full||(g.am&&g.pm)) return;
+    if(F.isTime(c)){ if(!g.am&&!g.pm) out.push({id:s.id,name:s.name,kind:"tm",mark:F.timeText(c),title:F.timeText(c)}); return }
+    if(c==="am"){ if(!g.am) out.push({id:s.id,name:s.name,kind:"am",mark:"AM",title:"AMのみ"}); return }
+    if(c==="pm"){ if(!g.pm) out.push({id:s.id,name:s.name,kind:"pm",mark:"PM",title:"PMのみ"}); return }
+    if(g.am)      out.push({id:s.id,name:s.name,kind:"pm",mark:"PM",title:"PMだけ入れる"});
+    else if(g.pm) out.push({id:s.id,name:s.name,kind:"am",mark:"AM",title:"AMだけ入れる"});
+    else          out.push({id:s.id,name:s.name,kind:"ok",mark:"",title:"終日で入れる",split:true});
+  });
+  return out;
+}
 /* skipTaken=true … すでにその日に入っている人を除く（②の候補ボタン用） */
 function avail(d,skipTaken){
   var M=mon(ym()), key=String(d);
@@ -492,6 +536,16 @@ function shortT(x){
   return f+"-"+t;
 }
 function calLabel(x){ return shortT(lb(x)) }
+/* 並び順。AMを上、PMを下に。時間指定は始まりの時刻の順、終日はいちばん上。 */
+function slotRank(label){
+  var x=lb(label);
+  if(x==="AM") return 1;
+  if(x==="PM") return 12.5;
+  var m=String(x).match(/^(\d{1,2}):(\d{2})/);
+  if(m) return +m[1]+(+m[2])/60;
+  return 0;
+}
+function sortAsg(a){ if(a) a.sort(function(p,q){ return slotRank(p.label)-slotRank(q.label) }); return a }
 function labelFor(sid,d){
   var r=mon(ym()).req[sid];
   var c=r?(r.days[String(d)]||"ok"):"ok";
@@ -505,8 +559,19 @@ $("#cal").addEventListener("click",function(e){
   var el=e.target.closest("[data-act]"); if(!el) return;
   var act=el.dataset.act;
   if(act==="add"){
-    (M.assign[key]=M.assign[key]||[]).push({s:el.dataset.s,label:labelFor(el.dataset.s,d)});
-    save(); renderCal(); renderOut(); return;
+    var sid=el.dataset.s, k=el.dataset.k;
+    var lab=(k==="am")?"AM":(k==="pm")?"PM":labelFor(sid,d);
+    var arr=(M.assign[key]=M.assign[key]||[]);
+    var mine=arr.filter(function(a){return a.s===sid});
+    var had=mine.length?lb(mine[0].label):"";
+    if((had==="AM"&&lab==="PM")||(had==="PM"&&lab==="AM")){
+      /* AMとPMがそろったので「終日」にまとめる */
+      arr=M.assign[key]=arr.filter(function(a){return a.s!==sid});
+      arr.push({s:sid,label:"終日"});
+    }else{
+      arr.push({s:sid,label:lab});
+    }
+    sortAsg(arr); save(); renderCal(); renderOut(); return;
   }
   if(act==="del"){
     M.assign[key]=(M.assign[key]||[]).filter(function(a){return a.s!==el.dataset.s});
@@ -554,7 +619,8 @@ function renderOut(){
       var r=M.req[s.id], c=r&&r.days[key];
       if(c&&c!=="ng") t[s.id].sub++;
     });
-    (M.assign[key]||[]).forEach(function(a){ if(t[a.s]) t[a.s].dec++ });
+    var seen={};
+    (M.assign[key]||[]).forEach(function(a){ if(t[a.s]&&!seen[a.s]){ seen[a.s]=1; t[a.s].dec++ } });
   }
   if(!DB.staff.length){ $("#sumTbl").innerHTML='<tr><td class="note">まだスタッフがいません。</td></tr>'; return }
   $("#sumTbl").innerHTML='<tr><th>名前</th><th>出せる日</th><th>入った日</th><th>外れた日</th></tr>'+
