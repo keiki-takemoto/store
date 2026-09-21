@@ -96,6 +96,10 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 .cp.h{font-weight:700}
 .cp.h[data-k="am"]{color:var(--am)} .cp.h[data-k="pm"]{color:var(--pm)}
 
+.flag{display:none;margin:0 0 10px;padding:9px 11px;border-radius:10px;font-size:12.5px;line-height:1.7;
+  background:var(--warn-bg);color:var(--warn)}
+.flag:not([hidden]){display:block}
+
 pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;
   font-family:var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.75;max-height:36vh;overflow:auto}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -144,6 +148,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="calReq"></div>
     <div class="row" id="memoRow" hidden style="margin-top:10px"></div>
+    <div class="flag" id="changeRowReq" hidden></div>
     <p class="note noprint">スタッフが「出られる」と出した日です。名前の横は希望の時間帯。
       ②に切り替えると、ここから選んでシフトを決められます。</p>
   </section>
@@ -152,9 +157,12 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <section class="view" id="v-cal" data-off>
     <div class="row noprint" style="margin-bottom:10px">
       <button class="btn sm" id="closeMode" aria-pressed="false">休業日を決める</button>
+      <button class="btn sm" id="draftBtn">仮で共有</button>
       <button class="btn sm primary" id="pubBtn">確定</button>
+      <button class="btn sm ghost" id="copyShare">お知らせ文</button>
       <span class="lbl" id="pubAt"></span>
     </div>
+    <div class="flag" id="changeRow" hidden></div>
     <div class="row noprint" id="dowRow" hidden style="margin:-4px 0 10px;padding:9px 11px;background:var(--surface-2);border-radius:10px">
       <span class="lbl">毎週の定休日</span>
       <span id="dowBtns" class="row" style="gap:5px"></span>
@@ -166,7 +174,9 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
       <b>終日OKの人のボタンは、上が名前・下がAMとPMの3つに分かれています。</b>名前を押すと終日、AM・PMを押すとその半日だけ入ります。
       AMに入れたあと同じ人のPMも押すと、自動で終日にまとまります。入った人は<b>AMが上、PMが下</b>の順に並びます。<br>
       日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。<br>
-      決まったら<b>「確定」</b>を押すと、スタッフのページの「確定シフト」に出ます。直して押し直せば上書きされます。</p>
+      組めたら<b>「仮で共有」</b>を押すと、スタッフの画面に<b>（仮）</b>として出ます。スタッフはそれを見て希望を出し直せます。
+      届いた変更を入れ直したら、また「仮で共有」。すべて決まったら<b>「確定」</b>を押します。<br>
+      <b>「お知らせ文」</b>を押すと、そのときの状態に合ったLINE用の文章がコピーされます。</p>
 
     <div class="card noprint" style="margin-top:16px">
       <div class="card-h"><h2>人ごとの集計</h2><span class="hint" id="sumMonth"></span></div>
@@ -365,7 +375,7 @@ async function pull(silent){
       var ks=Object.keys(others);
       toast(changed.join("、")+" の希望が届きました"+(ks.length?"（"+ks.map(function(k){return (+k.split("-")[1])+"月"}).join("・")+"）":""));
     } else if(!silent){ toast("新しい希望はありません") }
-    renderReq();
+    renderReq(); renderChange();
   }catch(e){
     if(!silent) toast((e&&e.message)||"受け取れませんでした");
   }finally{ pulling=false }
@@ -637,23 +647,59 @@ function download(name,text,type){
   var a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); a.remove() },1500);
 }
-$("#pubBtn").addEventListener("click",async function(){
+/* 仮で共有／確定。どちらも同じ場所に上書きし、「仮かどうか」の印だけを添える。 */
+async function publish(draft,btn){
   if(!syncOn()){ toast("③設定で置き場所につなぐと、スタッフの画面に反映できます"); return }
-  if(!confirm((view.getMonth()+1)+"月のシフトを確定して、スタッフの画面に出します。よろしいですか？")) return;
-  var b=this; b.disabled=true; b.textContent="反映しています…";
+  var mth=(view.getMonth()+1);
+  if(!confirm(mth+"月のシフトを"+(draft?"「仮」として":"確定として")+"スタッフの画面に出します。よろしいですか？")) return;
+  var label=btn.textContent;
+  btn.disabled=true; btn.textContent="反映しています…";
   try{
     var M=mon(ym()), y=view.getFullYear(), m=view.getMonth(), last=new Date(y,m+1,0).getDate();
     var days={}, closed=[];
     for(var d=1;d<=last;d++){
       if(isClosed(d)){ closed.push(d); continue }
-      var a=(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:lb(x.label),c:st.color}:null }).filter(Boolean);
+      var a=sortAsg(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:lb(x.label),c:st.color}:null }).filter(Boolean);
       if(a.length) days[String(d)]=a;
     }
-    await Sync.publishShift(ym(),days,closed);
-    $("#pubAt").textContent="確定ずみ "+new Date().toLocaleString("ja-JP",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"});
-    toast("スタッフの画面に反映しました");
+    days._meta={draft:!!draft};        /* 日付以外の印。スタッフ側だけが見る */
+    var res=await Sync.publishShift(ym(),days,closed);
+    M.pub={at:(res&&res.at)||"",draft:!!draft};
+    save(); renderPub();
+    toast(draft?"仮のシフトを共有しました":"スタッフの画面に反映しました");
   }catch(e){ toast((e&&e.message)||"反映できませんでした") }
-  finally{ b.disabled=false; b.textContent="確定" }
+  finally{ btn.disabled=false; btn.textContent=label }
+}
+$("#draftBtn").addEventListener("click",function(){ publish(true,this) });
+$("#pubBtn").addEventListener("click",function(){ publish(false,this) });
+
+/* いまの状態と、共有したあとに届いた変更のお知らせ */
+function renderPub(){
+  var p=mon(ym()).pub;
+  $("#pubAt").textContent = (p&&p.at) ? (p.draft?"仮を共有ずみ ":"確定ずみ ")+p.at.slice(5,16) : "";
+  renderChange();
+}
+function renderChange(){
+  var M=mon(ym()), p=M.pub, names=[];
+  if(p&&p.at) DB.staff.forEach(function(s){
+    var r=M.req[s.id];
+    if(r&&r.at&&r.at>p.at) names.push(s.name);
+  });
+  var t=names.length
+    ? (p.draft?"仮を出したあと":"確定したあと")+"、"+names.join("・")+" さんから希望が届いています。直したら、もう一度「"+(p.draft?"仮で共有":"確定")+"」を押してください。"
+    : "";
+  ["#changeRow","#changeRowReq"].forEach(function(sel){
+    var el=$(sel); if(!el) return;
+    el.textContent=t; el.hidden=!t;
+  });
+}
+$("#copyShare").addEventListener("click",function(){
+  var p=mon(ym()).pub, mth=(view.getMonth()+1);
+  if(!p||!p.at){ toast("先に「仮で共有」か「確定」を押してください"); return }
+  copyText(p.draft
+    ? "【"+mth+"月のシフト（仮）】\nいったん組んでみました。\n都合の悪い日や、追加で入れる日があれば出し直してください。\n"+staffUrl()
+    : "【"+mth+"月のシフトが確定しました】\nご確認ください。\n"+staffUrl(),
+    "お知らせ文をコピーしました");
 });
 
 /* ================= ③ 設定 ================= */
@@ -811,7 +857,7 @@ function toast(m){
   toastEl.textContent=m; toastEl.hidden=false;
   clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3200);
 }
-function renderAll(){ renderCal(); renderReq(); renderOut(); }
+function renderAll(){ renderCal(); renderReq(); renderOut(); renderPub(); }
 fillCfg(); renderAll(); renderSyncUI();
 if(syncOn()) pull(true);
 if("serviceWorker" in navigator) window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
