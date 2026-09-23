@@ -529,10 +529,11 @@ function renderConflict(bad){
   var el=$("#conflictRow"); if(!el) return;
   if(!bad.length){ el.hidden=true; el.textContent=""; return }
   var by={};
-  bad.forEach(function(b){ (by[b.name]=by[b.name]||[]).push(b.d) });
-  el.textContent=Object.keys(by).map(function(n){
-    return n+"さんは "+by[n].map(function(d){return d+"日"}).join("・")+" に出られなくなっています";
-  }).join("／")+"。取り消し線の名前を押すと外せます。直したら「仮で共有」か「確定」を押し直してください。";
+  bad.forEach(function(b){ var k=b.name+"｜"+b.why; (by[k]=by[k]||[]).push(b.d) });
+  el.textContent=Object.keys(by).map(function(k){
+    var p=k.split("｜");
+    return p[0]+"さんの "+by[k].map(function(d){return d+"日"}).join("・")+"："+p[1];
+  }).join(" ／ ")+" ／ 取り消し線の名前を押すと外せます。直したら「仮で共有」か「確定」を押し直してください。";
   el.hidden=false;
 }
 function cands(d){
@@ -598,17 +599,19 @@ function slotRank(label){
   return 0;
 }
 function sortAsg(a){ if(a) a.sort(function(p,q){ return slotRank(p.label)-slotRank(q.label) }); return a }
-/* いま入っている人が、そのあとの希望では出られなくなっていないか */
+/* いま入っている人が、そのあとの希望と食い違っていないか */
 function conflictOf(sid,d){
   var M=mon(ym()), r=M.req[sid];
   if(!r) return "";                      /* 希望が届いていない人は判定しない */
   var c=r.days[String(d)];
-  if(!c||c==="ng") return "この日は出られません";
+  if(!c||c==="ng") return "出られなくなっています";
   var a=(M.assign[String(d)]||[]).filter(function(x){return x.s===sid})[0];
-  var L=a?lb(a.label):"";
-  if(c==="am"&&(L==="PM"||L==="終日")) return "AMのみの希望です";
-  if(c==="pm"&&(L==="AM"||L==="終日")) return "PMのみの希望です";
-  return "";
+  if(!a) return "";
+  var want=F.isTime(c)?F.timeText(c):(c==="am"?"AM":c==="pm"?"PM":"終日");
+  if(want==="終日") return "";           /* 終日OKなら、どう入れても希望に収まる */
+  var L=lb(a.label)||"終日";
+  if(L===want) return "";
+  return "希望は「"+calLabel(want)+"」です";
 }
 function labelFor(sid,d){
   var r=mon(ym()).req[sid];
