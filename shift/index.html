@@ -72,6 +72,8 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 .who .t{font-size:.86em;font-weight:700;opacity:.85}
 .who[data-act]{cursor:pointer}
 .who[data-act]:hover{background:var(--surface-2)}
+/* 希望が変わって、もう出られなくなった日に入っている人 */
+.who.bad{background:var(--warn-bg);border-radius:5px;text-decoration:line-through}
 .offbig{flex:1;display:flex;align-items:center;justify-content:center;font-size:clamp(13px,3.4vw,28px);
   font-weight:800;color:var(--ink-3);letter-spacing:.04em;min-height:1.6em}
 .day.closed{background:var(--surface-2);opacity:1}
@@ -163,6 +165,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
       <span class="lbl" id="pubAt"></span>
     </div>
     <div class="flag" id="changeRow" hidden></div>
+    <div class="flag" id="conflictRow" hidden></div>
     <div class="row noprint" id="dowRow" hidden style="margin:-4px 0 10px;padding:9px 11px;background:var(--surface-2);border-radius:10px">
       <span class="lbl">毎週の定休日</span>
       <span id="dowBtns" class="row" style="gap:5px"></span>
@@ -416,7 +419,7 @@ var closeMode=false;
 function buildMonth(mode){
   var y=view.getFullYear(), m=view.getMonth();
   var first=new Date(y,m,1).getDay(), last=new Date(y,m+1,0).getDate();
-  var M=mon(ym()), html="", short=0, total=0;
+  var M=mon(ym()), html="", short=0, total=0, bad=[];
   for(var i=0;i<first;i++) html+='<div class="day blank"></div>';
   for(var d=1;d<=last;d++){
     var dow=new Date(y,m,d).getDay(), key=String(d);
@@ -431,7 +434,9 @@ function buildMonth(mode){
       if(lack) short++;
       rows=asg.map(function(a){
         var st=staffById(a.s); if(!st) return null;
-        return {c:st.color,name:st.name,label:(a.label==="終日"?"":calLabel(a.label)),s:a.s};
+        var ng=conflictOf(a.s,d);
+        if(ng) bad.push({name:st.name,d:d,why:ng});
+        return {c:st.color,name:st.name,label:(a.label==="終日"?"":calLabel(a.label)),s:a.s,bad:ng};
       }).filter(Boolean);
     }else{
       rows=avail(d,false).sort(function(p,q){ return slotRank(p.mark)-slotRank(q.mark) })
@@ -448,7 +453,9 @@ function buildMonth(mode){
     if(closed){ html+='<div class="offbig">off</div>' }
     else{
       html+='<div class="asg">'+rows.map(function(r){
-        return '<span class="who" style="--c:'+(r.c||"var(--ink)")+'"'+(mode==="shift"?' data-act="del" data-s="'+r.s+'"':'')+'>'+
+        return '<span class="who'+(r.bad?" bad":"")+'" style="--c:'+(r.c||"var(--ink)")+'"'+
+          (r.bad?' title="'+esc(r.bad)+'"':'')+
+          (mode==="shift"?' data-act="del" data-s="'+r.s+'"':'')+'>'+
           esc(r.name)+(r.label?' <span class="t">'+esc(r.label)+'</span>':'')+'</span>';
       }).join("")+'</div>';
       if(mode==="shift"){
@@ -466,7 +473,7 @@ function buildMonth(mode){
     }
     html+='</div>';
   }
-  return {html:html,total:total,short:short};
+  return {html:html,total:total,short:short,bad:bad};
 }
 /* 「森川 AM」が2行に折り返さないよう、いちばん長いものに合わせて全体を縮める。
    マスごとにばらばらの大きさにすると読みにくいので、カレンダー全体で1つの大きさにする。 */
@@ -503,9 +510,21 @@ function renderCal(){
   $("#calReq").innerHTML=buildMonth("req").html;
   requestAnimationFrame(fitAll);
   lastShift={total:r.total,short:r.short};
+  renderConflict(r.bad||[]);
   renderStat();
 }
 /* ②の候補ボタン。すでにAMだけ入っている人には、残りのPMだけを出す。 */
+/* 希望が変わって食い違っている人を、②の上にまとめて出す */
+function renderConflict(bad){
+  var el=$("#conflictRow"); if(!el) return;
+  if(!bad.length){ el.hidden=true; el.textContent=""; return }
+  var by={};
+  bad.forEach(function(b){ (by[b.name]=by[b.name]||[]).push(b.d) });
+  el.textContent=Object.keys(by).map(function(n){
+    return n+"さんは "+by[n].map(function(d){return d+"日"}).join("・")+" に出られなくなっています";
+  }).join("／")+"。取り消し線の名前を押すと外せます。直したら「仮で共有」か「確定」を押し直してください。";
+  el.hidden=false;
+}
 function cands(d){
   var M=mon(ym()), key=String(d), got={};
   (M.assign[key]||[]).forEach(function(a){
@@ -569,6 +588,18 @@ function slotRank(label){
   return 0;
 }
 function sortAsg(a){ if(a) a.sort(function(p,q){ return slotRank(p.label)-slotRank(q.label) }); return a }
+/* いま入っている人が、そのあとの希望では出られなくなっていないか */
+function conflictOf(sid,d){
+  var M=mon(ym()), r=M.req[sid];
+  if(!r) return "";                      /* 希望が届いていない人は判定しない */
+  var c=r.days[String(d)];
+  if(!c||c==="ng") return "この日は出られません";
+  var a=(M.assign[String(d)]||[]).filter(function(x){return x.s===sid})[0];
+  var L=a?lb(a.label):"";
+  if(c==="am"&&(L==="PM"||L==="終日")) return "AMのみの希望です";
+  if(c==="pm"&&(L==="AM"||L==="終日")) return "PMのみの希望です";
+  return "";
+}
 function labelFor(sid,d){
   var r=mon(ym()).req[sid];
   var c=r?(r.days[String(d)]||"ok"):"ok";
