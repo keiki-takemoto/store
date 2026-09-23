@@ -953,7 +953,23 @@ function toast(m){
 function renderAll(){ renderCal(); renderReq(); renderOut(); renderPub(); }
 fillCfg(); renderAll(); renderSyncUI();
 if(syncOn()) pull(true);
-if("serviceWorker" in navigator) window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+/* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える。
+   ホーム画面のアプリは、閉じずに切り替えて戻るとページが読み直されず、
+   直したものがいつまでも届かないため。 */
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+  var swCheck=function(){
+    if(document.visibilityState!=="visible") return;
+    try{ navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update() }).catch(function(){}) }catch(e){}
+  };
+  document.addEventListener("visibilitychange",swCheck);
+  window.addEventListener("pageshow",swCheck);
+}
 })();
 </script>
 </body>
