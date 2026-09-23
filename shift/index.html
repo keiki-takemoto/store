@@ -174,6 +174,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
     <div class="cal" id="cal"></div>
     <p class="note noprint">小さなボタンが希望を出している人です。押すとその日に入り、入った名前をもう一度押すと外れます。
+      終日で入っている人は<b>「名前 AM」「名前 PM」の2行</b>で出ます。片方を押すと、その半日だけ外れます。
       <b>終日OKの人のボタンは、上が名前・下がAMとPMの3つに分かれています。</b>名前を押すと終日、AM・PMを押すとその半日だけ入ります。
       AMに入れたあと同じ人のPMも押すと、自動で終日にまとまります。入った人は<b>AMが上、PMが下</b>の順に並びます。<br>
       日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。<br>
@@ -432,12 +433,21 @@ function buildMonth(mode){
       total+=asg.length;
       lack=!closed&&asg.length<need;
       if(lack) short++;
-      rows=asg.map(function(a){
-        var st=staffById(a.s); if(!st) return null;
+      /* 終日の人は「名前 AM」「名前 PM」の2行に分けて出す */
+      rows=[];
+      asg.forEach(function(a){
+        var st=staffById(a.s); if(!st) return;
         var ng=conflictOf(a.s,d);
         if(ng) bad.push({name:st.name,d:d,why:ng});
-        return {c:st.color,name:st.name,label:(a.label==="終日"?"":calLabel(a.label)),s:a.s,bad:ng};
-      }).filter(Boolean);
+        var L=lb(a.label);
+        if(!L||L==="終日"){
+          rows.push({c:st.color,name:st.name,label:"AM",s:a.s,bad:ng,half:"am",rank:slotRank("AM")});
+          rows.push({c:st.color,name:st.name,label:"PM",s:a.s,bad:ng,half:"pm",rank:slotRank("PM")});
+        }else{
+          rows.push({c:st.color,name:st.name,label:calLabel(a.label),s:a.s,bad:ng,rank:slotRank(a.label)});
+        }
+      });
+      rows.sort(function(p,q){ return p.rank-q.rank });
     }else{
       rows=avail(d,false).sort(function(p,q){ return slotRank(p.mark)-slotRank(q.mark) })
         .map(function(c){
@@ -455,7 +465,7 @@ function buildMonth(mode){
       html+='<div class="asg">'+rows.map(function(r){
         return '<span class="who'+(r.bad?" bad":"")+'" style="--c:'+(r.c||"var(--ink)")+'"'+
           (r.bad?' title="'+esc(r.bad)+'"':'')+
-          (mode==="shift"?' data-act="del" data-s="'+r.s+'"':'')+'>'+
+          (mode==="shift"?' data-act="del" data-s="'+r.s+'"'+(r.half?' data-half="'+r.half+'"':''):'')+'>'+
           esc(r.name)+(r.label?' <span class="t">'+esc(r.label)+'</span>':'')+'</span>';
       }).join("")+'</div>';
       if(mode==="shift"){
@@ -628,8 +638,15 @@ $("#cal").addEventListener("click",function(e){
     sortAsg(arr); save(); renderCal(); renderOut(); return;
   }
   if(act==="del"){
-    M.assign[key]=(M.assign[key]||[]).filter(function(a){return a.s!==el.dataset.s});
-    save(); renderCal(); renderOut(); return;
+    var sid=el.dataset.s, half=el.dataset.half||"";
+    var arr=M.assign[key]||[];
+    var mine=arr.filter(function(a){return a.s===sid})[0];
+    if(half&&mine&&(lb(mine.label)==="終日"||!mine.label)){
+      mine.label=(half==="am")?"PM":"AM";      /* 終日の人は押したほうの半日だけ外す */
+    }else{
+      arr=M.assign[key]=arr.filter(function(a){return a.s!==sid});
+    }
+    sortAsg(M.assign[key]); save(); renderCal(); renderOut(); return;
   }
   if(act==="need"){
     var v=prompt((view.getMonth()+1)+"月"+d+"日に必要な人数",String(needOf(d)));
