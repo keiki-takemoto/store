@@ -703,7 +703,19 @@ async function publish(draft,btn){
     var days={}, closed=[];
     for(var d=1;d<=last;d++){
       if(isClosed(d)){ closed.push(d); continue }
-      var a=sortAsg(M.assign[String(d)]||[]).map(function(x){ var st=staffById(x.s); return st?{name:st.name,label:lb(x.label),c:st.color}:null }).filter(Boolean);
+      /* 終日の人は「AM」「PM」の2つに分けて出す（受け取る側で時間帯が分かるように） */
+      var a=[];
+      sortAsg(M.assign[String(d)]||[]).forEach(function(x){
+        var st=staffById(x.s); if(!st) return;
+        var L=lb(x.label);
+        if(!L||L==="終日"){
+          a.push({name:st.name,label:"AM",c:st.color});
+          a.push({name:st.name,label:"PM",c:st.color});
+        }else{
+          a.push({name:st.name,label:L,c:st.color});
+        }
+      });
+      a.sort(function(p,q){ return slotRank(p.label)-slotRank(q.label) });
       if(a.length) days[String(d)]=a;
     }
     days._meta={draft:!!draft};        /* 日付以外の印。スタッフ側だけが見る */
