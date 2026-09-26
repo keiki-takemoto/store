@@ -102,6 +102,23 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
   background:var(--warn-bg);color:var(--warn)}
 .flag:not([hidden]){display:block}
 
+/* 店長が直接入れるときの画面 */
+.sheet{position:fixed;inset:0;z-index:70;display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(20,16,8,.45)}
+.sheet[hidden]{display:none}
+.sheet-in{background:var(--bg);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;border-radius:16px 16px 0 0;
+  border:1px solid var(--line);padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+@media (min-width:640px){.sheet{align-items:center}.sheet-in{border-radius:16px}}
+.sheet-h{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;gap:10px;padding:14px 16px;
+  border-bottom:1px solid var(--line);z-index:1}
+.sheet-h h2{font-size:15px}
+.addrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.addrow:last-child{border-bottom:none}
+.addrow .an{flex:1;min-width:130px;font-size:13.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.addrow .aw{font-size:11.5px;color:var(--ink-3)}
+.addrow .ab{display:flex;gap:5px;flex-wrap:wrap}
+.cand.more{font-weight:800;padding:0 7px}
+
 pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:12.5px;
   font-family:var(--mono);white-space:pre-wrap;word-break:break-word;margin:0;line-height:1.75;max-height:36vh;overflow:auto}
 .tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -175,6 +192,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     <div class="cal" id="cal"></div>
     <p class="note noprint">小さなボタンが希望を出している人です。押すとその日に入り、入った名前をもう一度押すと外れます。
       終日で入っている人は<b>「名前 AM」「名前 PM」の2行</b>で出ます。片方を押すと、その半日だけ外れます。
+      <b>「＋」</b>を押すと、希望を出していない人も含めて、誰でもその日に入れられます（時間の指定もできます）。
       <b>終日OKの人のボタンは、上が名前・下がAMとPMの3つに分かれています。</b>名前を押すと終日、AM・PMを押すとその半日だけ入ります。
       AMに入れたあと同じ人のPMも押すと、自動で終日にまとまります。入った人は<b>AMが上、PMが下</b>の順に並びます。<br>
       日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。<br>
@@ -254,6 +272,15 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     </div>
   </section>
 </main>
+
+<div class="sheet" id="addSheet" hidden><div class="sheet-in" role="dialog" aria-modal="true" aria-label="シフトに入れる">
+  <div class="sheet-h"><h2 id="addTitle">シフトに入れる</h2>
+    <button class="btn sm ghost" id="addClose" style="margin-left:auto">閉じる</button></div>
+  <div class="sec">
+    <p class="note" style="margin:0 0 6px">希望を出していない人も、ここから入れられます。押すとすぐ入ります。</p>
+    <div id="addList"></div>
+  </div>
+</div></div>
 
 <script src="../shared/shift-format.js"></script>
 <script src="../shared/sync.js"></script>
@@ -478,7 +505,8 @@ function buildMonth(mode){
           }
           return '<button class="cand" data-act="add" data-s="'+c.id+'" data-k="'+c.kind+'" title="'+esc(c.title)+'">'+
             esc(c.name)+(c.mark?' '+esc(calLabel(c.mark)):'')+'</button>';
-        }).join("")+'</div>';
+        }).join("")+
+        '<button class="cand more" data-act="more" title="ほかの人を入れる・時間を指定する">＋</button></div>';
       }
     }
     html+='</div>';
@@ -601,12 +629,13 @@ function slotRank(label){
 function sortAsg(a){ if(a) a.sort(function(p,q){ return slotRank(p.label)-slotRank(q.label) }); return a }
 /* いま入っている人が、そのあとの希望と食い違っていないか */
 function conflictOf(sid,d){
-  var M=mon(ym()), r=M.req[sid];
+  var M=mon(ym());
+  var a=(M.assign[String(d)]||[]).filter(function(x){return x.s===sid})[0];
+  if(!a||a.f) return "";                 /* 店長が直接入れた日は、希望と違っても知らせない */
+  var r=M.req[sid];
   if(!r) return "";                      /* 希望が届いていない人は判定しない */
   var c=r.days[String(d)];
   if(!c||c==="ng") return "出られなくなっています";
-  var a=(M.assign[String(d)]||[]).filter(function(x){return x.s===sid})[0];
-  if(!a) return "";
   var want=F.isTime(c)?F.timeText(c):(c==="am"?"AM":c==="pm"?"PM":"終日");
   if(want==="終日") return "";           /* 終日OKなら、どう入れても希望に収まる */
   var L=lb(a.label)||"終日";
@@ -651,6 +680,7 @@ $("#cal").addEventListener("click",function(e){
     }
     sortAsg(M.assign[key]); save(); renderCal(); renderOut(); return;
   }
+  if(act==="more"){ openAdd(d); return }
   if(act==="need"){
     var v=prompt((view.getMonth()+1)+"月"+d+"日に必要な人数",String(needOf(d)));
     if(v===null) return;
@@ -659,6 +689,72 @@ $("#cal").addEventListener("click",function(e){
     M.need[key]=n; save(); renderCal();
   }
 });
+/* ================= 店長が直接入れる ================= */
+var addDay=0;
+function askTime(){
+  var v=prompt("時間を入れてください\n例）11:00-17:00 ／ 11:00- ／ 11","");
+  if(v===null) return null;
+  v=String(v).trim(); if(!v) return null;
+  var p=v.split("-");
+  var code=F.timeCode(p[0],p.length>1?p[1]:"");
+  if(!code){ toast("時間を読み取れませんでした"); return null }
+  return F.timeText(code);
+}
+function wishText(sid,d){
+  var r=mon(ym()).req[sid];
+  if(!r) return "希望：未提出";
+  var c=r.days[String(d)];
+  if(!c||c==="ng") return "希望：この日は出られない";
+  if(F.isTime(c)) return "希望："+calLabel(F.timeText(c));
+  return "希望："+(c==="am"?"AM":c==="pm"?"PM":"終日OK");
+}
+function openAdd(d){
+  addDay=d;
+  var y=view.getFullYear(), m=view.getMonth();
+  $("#addTitle").textContent=(m+1)+"月"+d+"日（"+DOWN[new Date(y,m,d).getDay()]+"）に入れる";
+  renderAddList();
+  $("#addSheet").hidden=false;
+}
+function renderAddList(){
+  if(!DB.staff.length){
+    $("#addList").innerHTML='<p class="note">スタッフがまだいません。③設定で追加してください。</p>';
+    return;
+  }
+  var M=mon(ym()), key=String(addDay);
+  $("#addList").innerHTML=DB.staff.map(function(s){
+    var now0=(M.assign[key]||[]).filter(function(a){return a.s===s.id})[0];
+    var now=now0?(lb(now0.label)||"終日"):"";
+    function btn(k,t,on){
+      return '<button class="btn sm'+(on?" primary":" ghost")+'" data-put="'+s.id+'" data-k="'+k+'">'+t+'</button>';
+    }
+    return '<div class="addrow">'+
+      '<div class="an"><span class="dot" style="background:'+s.color+'"></span>'+esc(s.name)+
+        '<span class="aw">'+esc(wishText(s.id,addDay))+(now?' ／ いま '+esc(calLabel(now)):'')+'</span></div>'+
+      '<div class="ab">'+
+        btn("ok","終日",now==="終日")+btn("am","AM",now==="AM")+btn("pm","PM",now==="PM")+
+        btn("tm","時間",!!now&&["終日","AM","PM"].indexOf(now)<0)+
+        (now0?'<button class="btn sm ghost" data-rm="'+s.id+'">外す</button>':'')+
+      '</div></div>';
+  }).join("");
+}
+$("#addClose").addEventListener("click",function(){ $("#addSheet").hidden=true });
+$("#addSheet").addEventListener("click",function(e){ if(e.target===this) this.hidden=true });
+$("#addList").addEventListener("click",function(e){
+  var M=mon(ym()), key=String(addDay);
+  var rm=e.target.closest("[data-rm]");
+  if(rm){
+    M.assign[key]=(M.assign[key]||[]).filter(function(a){return a.s!==rm.dataset.rm});
+    save(); renderCal(); renderOut(); renderAddList(); return;
+  }
+  var b=e.target.closest("[data-put]"); if(!b) return;
+  var sid=b.dataset.put, k=b.dataset.k, lab;
+  if(k==="tm"){ lab=askTime(); if(lab===null) return }
+  else lab=(k==="am")?"AM":(k==="pm")?"PM":"終日";
+  var arr=M.assign[key]=(M.assign[key]||[]).filter(function(a){return a.s!==sid});
+  arr.push({s:sid,label:lab,f:1});        /* f:1 … 店長が直接入れた印 */
+  sortAsg(arr); save(); renderCal(); renderOut(); renderAddList();
+});
+
 function renderDowBtns(){
   $("#dowBtns").innerHTML=DOWN.map(function(w,i){
     return '<button class="chip" data-dow="'+i+'" aria-pressed="'+(DB.closedDow[i]?"true":"false")+'">'+w+'</button>';
