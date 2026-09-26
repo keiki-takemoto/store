@@ -112,6 +112,13 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 .sheet-h{position:sticky;top:0;background:var(--bg);display:flex;align-items:center;gap:10px;padding:14px 16px;
   border-bottom:1px solid var(--line);z-index:1}
 .sheet-h h2{font-size:15px}
+.dotbtn{width:14px;height:14px;border-radius:999px;border:1px solid rgba(0,0,0,.18);margin-right:7px;
+  padding:0;cursor:pointer;vertical-align:-2px}
+.swatches{display:flex;flex-wrap:wrap;gap:7px;padding:2px 0 8px}
+.sw{width:26px;height:26px;border-radius:999px;border:2px solid transparent;cursor:pointer;padding:0;
+  box-shadow:0 0 0 1px var(--line) inset}
+.sw.on{border-color:var(--ink);box-shadow:none}
+
 .addrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
 .addrow:last-child{border-bottom:none}
 .addrow .an{flex:1;min-width:130px;font-size:13.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -244,7 +251,8 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
           <span class="lbl" style="width:100%">受け取らない名前（削除した人）</span>
           <span id="hiddenList" class="row" style="gap:6px"></span>
         </div>
-        <p class="note">希望を受け取ると、知らない名前は自動で追加されます。
+        <p class="note">名前の左の丸を押すと、その人の色を変えられます。
+          希望を受け取ると、知らない名前は自動で追加されます。
           削除した人の名前は、あとから同じ名前で届いても取り込みません（上の「戻す」で解除できます）。</p>
       </div>
       <div class="sec">
@@ -291,7 +299,9 @@ var F=window.ShiftFormat;
 var $=function(s){return document.querySelector(s)};
 var KEY="shiftadmin.v1";
 var DOWN=["日","月","火","水","木","金","土"];
-var COLORS=["#C4703A","#2F7A55","#4F5FA6","#9C3C5E","#7A4E95","#1F7A82","#8A6D1F","#B3352C","#3F6297","#5F7A2F"];
+/* 隣どうしがなるべく似ないよう、色あいを離して並べてある。
+   白地（スタッフに配る画像）でも暗い画面でも読める濃さにしている。 */
+var COLORS=["#D4552F","#1E7F5C","#2F6FBF","#C0397A","#B07A0E","#7A54C9","#0F8C93","#4E7A22","#9B4A1E","#5A6470"];
 /* スタッフが希望を出すページ。別アプリとして /shift/ に置いてある。 */
 var STAFF_APP="https://keiki-takemoto.github.io/shift/";
 
@@ -312,6 +322,12 @@ var DB=load();
   if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
   if(typeof DB.need!=="number") DB.need=2;
   if(!Array.isArray(DB.hidden)) DB.hidden=[];
+  /* 色が似ていて見分けにくかったので、新しい並びで一度だけ振り直す */
+  if(DB.colorsV!==2){
+    DB.staff.forEach(function(s,i){ s.color=COLORS[i%COLORS.length] });
+    DB.colorsV=2;
+    try{ localStorage.setItem(KEY,JSON.stringify(DB)) }catch(e){}
+  }
   /* 希望の持ち方も「出られる日を並べる」形に統一する */
   var moved=false;
   Object.keys(DB.months||{}).forEach(function(ymk){
@@ -875,12 +891,20 @@ $("#copyShare").addEventListener("click",function(){
 });
 
 /* ================= ③ 設定 ================= */
+var colorFor=null;   /* 色を選んでいる最中の人 */
 function renderStaff(){
   if(!DB.staff.length){ $("#staffList").innerHTML='<p class="note">まだ登録がありません。</p>'; return }
   $("#staffList").innerHTML='<table class="tbl">'+DB.staff.map(function(s){
-    return '<tr><td><span class="dot" style="background:'+s.color+';margin-right:6px"></span>'+esc(s.name)+'</td>'+
+    var row='<tr><td><button class="dotbtn" data-col="'+s.id+'" title="色を変える" style="background:'+s.color+'"></button>'+esc(s.name)+'</td>'+
       '<td style="text-align:right;white-space:nowrap"><button class="btn sm ghost" data-ren="'+s.id+'">名前</button>'+
       '<button class="btn sm ghost" data-del="'+s.id+'">削除</button></td></tr>';
+    if(colorFor===s.id){
+      row+='<tr><td colspan="2" style="padding-top:0"><div class="swatches">'+
+        COLORS.map(function(c){
+          return '<button class="sw'+(c===s.color?" on":"")+'" data-setcol="'+s.id+'" data-c="'+c+'" style="background:'+c+'"></button>';
+        }).join("")+'</div></td></tr>';
+    }
+    return row;
   }).join("")+'</table>';
   renderHidden();
 }
@@ -892,6 +916,13 @@ function renderHidden(){
   }).join("");
 }
 $("#staffList").addEventListener("click",function(e){
+  var cb=e.target.closest("[data-col]"), sc=e.target.closest("[data-setcol]");
+  if(sc){
+    var st2=staffById(sc.dataset.setcol);
+    if(st2){ st2.color=sc.dataset.c; colorFor=null; save(); renderAll(); renderStaff() }
+    return;
+  }
+  if(cb){ colorFor=(colorFor===cb.dataset.col)?null:cb.dataset.col; renderStaff(); return }
   var r=e.target.closest("[data-ren]"), d=e.target.closest("[data-del]");
   if(r){ var s=staffById(r.dataset.ren); var v=prompt("名前",s.name); if(v&&v.trim()){ s.name=v.trim(); save(); renderAll(); renderStaff() } }
   if(d){
