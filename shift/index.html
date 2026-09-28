@@ -40,6 +40,9 @@ main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 .days{display:flex;gap:6px;flex-wrap:wrap}
 .days span{font-size:12.5px;border-radius:7px;padding:2px 9px;font-family:var(--mono)}
 .memo{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:4px 10px}
+.memo.none{color:var(--ink-3)}
+.memo b{color:var(--ink);font-family:var(--mono);font-weight:700}
+.memo.ng{background:var(--warn-bg);color:var(--warn)}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
 .fold{border:none;background:transparent;color:var(--ink-2);font-size:13px;cursor:pointer;padding:10px 14px;
   width:100%;text-align:left;border-top:1px solid var(--line)}
@@ -175,6 +178,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     <div class="cal" id="calReq"></div>
     <div class="row" id="memoRow" hidden style="margin-top:10px"></div>
     <div class="flag" id="changeRowReq" hidden></div>
+    <div class="row" id="reqLog" style="margin-top:10px"></div>
     <p class="note noprint">スタッフが「出られる」と出した日です。名前の横は希望の時間帯。
       ②に切り替えると、ここから選んでシフトを決められます。</p>
   </section>
@@ -408,18 +412,45 @@ function renderReq(){
   });
   $("#memoRow").innerHTML=memo.map(function(t){return '<span class="memo">'+esc(t)+'</span>'}).join("");
   $("#memoRow").hidden=!memo.length;
+  renderReqLog();
   renderStat();
+}
+/* 「いつ届いたぶんか」を人ごとに出す。スタッフの言っていることと突き合わせられるように。 */
+function shortAt(at){
+  var m=String(at||"").match(/^\d{4}-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? (+m[1])+"/"+(+m[2])+" "+m[3]+":"+m[4] : String(at||"");
+}
+function clockOf(ms){
+  var d=new Date(ms);
+  return (d.getMonth()+1)+"/"+d.getDate()+" "+pad(d.getHours())+":"+pad(d.getMinutes());
+}
+function renderReqLog(){
+  var box=$("#reqLog"); if(!box) return;
+  if(!syncOn()||!DB.staff.length){ box.innerHTML=""; return }
+  var M=mon(ym());
+  var html=DB.staff.map(function(s){
+    var r=M.req[s.id];
+    return r&&r.at
+      ? '<span class="memo">'+esc(s.name)+' <b>'+esc(shortAt(r.at))+'</b> に届いたぶん</span>'
+      : '<span class="memo none">'+esc(s.name)+' まだ届いていません</span>';
+  }).join("");
+  html+= pullOk
+    ? '<span class="memo none">最終確認 '+(pullAt?clockOf(pullAt):"—")+'</span>'
+    : '<span class="memo ng">受け取れていません。通信を確かめて、①のタブをもう一度押してください</span>';
+  box.innerHTML=html;
 }
 
 /* オンライン受信 */
-var lastPull=0, pulling=false;
+var lastPull=0, pulling=false, pullOk=true, pullAt=0;
 async function pull(silent){
   if(!syncOn()||pulling) return;
   pulling=true;
   try{
     var r=await Sync.listRequests("");
     var changed=[], others={};
-    (r.items||[]).forEach(function(it){
+    /* 同じ人の行が複数あっても、いちばん新しいものが最後に入るようにする */
+    var items=(r.items||[]).slice().sort(function(p,q){ return String(p.at||"")<String(q.at||"")?-1:1 });
+    items.forEach(function(it){
       if(!it.name||!/^\d{4}-\d{2}$/.test(it.month||"")) return;
       if(isHidden(it.name)) return;        /* 削除した人はもう復活させない */
       var st=staffByName(it.name)||addStaff(it.name);
@@ -429,7 +460,7 @@ async function pull(silent){
       changed.push(st.name+(it.month===ym()?"":"（"+(+it.month.split("-")[1])+"月）"));
       if(it.month!==ym()) others[it.month]=1;
     });
-    lastPull=Date.now();
+    lastPull=Date.now(); pullOk=true; pullAt=lastPull;
     if(changed.length){
       save(); renderAll();
       var ks=Object.keys(others);
@@ -437,6 +468,7 @@ async function pull(silent){
     } else if(!silent){ toast("新しい希望はありません") }
     renderReq(); renderChange();
   }catch(e){
+    pullOk=false; renderReq();
     if(!silent) toast((e&&e.message)||"受け取れませんでした");
   }finally{ pulling=false }
 }
