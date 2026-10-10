@@ -159,8 +159,9 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
 <a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
 <header class="top"><div class="top-in"><div class="tabs">
   <button class="tab" data-v="req" aria-selected="true">① 届いた希望</button>
-  <button class="tab" data-v="cal" aria-selected="false">② 確定シフト</button>
-  <button class="tab" data-v="cfg" aria-selected="false">③ 設定</button>
+  <button class="tab" data-v="cal" aria-selected="false">② 編集</button>
+  <button class="tab" data-v="fix" aria-selected="false">③ 確定シフト</button>
+  <button class="tab" data-v="cfg" aria-selected="false">④ 設定</button>
 </div></div></header>
 
 <main>
@@ -187,10 +188,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <section class="view" id="v-cal" data-off>
     <div class="row noprint" style="margin-bottom:10px">
       <button class="btn sm" id="closeMode" aria-pressed="false">休業日を決める</button>
-      <button class="btn sm" id="draftBtn">仮で共有</button>
-      <button class="btn sm primary" id="pubBtn">確定</button>
-      <button class="btn sm ghost" id="copyShare">お知らせ文</button>
-      <span class="lbl" id="pubAt"></span>
+      <span class="lbl" id="pubAt2"></span>
     </div>
     <div class="flag" id="changeRow" hidden></div>
     <div class="flag" id="conflictRow" hidden></div>
@@ -207,9 +205,7 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
       <b>終日OKの人のボタンは、上が名前・下がAMとPMの3つに分かれています。</b>名前を押すと終日、AM・PMを押すとその半日だけ入ります。
       AMに入れたあと同じ人のPMも押すと、自動で終日にまとまります。入った人は<b>AMが上、PMが下</b>の順に並びます。<br>
       日付の数字を押すと、その日だけ必要人数を変えられます（足りない日の数は上に出ます）。<br>
-      組めたら<b>「仮で共有」</b>を押すと、スタッフの画面に<b>（仮）</b>として出ます。スタッフはそれを見て希望を出し直せます。
-      届いた変更を入れ直したら、また「仮で共有」。すべて決まったら<b>「確定」</b>を押します。<br>
-      <b>「お知らせ文」</b>を押すと、そのときの状態に合ったLINE用の文章がコピーされます。</p>
+      組めたら<b>③確定シフト</b>に切り替えて、入る人だけの表を確かめてから、そこでスタッフに出します。</p>
 
     <div class="card noprint" style="margin-top:16px">
       <div class="card-h"><h2>人ごとの集計</h2><span class="hint" id="sumMonth"></span></div>
@@ -219,7 +215,25 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
     </div>
   </section>
 
-  <!-- ③ 設定 -->
+  <!-- ③ 確定シフト（入る人だけ） -->
+  <section class="view" id="v-fix" data-off>
+    <div class="row noprint" style="margin-bottom:10px">
+      <button class="btn sm" id="draftBtn">仮で共有</button>
+      <button class="btn sm primary" id="pubBtn">確定</button>
+      <button class="btn sm ghost" id="copyShare">お知らせ文</button>
+      <span class="lbl" id="pubAt"></span>
+    </div>
+    <div class="flag" id="changeRowFix" hidden></div>
+    <div class="flag" id="conflictRowFix" hidden></div>
+    <div class="dows"><span class="s0">日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="s6">土</span></div>
+    <div class="cal" id="calFix"></div>
+    <p class="note noprint">その日に<b>実際に入る人</b>だけを並べた表です。ここでは押しても変わりません。直すときは②編集で。<br>
+      <b>「仮で共有」</b>を押すと、スタッフの画面に<b>（仮）</b>として出ます。スタッフはそれを見て希望を出し直せます。
+      すべて決まったら<b>「確定」</b>を押します。<br>
+      <b>「お知らせ文」</b>を押すと、そのときの状態に合ったLINE用の文章がコピーされます。</p>
+  </section>
+
+  <!-- ④ 設定 -->
   <section class="view" id="v-cfg" data-off>
     <div class="card">
       <div class="sec">
@@ -392,7 +406,7 @@ function isClosed(d){
 var curTab="req", lastShift={total:0,short:0};
 /* 月の行の右側。①のときは提出の数、②のときはのべ人数と足りない日。 */
 function renderStat(){
-  if(curTab==="cal"){
+  if(curTab==="cal"||curTab==="fix"){
     $("#stat").innerHTML='のべ <b>'+lastShift.total+'</b> 人 ・ '+
       (lastShift.short?'<span class="short">足りない日 <b>'+lastShift.short+'</b></span>':'<span>過不足なし</span>');
     return;
@@ -491,7 +505,7 @@ var HOLIDAYS={'2026-1-1':'元日','2026-1-12':'成人の日','2026-2-11':'建国
 function holidayOf(y,m,d){ return HOLIDAYS[y+"-"+(m+1)+"-"+d]||"" }
 var closeMode=false;
 
-/* mode:"req"=届いた希望をそのまま並べる ／ "shift"=決まったシフトを並べる */
+/* mode:"req"=届いた希望をそのまま並べる ／ "shift"=組む画面 ／ "fix"=入る人だけの表 */
 function buildMonth(mode){
   var y=view.getFullYear(), m=view.getMonth();
   var first=new Date(y,m,1).getDay(), last=new Date(y,m+1,0).getDate();
@@ -503,7 +517,7 @@ function buildMonth(mode){
     var hol=holidayOf(y,m,d);
     var isToday=(y===today.getFullYear()&&m===today.getMonth()&&d===today.getDate());
     var rows, lack=false;
-    if(mode==="shift"){
+    if(mode!=="req"){
       var asg=sortAsg(M.assign[key]||[]);
       total+=asg.length;
       lack=!closed&&asg.length<need;
@@ -512,7 +526,7 @@ function buildMonth(mode){
       rows=[];
       asg.forEach(function(a){
         var st=staffById(a.s); if(!st) return;
-        var ng=conflictOf(a.s,d);
+        var ng=(mode==="shift")?conflictOf(a.s,d):"";
         if(ng) bad.push({name:st.name,d:d,why:ng});
         var L=lb(a.label);
         if(!L||L==="終日"){
@@ -538,8 +552,8 @@ function buildMonth(mode){
     if(closed){ html+='<div class="offbig">off</div>' }
     else{
       html+='<div class="asg">'+rows.map(function(r){
-        return '<span class="who'+(r.bad?" bad":"")+'" style="--c:'+(r.c||"var(--ink)")+'"'+
-          (r.bad?' title="'+esc(r.bad)+'"':'')+
+        return '<span class="who'+(r.bad&&mode==="shift"?" bad":"")+'" style="--c:'+(r.c||"var(--ink)")+'"'+
+          (r.bad&&mode==="shift"?' title="'+esc(r.bad)+'"':'')+
           (mode==="shift"?' data-act="del" data-s="'+r.s+'"'+(r.half?' data-half="'+r.half+'"':''):'')+'>'+
           esc(r.name)+(r.label?' <span class="t">'+esc(r.label)+'</span>':'')+'</span>';
       }).join("")+'</div>';
@@ -584,7 +598,7 @@ function fitNames(box){
 }
 var fitTimer=null;
 function fitAll(){
-  fitNames($("#cal")); fitNames($("#calReq"));
+  fitNames($("#cal")); fitNames($("#calReq")); fitNames($("#calFix"));
 }
 window.addEventListener("resize",function(){
   clearTimeout(fitTimer); fitTimer=setTimeout(fitAll,150);
@@ -594,6 +608,7 @@ function renderCal(){
   var r=buildMonth("shift");
   $("#cal").innerHTML=r.html;
   $("#calReq").innerHTML=buildMonth("req").html;
+  $("#calFix").innerHTML=buildMonth("fix").html;
   requestAnimationFrame(fitAll);
   lastShift={total:r.total,short:r.short};
   renderConflict(r.bad||[]);
@@ -602,15 +617,16 @@ function renderCal(){
 /* ②の候補ボタン。すでにAMだけ入っている人には、残りのPMだけを出す。 */
 /* 希望が変わって食い違っている人を、②の上にまとめて出す */
 function renderConflict(bad){
-  var el=$("#conflictRow"); if(!el) return;
-  if(!bad.length){ el.hidden=true; el.textContent=""; return }
+  var els=[$("#conflictRow"),$("#conflictRowFix")].filter(Boolean);
+  if(!els.length) return;
+  if(!bad.length){ els.forEach(function(e){ e.hidden=true; e.textContent="" }); return }
   var by={};
   bad.forEach(function(b){ var k=b.name+"｜"+b.why; (by[k]=by[k]||[]).push(b.d) });
-  el.textContent=Object.keys(by).map(function(k){
+  var t=Object.keys(by).map(function(k){
     var p=k.split("｜");
     return p[0]+"さんの "+by[k].map(function(d){return d+"日"}).join("・")+"："+p[1];
-  }).join(" ／ ")+" ／ 取り消し線の名前を押すと外せます。直したら「仮で共有」か「確定」を押し直してください。";
-  el.hidden=false;
+  }).join(" ／ ")+" ／ ②編集で取り消し線の名前を押すと外せます。直したら「仮で共有」か「確定」を押し直してください。";
+  els.forEach(function(e){ e.textContent=t; e.hidden=false });
 }
 function cands(d){
   var M=mon(ym()), key=String(d), got={};
@@ -896,7 +912,9 @@ $("#pubBtn").addEventListener("click",function(){ publish(false,this) });
 /* いまの状態と、共有したあとに届いた変更のお知らせ */
 function renderPub(){
   var p=mon(ym()).pub;
-  $("#pubAt").textContent = (p&&p.at) ? (p.draft?"仮を共有ずみ ":"確定ずみ ")+p.at.slice(5,16) : "";
+  var t=(p&&p.at) ? (p.draft?"仮を共有ずみ ":"確定ずみ ")+p.at.slice(5,16) : "";
+  $("#pubAt").textContent=t;
+  if($("#pubAt2")) $("#pubAt2").textContent=t;
   renderChange();
 }
 function renderChange(){
@@ -908,7 +926,7 @@ function renderChange(){
   var t=names.length
     ? (p.draft?"仮を出したあと":"確定したあと")+"、"+names.join("・")+" さんから希望が届いています。直したら、もう一度「"+(p.draft?"仮で共有":"確定")+"」を押してください。"
     : "";
-  ["#changeRow","#changeRowReq"].forEach(function(sel){
+  ["#changeRow","#changeRowReq","#changeRowFix"].forEach(function(sel){
     var el=$(sel); if(!el) return;
     el.textContent=t; el.hidden=!t;
   });
@@ -1095,7 +1113,7 @@ $("#nextM").addEventListener("click",function(){ view.setMonth(view.getMonth()+1
 document.querySelector(".tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
   curTab=b.dataset.v;
-  ["req","cal","cfg"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  ["req","cal","fix","cfg"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   $("#monthbar").hidden=(b.dataset.v==="cfg");
   if(b.dataset.v==="cfg"){
