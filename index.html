@@ -108,7 +108,8 @@ var TILES=[
    url:"./shift/"},
   {k:"order", ic:"🛒", nm:"発注",       ds:"仕入れの発注・発注履歴"},
   {k:"export",ic:"📤", nm:"エクスポート", ds:"税理士・確定申告用の出力"},
-  {k:"cfg",   ic:"⚙️", nm:"設定",       ds:"各種設定"}
+  {k:"cfg",   ic:"⚙️", nm:"設定",       ds:"スタッフ名簿・時給・商品リスト",
+   url:"./settings/"}
 ];
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}

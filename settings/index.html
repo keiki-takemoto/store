@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>設定</title>
+<meta name="description" content="アルバイトスタッフの名簿と時給、お店の商品リストをまとめて管理する画面。">
+<meta name="theme-color" content="#2BA55F">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+.top{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 14px 0}
+.top-in{max-width:760px;margin:0 auto}
+.tabs{display:flex;gap:4px}
+.tab{flex:1;border:none;background:transparent;border-bottom:3px solid transparent;padding:9px 4px 10px;
+  cursor:pointer;font-size:13.5px;color:var(--ink-3);font-weight:500;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:#2BA55F;font-weight:700}
+main{max-width:760px;margin:0 auto;padding:14px 14px calc(28px + env(safe-area-inset-bottom,0px))}
+.view[data-off]{display:none}
+.sec{padding:14px 15px}
+.sec+.sec{border-top:1px solid var(--line)}
+.sec h3{font-size:12px;letter-spacing:.07em;color:var(--ink-3);margin-bottom:9px;font-weight:500}
+.note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:8px 0 0}
+input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line-2);border-radius:9px;padding:9px 11px}
+input:focus{outline:2px solid var(--accent);outline-offset:1px}
+/* 携帯でも名前が折り返さないよう、1件を2段にして並べる */
+.rowitem{padding:11px 2px;border-bottom:1px solid var(--line)}
+.rowitem:last-of-type{border-bottom:none}
+.ri-top{display:flex;align-items:center;gap:8px}
+.ri-name{font-size:14.5px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri-act{display:flex;gap:4px;flex-shrink:0}
+.ri-act .btn{padding:5px 9px}
+.ri-sub{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12.5px;color:var(--ink-3)}
+.dot{width:12px;height:12px;border-radius:999px;display:inline-block;flex-shrink:0}
+.wage,.price{width:6.2em;text-align:right;font-family:var(--mono);padding:7px 9px}
+.addbox{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.addbox input[type=text]{flex:1;min-width:140px}
+.sum{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
+.empty{font-size:12.5px;color:var(--ink-3);padding:4px 0}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
+<header class="top"><div class="top-in"><div class="tabs">
+  <button class="tab" data-v="staff" aria-selected="true">スタッフ</button>
+  <button class="tab" data-v="item" aria-selected="false">商品</button>
+</div></div></header>
+
+<main>
+  <!-- スタッフ -->
+  <section class="view" id="v-staff">
+    <div class="card">
+      <div class="card-h"><h2>アルバイトスタッフ</h2><span class="hint" id="staffCount"></span></div>
+      <div class="sec">
+        <div id="staffTbl"></div>
+        <div id="staffEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
+        <div class="addbox">
+          <input type="text" id="newStaff" placeholder="名前（例）森川" autocomplete="off">
+          <input type="number" id="newWage" class="wage" placeholder="時給" min="0" step="10" inputmode="numeric">
+          <button class="btn sm primary" id="addStaff">追加</button>
+        </div>
+        <p class="note">時給の欄は、数字を直して画面のどこかを押せばそのまま保存されます。空のままでも構いません。<br>
+          名前の左の丸はシフト表での色です。色を変えるのは<b>シフト管理の④設定</b>から。</p>
+      </div>
+      <div class="sec" id="hiddenSec" hidden>
+        <h3>受け取らない名前（削除した人）</h3>
+        <div class="row" id="hiddenList" style="gap:7px"></div>
+        <p class="note">削除した人の名前です。この名前でシフト希望が届いても取り込みません。「戻す」で解除できます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 商品 -->
+  <section class="view" id="v-item" data-off>
+    <div class="card">
+      <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
+      <div class="sec">
+        <div id="itemTbl"></div>
+        <div id="itemEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
+        <div class="addbox">
+          <input type="text" id="newItem" placeholder="商品名" autocomplete="off">
+          <input type="number" id="newPrice" class="price" placeholder="売価" min="0" step="10" inputmode="numeric">
+          <button class="btn sm primary" id="addItem">追加</button>
+        </div>
+        <p class="note">売価は数字を直せばそのまま保存されます。空のままでも構いません。<br>
+          ここに登録した商品が、<b>在庫管理</b>や<b>発注</b>で使えるようになります。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function uid(){return "s"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function normName(n){ return String(n==null?"":n).replace(/\s|　/g,"") }
+
+/* シフト管理と同じ置き場所を使う。1つの名簿を2つの画面で見る形にしてある。 */
+var K_SHIFT="shiftadmin.v1", K_ITEM="storeitems.v1";
+var COLORS=["#D4552F","#1E7F5C","#2F6FBF","#C0397A","#B07A0E","#7A54C9","#0F8C93","#4E7A22","#9B4A1E","#5A6470"];
+
+function loadShift(){
+  var v=null;
+  try{ v=JSON.parse(localStorage.getItem(K_SHIFT)) }catch(e){}
+  if(!v||typeof v!=="object") v={};
+  if(!Array.isArray(v.staff)) v.staff=[];
+  if(!Array.isArray(v.hidden)) v.hidden=[];
+  if(!v.months||typeof v.months!=="object") v.months={};
+  return v;
+}
+function saveShift(v){ try{ localStorage.setItem(K_SHIFT,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
+function loadItems(){
+  var v=null;
+  try{ v=JSON.parse(localStorage.getItem(K_ITEM)) }catch(e){}
+  if(!v||!Array.isArray(v.items)) v={items:[]};
+  return v;
+}
+function saveItems(v){ try{ localStorage.setItem(K_ITEM,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
+
+var DB=loadShift(), IT=loadItems();
+
+/* ---------- スタッフ ---------- */
+function renderStaff(){
+  var n=DB.staff.length;
+  $("#staffCount").textContent=n?n+"人":"";
+  $("#staffEmpty").hidden=!!n;
+  $("#staffTbl").innerHTML=DB.staff.map(function(s){
+    return '<div class="rowitem">'+
+      '<div class="ri-top"><span class="dot" style="background:'+esc(s.color||"#8B857A")+'"></span>'+
+        '<span class="ri-name">'+esc(s.name)+'</span>'+
+        '<span class="ri-act"><button class="btn sm ghost" data-ren="'+esc(s.id)+'">名前</button>'+
+        '<button class="btn sm ghost" data-del="'+esc(s.id)+'">削除</button></span></div>'+
+      '<div class="ri-sub">時給 <input type="number" class="wage" data-wage="'+esc(s.id)+'" min="0" step="10" '+
+        'inputmode="numeric" value="'+(typeof s.wage==="number"?s.wage:"")+'" placeholder="—"> 円</div>'+
+      '</div>';
+  }).join("");
+  renderHidden();
+}
+function renderHidden(){
+  var h=DB.hidden||[];
+  $("#hiddenSec").hidden=!h.length;
+  $("#hiddenList").innerHTML=h.map(function(n){
+    return '<span class="btn sm ghost" style="cursor:default">'+esc(n)+
+      ' <button class="btn sm ghost" data-unhide="'+esc(n)+'" style="margin-left:4px">戻す</button></span>';
+  }).join("");
+}
+function staffByName(n){
+  var k=normName(n);
+  return DB.staff.filter(function(s){ return normName(s.name)===k })[0];
+}
+$("#addStaff").addEventListener("click",function(){
+  var v=$("#newStaff").value.trim();
+  if(!v){ toast("名前を入れてください"); $("#newStaff").focus(); return }
+  if(staffByName(v)){ toast("同じ名前の人がいます"); return }
+  var w=parseInt($("#newWage").value,10);
+  DB.hidden=(DB.hidden||[]).filter(function(x){ return x!==normName(v) });   /* 入れ直したら受け取る */
+  var s={id:uid(),name:v,color:COLORS[DB.staff.length%COLORS.length]};
+  if(!isNaN(w)&&w>=0) s.wage=w;
+  DB.staff.push(s);
+  saveShift(DB);
+  $("#newStaff").value=""; $("#newWage").value="";
+  renderStaff(); toast(v+" さんを追加しました");
+});
+$("#newStaff").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addStaff").click() });
+$("#newWage").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addStaff").click() });
+
+$("#staffTbl").addEventListener("change",function(e){
+  var w=e.target.closest("[data-wage]"); if(!w) return;
+  var s=DB.staff.filter(function(x){ return x.id===w.dataset.wage })[0]; if(!s) return;
+  var v=parseInt(w.value,10);
+  if(w.value===""||isNaN(v)||v<0){ delete s.wage; w.value="" } else { s.wage=v }
+  saveShift(DB);
+});
+$("#staffTbl").addEventListener("click",function(e){
+  var r=e.target.closest("[data-ren]"), d=e.target.closest("[data-del]");
+  if(r){
+    var s=DB.staff.filter(function(x){ return x.id===r.dataset.ren })[0]; if(!s) return;
+    var v=prompt("名前",s.name);
+    if(v===null) return;
+    v=v.trim(); if(!v) return;
+    var other=staffByName(v);
+    if(other&&other.id!==s.id){ toast("同じ名前の人がいます"); return }
+    s.name=v; saveShift(DB); renderStaff();
+    return;
+  }
+  if(d){
+    var st=DB.staff.filter(function(x){ return x.id===d.dataset.del })[0]; if(!st) return;
+    if(!confirm(st.name+" さんを削除します。この人のシフト希望と割り当ても消えます。\n"+
+      "これから「"+st.name+"」という名前で届く希望も、受け取らないようにします。よろしいですか？")) return;
+    DB.staff=DB.staff.filter(function(x){ return x.id!==st.id });
+    Object.keys(DB.months||{}).forEach(function(k){
+      var m=DB.months[k]; if(!m) return;
+      if(m.req) delete m.req[st.id];
+      if(m.assign) Object.keys(m.assign).forEach(function(day){
+        m.assign[day]=(m.assign[day]||[]).filter(function(a){ return a.s!==st.id });
+      });
+    });
+    DB.hidden=DB.hidden||[];
+    if(DB.hidden.indexOf(normName(st.name))<0) DB.hidden.push(normName(st.name));
+    saveShift(DB); renderStaff(); toast(st.name+" さんを削除しました");
+  }
+});
+$("#hiddenList").addEventListener("click",function(e){
+  var b=e.target.closest("[data-unhide]"); if(!b) return;
+  DB.hidden=(DB.hidden||[]).filter(function(x){ return x!==b.dataset.unhide });
+  saveShift(DB); renderHidden(); toast("「"+b.dataset.unhide+"」の希望をまた受け取ります");
+});
+
+/* ---------- 商品 ---------- */
+function renderItems(){
+  var n=IT.items.length;
+  $("#itemCount").textContent=n?n+"点":"";
+  $("#itemEmpty").hidden=!!n;
+  $("#itemTbl").innerHTML=IT.items.map(function(it){
+    return '<div class="rowitem">'+
+      '<div class="ri-top"><span class="ri-name">'+esc(it.name)+'</span>'+
+        '<span class="ri-act"><button class="btn sm ghost" data-iren="'+esc(it.id)+'">名前</button>'+
+        '<button class="btn sm ghost" data-idel="'+esc(it.id)+'">削除</button></span></div>'+
+      '<div class="ri-sub">売価 <input type="number" class="price" data-price="'+esc(it.id)+'" min="0" step="10" '+
+        'inputmode="numeric" value="'+(typeof it.price==="number"?it.price:"")+'" placeholder="—"> 円</div>'+
+      '</div>';
+  }).join("");
+}
+function itemByName(n){
+  var k=normName(n);
+  return IT.items.filter(function(x){ return normName(x.name)===k })[0];
+}
+$("#addItem").addEventListener("click",function(){
+  var v=$("#newItem").value.trim();
+  if(!v){ toast("商品名を入れてください"); $("#newItem").focus(); return }
+  if(itemByName(v)){ toast("同じ名前の商品があります"); return }
+  var p=parseInt($("#newPrice").value,10);
+  var it={id:uid(),name:v};
+  if(!isNaN(p)&&p>=0) it.price=p;
+  IT.items.push(it); saveItems(IT);
+  $("#newItem").value=""; $("#newPrice").value="";
+  renderItems(); toast(v+" を追加しました");
+});
+$("#newItem").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
+$("#newPrice").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
+
+$("#itemTbl").addEventListener("change",function(e){
+  var p=e.target.closest("[data-price]"); if(!p) return;
+  var it=IT.items.filter(function(x){ return x.id===p.dataset.price })[0]; if(!it) return;
+  var v=parseInt(p.value,10);
+  if(p.value===""||isNaN(v)||v<0){ delete it.price; p.value="" } else { it.price=v }
+  saveItems(IT);
+});
+$("#itemTbl").addEventListener("click",function(e){
+  var r=e.target.closest("[data-iren]"), d=e.target.closest("[data-idel]");
+  if(r){
+    var it=IT.items.filter(function(x){ return x.id===r.dataset.iren })[0]; if(!it) return;
+    var v=prompt("商品名",it.name);
+    if(v===null) return;
+    v=v.trim(); if(!v) return;
+    var other=itemByName(v);
+    if(other&&other.id!==it.id){ toast("同じ名前の商品があります"); return }
+    it.name=v; saveItems(IT); renderItems();
+    return;
+  }
+  if(d){
+    var it2=IT.items.filter(function(x){ return x.id===d.dataset.idel })[0]; if(!it2) return;
+    if(!confirm(it2.name+" を削除します。よろしいですか？")) return;
+    IT.items=IT.items.filter(function(x){ return x.id!==it2.id });
+    saveItems(IT); renderItems(); toast(it2.name+" を削除しました");
+  }
+});
+
+/* ---------- 共通 ---------- */
+document.querySelector(".tabs").addEventListener("click",function(e){
+  var b=e.target.closest(".tab[data-v]"); if(!b) return;
+  ["staff","item"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
+  window.scrollTo({top:0});
+});
+var toastEl=null,tt=null;
+function toast(m){
+  if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }
+  toastEl.textContent=m; toastEl.hidden=false;
+  clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3000);
+}
+/* ほかの画面で名簿が変わっていたら読み直す */
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState!=="visible") return;
+  DB=loadShift(); IT=loadItems(); renderStaff(); renderItems();
+});
+renderStaff(); renderItems();
+
+/* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える */
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+  var swCheck=function(){
+    if(document.visibilityState!=="visible") return;
+    try{ navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update() }).catch(function(){}) }catch(e){}
+  };
+  document.addEventListener("visibilitychange",swCheck);
+  window.addEventListener("pageshow",swCheck);
+}
+})();
+</script>
+</body>
+</html>
