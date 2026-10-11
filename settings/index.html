@@ -44,6 +44,11 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .ri-sub+.ri-sub{margin-top:7px}
 /* 項目名が途中で改行しないよう、ひとかたまりで折り返す */
 .fg{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);
+  border-radius:9px;padding:7px 9px;font-size:13px;max-width:11em}
+select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px;color:var(--ink-3)}
+.catTag{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border-radius:7px;padding:2px 8px}
 .rate{font-family:var(--mono);color:var(--ink-2)}
 .low{color:var(--warn);font-weight:700}
 .rowitem.lowstock{background:var(--warn-bg);border-radius:9px;padding-left:9px;padding-right:9px}
@@ -95,6 +100,7 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
     <div class="card">
       <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
       <div class="sec">
+        <div class="filter">表示 <select id="catFilter"></select></div>
         <div id="itemTbl"></div>
         <div id="itemEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
         <div class="newform">
@@ -102,6 +108,9 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
           <div class="nf-row">
             <span class="fg">商品No <input type="text" id="nNo" class="no" placeholder="001" autocomplete="off"></span>
             <input type="text" id="nName" class="grow" placeholder="商品名" autocomplete="off">
+          </div>
+          <div class="nf-row">
+            <span class="fg">カテゴリー <select id="nCat"></select></span>
           </div>
           <div class="nf-row">
             <span class="fg">売価 <input type="number" id="nPrice" class="num" min="0" step="10" inputmode="numeric" placeholder="—"> 円</span>
@@ -116,6 +125,7 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
         <p class="note">商品名だけ入れれば登録できます。ほかは空のままでも構いません。<br>
           <b>原価率</b>は売価と仕入れ値から自動で出します（仕入れ値 ÷ 売価）。<br>
           <b>店舗にある数</b>が<b>在庫アラーム</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
+          <b>カテゴリー</b>は「＋ 新しいカテゴリー…」からその場で作れます。上の「表示」で絞り込めます。<br>
           登録したあとは、一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
       </div>
     </div>
@@ -148,6 +158,7 @@ function loadItems(){
   var v=null;
   try{ v=JSON.parse(localStorage.getItem(K_ITEM)) }catch(e){}
   if(!v||!Array.isArray(v.items)) v={items:[]};
+  if(!Array.isArray(v.cats)) v.cats=[];
   return v;
 }
 function saveItems(v){ try{ localStorage.setItem(K_ITEM,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
@@ -242,6 +253,31 @@ $("#hiddenList").addEventListener("click",function(e){
 });
 
 /* ---------- 商品 ---------- */
+/* ---- カテゴリー ---- */
+var NEWCAT="__new__";
+function catOpts(sel,withAdd){
+  var h='<option value="">（未分類）</option>'+
+    IT.cats.map(function(c){
+      return '<option value="'+esc(c)+'"'+(c===sel?" selected":"")+'>'+esc(c)+'</option>';
+    }).join("");
+  if(withAdd) h+='<option value="'+NEWCAT+'">＋ 新しいカテゴリー…</option>';
+  return h;
+}
+function addCat(){
+  var v=prompt("新しいカテゴリーの名前（例）雑貨","");
+  if(v===null) return null;
+  v=v.trim(); if(!v) return null;
+  if(IT.cats.indexOf(v)<0){ IT.cats.push(v); IT.cats.sort(); saveItems(IT) }
+  return v;
+}
+function renderCatPickers(){
+  $("#nCat").innerHTML=catOpts($("#nCat").dataset.v||"",true);
+  var cur=$("#catFilter").value;
+  $("#catFilter").innerHTML='<option value="">すべて</option>'+
+    IT.cats.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>' }).join("")+
+    '<option value="__none__">（未分類）</option>';
+  $("#catFilter").value=cur||"";
+}
 function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
 function isLow(it){
   var st=numOf(it.stock), al=numOf(it.alert);
@@ -258,18 +294,25 @@ function fld(it,f,label,unit,step){
     'inputmode="numeric" value="'+(numOf(it[f])!==null?it[f]:"")+'" placeholder="—">'+(unit?" "+unit:"")+'</span>';
 }
 function renderItems(){
+  renderCatPickers();
   var n=IT.items.length, low=IT.items.filter(isLow).length;
   $("#itemCount").textContent=n?(n+"点"+(low?" ・ 在庫少 "+low:"")):"";
+  var f=$("#catFilter").value;
+  var list=!f?IT.items:IT.items.filter(function(x){
+    return f==="__none__" ? !x.cat : x.cat===f;
+  });
   $("#itemEmpty").hidden=!!n;
-  $("#itemTbl").innerHTML=IT.items.map(function(it){
+  if(n&&!list.length){ $("#itemTbl").innerHTML='<div class="empty">このカテゴリーの商品はありません。</div>'; return }
+  $("#itemTbl").innerHTML=list.map(function(it){
     return '<div class="rowitem'+(isLow(it)?" lowstock":"")+'">'+
       '<div class="ri-top">'+
         '<input type="text" class="no" data-f="no" data-id="'+esc(it.id)+'" value="'+esc(it.no||"")+'" placeholder="No">'+
         '<span class="ri-name">'+esc(it.name)+'</span>'+
         '<span class="ri-act"><button class="btn sm ghost" data-iren="'+esc(it.id)+'">名前</button>'+
         '<button class="btn sm ghost" data-idel="'+esc(it.id)+'">削除</button></span></div>'+
-      '<div class="ri-sub">'+fld(it,"price","売価","円")+fld(it,"cost","仕入れ","円")+
+      '<div class="ri-sub"><span class="fg">カテゴリー <select data-cat="'+esc(it.id)+'">'+catOpts(it.cat||"",true)+'</select></span>'+
         '<span class="fg rate">原価率 '+rateText(it)+'</span></div>'+
+      '<div class="ri-sub">'+fld(it,"price","売価","円")+fld(it,"cost","仕入れ","円")+'</div>'+
       '<div class="ri-sub">'+fld(it,"stock","店舗にある数","",1)+fld(it,"alert","在庫アラーム","",1)+
         (isLow(it)?'<span class="fg low">少なくなっています</span>':'')+'</div>'+
       '</div>';
@@ -292,20 +335,41 @@ $("#addItem").addEventListener("click",function(){
   if(no&&itemByNo(no)){ toast("商品No「"+no+"」はもう使われています"); $("#nNo").focus(); return }
   var it={id:uid(),name:name};
   if(no) it.no=no;
+  var cat=$("#nCat").value;
+  if(cat&&cat!==NEWCAT) it.cat=cat;
   [["price","#nPrice"],["cost","#nCost"],["stock","#nStock"],["alert","#nAlert"]].forEach(function(pair){
     var v=parseInt($(pair[1]).value,10);
     if(!isNaN(v)&&v>=0) it[pair[0]]=v;
   });
   IT.items.push(it); saveItems(IT);
   ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
-  renderItems(); $("#nNo").focus();
+  renderItems(); $("#nNo").focus();      /* カテゴリーは続けて登録しやすいよう残す */
   toast(name+" を登録しました");
 });
 ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){
   $(sel).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
 });
 
+$("#catFilter").addEventListener("change",renderItems);
+$("#nCat").addEventListener("change",function(){
+  if(this.value!==NEWCAT){ this.dataset.v=this.value; return }
+  var v=addCat();
+  this.dataset.v=v||"";
+  renderCatPickers();
+  this.value=v||"";
+});
 $("#itemTbl").addEventListener("change",function(e){
+  var cs=e.target.closest("[data-cat]");
+  if(cs){
+    var it0=IT.items.filter(function(x){ return x.id===cs.dataset.cat })[0]; if(!it0) return;
+    if(cs.value===NEWCAT){
+      var nv=addCat();
+      if(nv) it0.cat=nv; 
+      saveItems(IT); renderItems(); return;
+    }
+    if(cs.value) it0.cat=cs.value; else delete it0.cat;
+    saveItems(IT); renderItems(); return;
+  }
   var el=e.target.closest("[data-f]"); if(!el) return;
   var it=IT.items.filter(function(x){ return x.id===el.dataset.id })[0]; if(!it) return;
   var f=el.dataset.f;
