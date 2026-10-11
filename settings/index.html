@@ -31,12 +31,22 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .rowitem{padding:11px 2px;border-bottom:1px solid var(--line)}
 .rowitem:last-of-type{border-bottom:none}
 .ri-top{display:flex;align-items:center;gap:8px}
-.ri-name{font-size:14.5px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri-name{font-size:14.5px;font-weight:600;flex:1;min-width:0;line-height:1.45;word-break:break-word}
+.no{flex-shrink:0}
 .ri-act{display:flex;gap:4px;flex-shrink:0}
 .ri-act .btn{padding:5px 9px}
-.ri-sub{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12.5px;color:var(--ink-3)}
+.ri-sub{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12.5px;color:var(--ink-3)}
 .dot{width:12px;height:12px;border-radius:999px;display:inline-block;flex-shrink:0}
 .wage,.price{width:6.2em;text-align:right;font-family:var(--mono);padding:7px 9px}
+.num{width:4.8em;text-align:right;font-family:var(--mono);padding:7px 8px}
+.no{width:5.6em;font-family:var(--mono);padding:6px 8px;font-size:12.5px}
+.ri-sub{flex-wrap:wrap;row-gap:7px}
+.ri-sub+.ri-sub{margin-top:7px}
+/* 項目名が途中で改行しないよう、ひとかたまりで折り返す */
+.fg{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.rate{font-family:var(--mono);color:var(--ink-2)}
+.low{color:var(--warn);font-weight:700}
+.rowitem.lowstock{background:var(--warn-bg);border-radius:9px;padding-left:9px;padding-right:9px}
 .addbox{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .addbox input[type=text]{flex:1;min-width:140px}
 .sum{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
@@ -86,8 +96,10 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
           <input type="number" id="newPrice" class="price" placeholder="売価" min="0" step="10" inputmode="numeric">
           <button class="btn sm primary" id="addItem">追加</button>
         </div>
-        <p class="note">売価は数字を直せばそのまま保存されます。空のままでも構いません。<br>
-          ここに登録した商品が、<b>在庫管理</b>や<b>発注</b>で使えるようになります。</p>
+        <p class="note">どの欄も、数字や文字を直して画面のどこかを押せばそのまま保存されます。空のままでも構いません。<br>
+          <b>原価率</b>は売価と仕入れ値から自動で出します（仕入れ値 ÷ 売価）。<br>
+          <b>店舗にある数</b>が<b>在庫アラーム</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
+          商品Noは追加したときに自動で振られます。好きな番号に直して構いません。</p>
       </div>
     </div>
   </section>
@@ -124,6 +136,11 @@ function loadItems(){
 function saveItems(v){ try{ localStorage.setItem(K_ITEM,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
 
 var DB=loadShift(), IT=loadItems();
+(function(){      /* 前に登録した商品に商品Noが無ければ、ここで振っておく */
+  var n=0, changed=false;
+  IT.items.forEach(function(x){ if(!x.no){ x.no=String(++n).padStart(3,"0"); changed=true } else { n=Math.max(n,parseInt(String(x.no).replace(/\D/g,""),10)||0) } });
+  if(changed) saveItems(IT);
+})();
 
 /* ---------- スタッフ ---------- */
 function renderStaff(){
@@ -213,19 +230,47 @@ $("#hiddenList").addEventListener("click",function(e){
 });
 
 /* ---------- 商品 ---------- */
+function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
+function isLow(it){
+  var st=numOf(it.stock), al=numOf(it.alert);
+  return (st!==null&&al!==null&&st<=al);
+}
+function rateText(it){
+  var p=numOf(it.price), c=numOf(it.cost);
+  if(p===null||c===null||p<=0) return "—";
+  return (Math.round(c/p*1000)/10)+"%";
+}
+function fld(it,f,label,unit,step){
+  return '<span class="fg">'+label+
+    ' <input type="number" class="num" data-f="'+f+'" data-id="'+esc(it.id)+'" min="0" step="'+(step||10)+'" '+
+    'inputmode="numeric" value="'+(numOf(it[f])!==null?it[f]:"")+'" placeholder="—">'+(unit?" "+unit:"")+'</span>';
+}
 function renderItems(){
-  var n=IT.items.length;
-  $("#itemCount").textContent=n?n+"点":"";
+  var n=IT.items.length, low=IT.items.filter(isLow).length;
+  $("#itemCount").textContent=n?(n+"点"+(low?" ・ 在庫少 "+low:"")):"";
   $("#itemEmpty").hidden=!!n;
   $("#itemTbl").innerHTML=IT.items.map(function(it){
-    return '<div class="rowitem">'+
-      '<div class="ri-top"><span class="ri-name">'+esc(it.name)+'</span>'+
+    return '<div class="rowitem'+(isLow(it)?" lowstock":"")+'">'+
+      '<div class="ri-top">'+
+        '<input type="text" class="no" data-f="no" data-id="'+esc(it.id)+'" value="'+esc(it.no||"")+'" placeholder="No">'+
+        '<span class="ri-name">'+esc(it.name)+'</span>'+
         '<span class="ri-act"><button class="btn sm ghost" data-iren="'+esc(it.id)+'">名前</button>'+
         '<button class="btn sm ghost" data-idel="'+esc(it.id)+'">削除</button></span></div>'+
-      '<div class="ri-sub">売価 <input type="number" class="price" data-price="'+esc(it.id)+'" min="0" step="10" '+
-        'inputmode="numeric" value="'+(typeof it.price==="number"?it.price:"")+'" placeholder="—"> 円</div>'+
+      '<div class="ri-sub">'+fld(it,"price","売価","円")+fld(it,"cost","仕入れ","円")+
+        '<span class="fg rate">原価率 '+rateText(it)+'</span></div>'+
+      '<div class="ri-sub">'+fld(it,"stock","店舗にある数","",1)+fld(it,"alert","在庫アラーム","",1)+
+        (isLow(it)?'<span class="fg low">少なくなっています</span>':'')+'</div>'+
       '</div>';
   }).join("");
+}
+/* 商品Noは、いちばん大きい数字の次を自動で振る（あとから自由に直せる） */
+function nextNo(){
+  var mx=0;
+  IT.items.forEach(function(x){
+    var m=String(x.no||"").match(/(\d+)\s*$/);
+    if(m) mx=Math.max(mx,parseInt(m[1],10));
+  });
+  return String(mx+1).padStart(3,"0");
 }
 function itemByName(n){
   var k=normName(n);
@@ -236,7 +281,7 @@ $("#addItem").addEventListener("click",function(){
   if(!v){ toast("商品名を入れてください"); $("#newItem").focus(); return }
   if(itemByName(v)){ toast("同じ名前の商品があります"); return }
   var p=parseInt($("#newPrice").value,10);
-  var it={id:uid(),name:v};
+  var it={id:uid(),name:v,no:nextNo()};
   if(!isNaN(p)&&p>=0) it.price=p;
   IT.items.push(it); saveItems(IT);
   $("#newItem").value=""; $("#newPrice").value="";
@@ -246,11 +291,15 @@ $("#newItem").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#ad
 $("#newPrice").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
 
 $("#itemTbl").addEventListener("change",function(e){
-  var p=e.target.closest("[data-price]"); if(!p) return;
-  var it=IT.items.filter(function(x){ return x.id===p.dataset.price })[0]; if(!it) return;
-  var v=parseInt(p.value,10);
-  if(p.value===""||isNaN(v)||v<0){ delete it.price; p.value="" } else { it.price=v }
-  saveItems(IT);
+  var el=e.target.closest("[data-f]"); if(!el) return;
+  var it=IT.items.filter(function(x){ return x.id===el.dataset.id })[0]; if(!it) return;
+  var f=el.dataset.f;
+  if(f==="no"){ var t=el.value.trim(); if(t) it.no=t; else delete it.no }
+  else{
+    var v=parseInt(el.value,10);
+    if(el.value===""||isNaN(v)||v<0){ delete it[f]; el.value="" } else { it[f]=v }
+  }
+  saveItems(IT); renderItems();
 });
 $("#itemTbl").addEventListener("click",function(e){
   var r=e.target.closest("[data-iren]"), d=e.target.closest("[data-idel]");
