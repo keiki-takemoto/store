@@ -47,6 +47,12 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .rate{font-family:var(--mono);color:var(--ink-2)}
 .low{color:var(--warn);font-weight:700}
 .rowitem.lowstock{background:var(--warn-bg);border-radius:9px;padding-left:9px;padding-right:9px}
+.newform{margin-top:16px;padding:13px 13px 14px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2)}
+.newform h3{margin-bottom:10px}
+.nf-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;row-gap:9px;font-size:12.5px;color:var(--ink-3)}
+.nf-row+.nf-row{margin-top:10px}
+.nf-row.end{justify-content:flex-end}
+.nf-row .grow{flex:1;min-width:150px}
 .addbox{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .addbox input[type=text]{flex:1;min-width:140px}
 .sum{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
@@ -91,15 +97,26 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
       <div class="sec">
         <div id="itemTbl"></div>
         <div id="itemEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
-        <div class="addbox">
-          <input type="text" id="newItem" placeholder="商品名" autocomplete="off">
-          <input type="number" id="newPrice" class="price" placeholder="売価" min="0" step="10" inputmode="numeric">
-          <button class="btn sm primary" id="addItem">追加</button>
+        <div class="newform">
+          <h3>商品を登録</h3>
+          <div class="nf-row">
+            <span class="fg">商品No <input type="text" id="nNo" class="no" placeholder="001" autocomplete="off"></span>
+            <input type="text" id="nName" class="grow" placeholder="商品名" autocomplete="off">
+          </div>
+          <div class="nf-row">
+            <span class="fg">売価 <input type="number" id="nPrice" class="num" min="0" step="10" inputmode="numeric" placeholder="—"> 円</span>
+            <span class="fg">仕入れ <input type="number" id="nCost" class="num" min="0" step="10" inputmode="numeric" placeholder="—"> 円</span>
+          </div>
+          <div class="nf-row">
+            <span class="fg">店舗にある数 <input type="number" id="nStock" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
+            <span class="fg">在庫アラーム <input type="number" id="nAlert" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
+          </div>
+          <div class="nf-row end"><button class="btn primary" id="addItem">保存</button></div>
         </div>
-        <p class="note">どの欄も、数字や文字を直して画面のどこかを押せばそのまま保存されます。空のままでも構いません。<br>
+        <p class="note">商品名だけ入れれば登録できます。ほかは空のままでも構いません。<br>
           <b>原価率</b>は売価と仕入れ値から自動で出します（仕入れ値 ÷ 売価）。<br>
           <b>店舗にある数</b>が<b>在庫アラーム</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
-          商品Noは追加したときに自動で振られます。好きな番号に直して構いません。</p>
+          登録したあとは、一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
       </div>
     </div>
   </section>
@@ -136,11 +153,6 @@ function loadItems(){
 function saveItems(v){ try{ localStorage.setItem(K_ITEM,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
 
 var DB=loadShift(), IT=loadItems();
-(function(){      /* 前に登録した商品に商品Noが無ければ、ここで振っておく */
-  var n=0, changed=false;
-  IT.items.forEach(function(x){ if(!x.no){ x.no=String(++n).padStart(3,"0"); changed=true } else { n=Math.max(n,parseInt(String(x.no).replace(/\D/g,""),10)||0) } });
-  if(changed) saveItems(IT);
-})();
 
 /* ---------- スタッフ ---------- */
 function renderStaff(){
@@ -263,32 +275,35 @@ function renderItems(){
       '</div>';
   }).join("");
 }
-/* 商品Noは、いちばん大きい数字の次を自動で振る（あとから自由に直せる） */
-function nextNo(){
-  var mx=0;
-  IT.items.forEach(function(x){
-    var m=String(x.no||"").match(/(\d+)\s*$/);
-    if(m) mx=Math.max(mx,parseInt(m[1],10));
-  });
-  return String(mx+1).padStart(3,"0");
-}
 function itemByName(n){
   var k=normName(n);
   return IT.items.filter(function(x){ return normName(x.name)===k })[0];
 }
+function itemByNo(no){
+  var k=String(no||"").trim();
+  if(!k) return null;
+  return IT.items.filter(function(x){ return String(x.no||"").trim()===k })[0]||null;
+}
 $("#addItem").addEventListener("click",function(){
-  var v=$("#newItem").value.trim();
-  if(!v){ toast("商品名を入れてください"); $("#newItem").focus(); return }
-  if(itemByName(v)){ toast("同じ名前の商品があります"); return }
-  var p=parseInt($("#newPrice").value,10);
-  var it={id:uid(),name:v,no:nextNo()};
-  if(!isNaN(p)&&p>=0) it.price=p;
+  var name=$("#nName").value.trim();
+  if(!name){ toast("商品名を入れてください"); $("#nName").focus(); return }
+  if(itemByName(name)){ toast("同じ名前の商品があります"); return }
+  var no=$("#nNo").value.trim();
+  if(no&&itemByNo(no)){ toast("商品No「"+no+"」はもう使われています"); $("#nNo").focus(); return }
+  var it={id:uid(),name:name};
+  if(no) it.no=no;
+  [["price","#nPrice"],["cost","#nCost"],["stock","#nStock"],["alert","#nAlert"]].forEach(function(pair){
+    var v=parseInt($(pair[1]).value,10);
+    if(!isNaN(v)&&v>=0) it[pair[0]]=v;
+  });
   IT.items.push(it); saveItems(IT);
-  $("#newItem").value=""; $("#newPrice").value="";
-  renderItems(); toast(v+" を追加しました");
+  ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
+  renderItems(); $("#nNo").focus();
+  toast(name+" を登録しました");
 });
-$("#newItem").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
-$("#newPrice").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
+["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){
+  $(sel).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
+});
 
 $("#itemTbl").addEventListener("change",function(e){
   var el=e.target.closest("[data-f]"); if(!el) return;
