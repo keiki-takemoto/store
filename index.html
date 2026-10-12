@@ -2,7 +2,7 @@
 <html lang="ja" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>店舗管理</title>
 <meta name="description" content="売上・経費・在庫・予約・レジをまとめて見るための店舗管理アプリ。">
 <link rel="manifest" href="./manifest.webmanifest">
@@ -14,6 +14,10 @@
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
 <style>
+/* 画面が勝手に拡大・縮小しないようにする。スクロール中に指が当たって
+   拡大されると、どこを見ているか分からなくなるため。 */
+html,body{touch-action:pan-x pan-y}
+
 :root{
   --green:#2BA55F; --green-d:#218B4F; --green-ink:#FFFFFF;
   --bg:#F2F2F2; --card:#FFFFFF; --line:#E6E6E6;
@@ -151,6 +155,12 @@ if("serviceWorker" in navigator){
   document.addEventListener("visibilitychange",swCheck);
   window.addEventListener("pageshow",swCheck);
 }
+/* ピンチやダブルタップでの拡大を止める（iOSはviewportの指定を無視するので、
+   指の動きそのものを受け止めて打ち消す） */
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+document.addEventListener("dblclick",function(e){ e.preventDefault() },{passive:false});
 })();
 </script>
 </body>

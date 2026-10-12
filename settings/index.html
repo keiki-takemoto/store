@@ -2,13 +2,17 @@
 <html lang="ja" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>設定</title>
 <meta name="description" content="アルバイトスタッフの名簿と時給、お店の商品リストをまとめて管理する画面。">
 <meta name="theme-color" content="#2BA55F">
 <link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
 <link rel="stylesheet" href="../shared/theme.css">
 <style>
+/* 画面が勝手に拡大・縮小しないようにする。スクロール中に指が当たって
+   拡大されると、どこを見ているか分からなくなるため。 */
+html,body{touch-action:pan-x pan-y}
+
 .homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
   padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
 .homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
@@ -435,6 +439,12 @@ if("serviceWorker" in navigator){
   document.addEventListener("visibilitychange",swCheck);
   window.addEventListener("pageshow",swCheck);
 }
+/* ピンチやダブルタップでの拡大を止める（iOSはviewportの指定を無視するので、
+   指の動きそのものを受け止めて打ち消す） */
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+document.addEventListener("dblclick",function(e){ e.preventDefault() },{passive:false});
 })();
 </script>
 </body>
