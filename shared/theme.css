@@ -72,7 +72,10 @@ a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center;
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .lbl{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
-input[type=text],input[type=time],select,textarea{border:1px solid var(--line-2);background:var(--surface-2);
+/* iPhoneは文字が16pxより小さい入力欄を押すと画面を勝手に拡大するので、
+   入力欄の文字は必ず16px以上にすること。 */
+input[type=text],input[type=time],input[type=number],select,textarea{
+  border:1px solid var(--line-2);background:var(--surface-2);
   border-radius:9px;padding:9px 11px;font-size:16px;max-width:100%}
 textarea{width:100%;line-height:1.7;resize:vertical}
 
