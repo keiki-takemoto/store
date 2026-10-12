@@ -2,12 +2,16 @@
 <html lang="ja" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>はじめの設定</title>
 <meta name="theme-color" content="#2BA55F">
 <link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
 <link rel="stylesheet" href="../shared/theme.css">
 <style>
+/* 画面が勝手に拡大・縮小しないようにする。スクロール中に指が当たって
+   拡大されると、どこを見ているか分からなくなるため。 */
+html,body{touch-action:pan-x pan-y}
+
 main{max-width:780px;margin:0 auto;padding:24px 16px 60px}
 h1{font-size:20px;margin-bottom:6px}
 .lead{color:var(--ink-2);font-size:14px;margin:0 0 22px;line-height:1.85}
@@ -201,6 +205,12 @@ document.querySelectorAll("[data-copy]").forEach(function(b){
     setTimeout(function(){ b.textContent="コピー" },2000);
   });
 });
+/* ピンチやダブルタップでの拡大を止める（iOSはviewportの指定を無視するので、
+   指の動きそのものを受け止めて打ち消す） */
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+document.addEventListener("dblclick",function(e){ e.preventDefault() },{passive:false});
 </script>
 </body>
 </html>
