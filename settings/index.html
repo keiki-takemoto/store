@@ -66,6 +66,9 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .addbox input[type=text]{flex:1;min-width:140px}
 .sum{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
 .empty{font-size:12.5px;color:var(--ink-3);padding:4px 0}
+.filter input[type=text]{flex:1;min-width:140px;padding:6px 10px}
+.morerow{padding:10px 0 2px;text-align:center}
+#impInfo{margin-left:0}
 </style>
 </head>
 <body>
@@ -104,8 +107,11 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
     <div class="card">
       <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
       <div class="sec">
-        <div class="filter">表示 <select id="catFilter"></select></div>
+        <div class="filter">表示 <select id="catFilter"></select>
+          <input type="text" id="q" placeholder="商品名・Noで探す" autocomplete="off" enterkeyhint="search">
+          <span class="sum" id="itemShown"></span></div>
         <div id="itemTbl"></div>
+        <div class="morerow"><button class="btn sm ghost" id="more" hidden></button></div>
         <div id="itemEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
         <div class="newform">
           <h3>商品を登録</h3>
@@ -131,6 +137,16 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
           <b>店舗にある数</b>が<b>在庫アラーム</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
           <b>カテゴリー</b>は「＋ 新しいカテゴリー…」からその場で作れます。上の「表示」で絞り込めます。<br>
           登録したあとは、一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
+      </div>
+      <div class="sec">
+        <h3>原価表の読み込み</h3>
+        <div class="row" style="gap:9px;flex-wrap:wrap;align-items:center">
+          <button class="btn sm" id="impBtn">原価表を読み込む</button>
+          <span class="sum" id="impInfo"></span>
+        </div>
+        <p class="note">お店の原価表（<b>794点</b>）をこの画面に入れ直します。<br>
+          同じ商品があれば<b>商品No・商品名・売価・仕入れ値</b>を原価表の内容に合わせます。<b>カテゴリーと在庫の数はそのまま残ります。</b><br>
+          原価表に無い商品が消えることはありません。売価と仕入れ値はどちらも<b>税込</b>です。</p>
       </div>
     </div>
   </section>
@@ -297,17 +313,32 @@ function fld(it,f,label,unit,step){
     ' <input type="number" class="num" data-f="'+f+'" data-id="'+esc(it.id)+'" min="0" step="'+(step||10)+'" '+
     'inputmode="numeric" value="'+(numOf(it[f])!==null?it[f]:"")+'" placeholder="—">'+(unit?" "+unit:"")+'</span>';
 }
+var LIMIT=40, shown=LIMIT;
+function matchQ(it,q){
+  if(!q) return true;
+  return (String(it.name)+" "+String(it.no||"")).toLowerCase().indexOf(q)>=0;
+}
 function renderItems(){
   renderCatPickers();
   var n=IT.items.length, low=IT.items.filter(isLow).length;
   $("#itemCount").textContent=n?(n+"点"+(low?" ・ 在庫少 "+low:"")):"";
-  var f=$("#catFilter").value;
-  var list=!f?IT.items:IT.items.filter(function(x){
-    return f==="__none__" ? !x.cat : x.cat===f;
+  var f=$("#catFilter").value, q=$("#q").value.trim().toLowerCase();
+  var list=IT.items.filter(function(x){
+    if(f==="__none__"){ if(x.cat) return false } else if(f&&x.cat!==f) return false;
+    return matchQ(x,q);
   });
   $("#itemEmpty").hidden=!!n;
-  if(n&&!list.length){ $("#itemTbl").innerHTML='<div class="empty">このカテゴリーの商品はありません。</div>'; return }
-  $("#itemTbl").innerHTML=list.map(function(it){
+  if(n&&!list.length){
+    $("#itemTbl").innerHTML='<div class="empty">見つかりませんでした。</div>';
+    $("#itemShown").textContent=""; $("#more").hidden=true; return;
+  }
+  /* 商品が何百点もあるので、一度に出すのは少しだけにする。
+     ぜんぶ出すと携帯では重くて動かなくなるため。 */
+  var view=list.slice(0,shown), rest=list.length-view.length;
+  $("#itemShown").textContent=list.length?(rest>0?view.length+" / "+list.length+"点":list.length+"点"):"";
+  $("#more").hidden=rest<=0;
+  $("#more").textContent="のこり "+rest+"点を表示";
+  $("#itemTbl").innerHTML=view.map(function(it){
     return '<div class="rowitem'+(isLow(it)?" lowstock":"")+'">'+
       '<div class="ri-top">'+
         '<input type="text" class="no" data-f="no" data-id="'+esc(it.id)+'" value="'+esc(it.no||"")+'" placeholder="No">'+
@@ -322,6 +353,11 @@ function renderItems(){
       '</div>';
   }).join("");
 }
+$("#more").addEventListener("click",function(){ shown+=200; renderItems() });
+var qT=null;
+$("#q").addEventListener("input",function(){
+  clearTimeout(qT); qT=setTimeout(function(){ shown=LIMIT; renderItems() },180);
+});
 function itemByName(n){
   var k=normName(n);
   return IT.items.filter(function(x){ return normName(x.name)===k })[0];
@@ -354,7 +390,7 @@ $("#addItem").addEventListener("click",function(){
   $(sel).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
 });
 
-$("#catFilter").addEventListener("change",renderItems);
+$("#catFilter").addEventListener("change",function(){ shown=LIMIT; renderItems() });
 $("#nCat").addEventListener("change",function(){
   if(this.value!==NEWCAT){ this.dataset.v=this.value; return }
   var v=addCat();
@@ -404,6 +440,67 @@ $("#itemTbl").addEventListener("click",function(e){
   }
 });
 
+/* ---- 原価表（items.json）の読み込み ---- */
+/* 商品は数が多くて手で入れるのが大変なので、お店の原価表を
+   そのままファイルに書き出してアプリから読む形にしてある。 */
+function loadSeed(){
+  return fetch("./items.json",{cache:"no-store"}).then(function(r){
+    if(!r.ok) throw new Error("ng");
+    return r.json();
+  }).then(function(d){
+    if(!d||!Array.isArray(d.items)||!d.items.length) throw new Error("ng");
+    return d.items;
+  });
+}
+function mergeSeed(src){
+  var byId={},byNo={},byName={};
+  IT.items.forEach(function(x){
+    byId[x.id]=x;
+    var k=String(x.no==null?"":x.no).trim();
+    if(k&&!byNo[k]) byNo[k]=x;
+    var nk=normName(x.name);
+    if(!byName[nk]) byName[nk]=x;
+  });
+  var add=0,upd=0;
+  src.forEach(function(sr){
+    var nk=normName(sr.name), k=String(sr.no==null?"":sr.no).trim();
+    var cur=byId[sr.id]||(k?byNo[k]:null)||byName[nk];
+    if(cur){
+      /* 一度あてた行は使い回さない。同じNoの商品が何点かあるため */
+      delete byId[cur.id];
+      if(cur.no) delete byNo[String(cur.no).trim()];
+      delete byName[normName(cur.name)];
+      cur.name=sr.name;
+      if(k) cur.no=k;
+      if(typeof sr.price==="number") cur.price=sr.price; else delete cur.price;
+      if(typeof sr.cost==="number") cur.cost=sr.cost; else delete cur.cost;
+      upd++;
+    }else{
+      var it={id:sr.id,name:sr.name};
+      if(k) it.no=k;
+      if(typeof sr.price==="number") it.price=sr.price;
+      if(typeof sr.cost==="number") it.cost=sr.cost;
+      IT.items.push(it);
+      add++;
+    }
+  });
+  saveItems(IT);
+  return {add:add,upd:upd};
+}
+$("#impBtn").addEventListener("click",function(){
+  var b=this;
+  b.disabled=true; $("#impInfo").textContent="読み込み中…";
+  loadSeed().then(function(src){
+    var r=mergeSeed(src);
+    shown=LIMIT; renderItems();
+    $("#impInfo").textContent="追加 "+r.add+"点 ／ 更新 "+r.upd+"点";
+    toast("原価表を読み込みました");
+  }).catch(function(){
+    $("#impInfo").textContent="";
+    toast("読み込めませんでした。通信を確かめてください");
+  }).then(function(){ b.disabled=false });
+});
+
 /* ---------- 共通 ---------- */
 document.querySelector(".tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
@@ -423,6 +520,17 @@ document.addEventListener("visibilitychange",function(){
   DB=loadShift(); IT=loadItems(); renderStaff(); renderItems();
 });
 renderStaff(); renderItems();
+
+/* まだ1点も入っていなければ、原価表を自動で入れておく */
+if(!IT.items.length){
+  loadSeed().then(function(src){
+    if(IT.items.length) return;
+    var r=mergeSeed(src);
+    shown=LIMIT; renderItems();
+    $("#impInfo").textContent="追加 "+r.add+"点";
+    toast("商品 "+r.add+"点を読み込みました");
+  }).catch(function(){});
+}
 
 /* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える */
 if("serviceWorker" in navigator){
