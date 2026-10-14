@@ -184,3 +184,65 @@ end $$;
 
 grant execute on function store_items_get(text, text)        to anon, authenticated;
 grant execute on function store_items_put(text, jsonb, jsonb) to anon, authenticated;
+
+-- ========================================================================
+-- 帳簿（店舗管理の「経費」と「収支表」）
+-- 変動費・固定費・人件費を1つの表にまとめて入れる。kind で見分ける。
+--   exp   … 変動費（day＝使った日。data に 科目・支払い方法・金額・メモ）
+--   fix   … 固定費（day は空。data に 名称・月額・支払い方法・メモ）
+--   labor … 人件費（day＝働いた日。data に スタッフ・始まり・終わり・その時の時給・交通費）
+-- お給料や経費はスタッフに見せないので、店長用キーだけが触れる。
+-- ========================================================================
+
+create table if not exists store_books (
+  id         text primary key,
+  kind       text    not null default '',
+  day        text    not null default '',
+  data       jsonb   not null default '{}'::jsonb,
+  deleted    boolean not null default false,   -- 消した印。ほかの端末にも消したことを伝えるため残す
+  updated_at timestamptz not null default now()
+);
+create index if not exists store_books_upd on store_books (updated_at);
+
+alter table store_books enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：帳簿を受け取る（p_since より後に変わったものだけ。空なら全部）
+create or replace function store_books_get(p_key text, p_since text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_rows jsonb; v_since timestamptz;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  v_since := case when coalesce(p_since,'') = '' then null else p_since::timestamptz end;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', b.id, 'kind', b.kind, 'day', b.day, 'data', b.data, 'deleted', b.deleted
+         ) order by b.updated_at), '[]'::jsonb)
+    into v_rows
+    from store_books b
+   where v_since is null or b.updated_at > v_since;
+  -- 5秒だけ手前を返す。ちょうど同じ瞬間に書かれたものを取りこぼさないため。
+  return jsonb_build_object('ok', true, 'rows', v_rows,
+    'now', to_char((now() - interval '5 seconds') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+end $$;
+
+-- 店長：帳簿を書き込む（同じ id は上書き）
+create or replace function store_books_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if p_rows is not null and jsonb_typeof(p_rows) = 'array' then
+    insert into store_books (id, kind, day, data, deleted, updated_at)
+    select x->>'id', coalesce(x->>'kind',''), coalesce(x->>'day',''),
+           coalesce(x->'data','{}'::jsonb), coalesce((x->>'deleted')::boolean, false), now()
+      from jsonb_array_elements(p_rows) x
+     where coalesce(x->>'id','') <> ''
+    on conflict (id) do update
+      set kind = excluded.kind, day = excluded.day, data = excluded.data,
+          deleted = excluded.deleted, updated_at = now();
+  end if;
+  return jsonb_build_object('ok', true,
+    'now', to_char(now() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+end $$;
+
+grant execute on function store_books_get(text, text)  to anon, authenticated;
+grant execute on function store_books_put(text, jsonb) to anon, authenticated;

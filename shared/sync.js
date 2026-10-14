@@ -86,6 +86,13 @@
     },
     itemsPut: function (items, cats) {
       return rpc("store_items_put", { p_key: (CFG && CFG.key) || "", p_items: items || [], p_cats: cats || null });
+    },
+    /* 帳簿（変動費・固定費・人件費）。これも店長用キーだけ */
+    booksGet: function (since) {
+      return rpc("store_books_get", { p_key: (CFG && CFG.key) || "", p_since: since || null });
+    },
+    booksPut: function (rows) {
+      return rpc("store_books_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

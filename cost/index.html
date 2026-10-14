@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>経費</title>
+<meta name="description" content="変動費・固定費・人件費（スタッフの働いた時間とお給料）を入れる画面。">
+<meta name="theme-color" content="#2BA55F">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* 画面が勝手に拡大・縮小しないようにする */
+html,body{touch-action:pan-x pan-y}
+
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+.top{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 14px 0}
+.top-in{max-width:760px;margin:0 auto}
+.tabs{display:flex;gap:4px}
+.tab{flex:1;border:none;background:transparent;border-bottom:3px solid transparent;padding:9px 4px 10px;
+  cursor:pointer;font-size:13.5px;color:var(--ink-3);font-weight:500;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:#2BA55F;font-weight:700}
+main{max-width:760px;margin:0 auto;padding:14px 14px calc(28px + env(safe-area-inset-bottom,0px))}
+.view[data-off]{display:none}
+.card+.card{margin-top:14px}
+.sec{padding:14px 15px}
+.sec+.sec{border-top:1px solid var(--line)}
+.sec h3{font-size:12px;letter-spacing:.07em;color:var(--ink-3);margin-bottom:9px;font-weight:500}
+.note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:8px 0 0}
+.empty{font-size:12.5px;color:var(--ink-3);padding:6px 0}
+input[type=date],input[type=month]{border:1px solid var(--line-2);background:var(--surface-2);
+  border-radius:9px;padding:8px 10px;font-size:16px;max-width:100%}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+.syncbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px;
+  font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px;line-height:1.7}
+.syncbar #syncState{flex:1;min-width:150px}
+
+/* 入力欄 */
+.fld{margin-bottom:12px}
+.fld>label,.fld>.lbl{display:block;font-size:12px;color:var(--ink-3);font-weight:600;margin-bottom:5px;letter-spacing:0}
+.fld input,.fld select{width:100%}
+.yen{position:relative}
+.yen input{padding-right:40px;font-family:var(--mono);text-align:right;font-size:20px;font-weight:700}
+.yen span{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:14px}
+.btn.wide{width:100%;padding:12px;font-size:15px}
+
+/* 月・日の切り替え */
+.nav{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.nav b{flex:1;text-align:center;font-size:15.5px}
+.nav .btn{min-width:44px;padding:7px 0}
+.back{display:block;text-align:center;font-size:12px;color:var(--accent);margin:-6px 0 10px;cursor:pointer;
+  background:none;border:none;width:100%}
+
+/* 合計の帯 */
+.band{display:flex;justify-content:space-between;align-items:center;border-radius:10px;
+  padding:11px 14px;margin-bottom:12px;color:#fff;background:#2BA55F}
+.band.blue{background:#5b7fa6}
+.band.org{background:#C2761E}
+.band span{font-size:13px;opacity:.92}
+.band b{font-size:21px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.line{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;
+  border-bottom:1px solid var(--line);font-size:13.5px}
+.line:last-child{border-bottom:none}
+.line b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* 明細 */
+.it{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.it:last-child{border-bottom:none}
+.it-main{flex:1;min-width:0}
+.it-top{font-size:12.5px;color:var(--ink-3);display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.tag{font-size:11px;font-weight:600;border-radius:9px;padding:1px 8px;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.tag.cat{background:#E2F3E8;color:#1E7F45}
+.it-amt{font-weight:700;font-size:15.5px;font-family:var(--mono);margin-top:2px}
+.it-memo{font-size:12px;color:var(--ink-2);word-break:break-word}
+.del{border:none;background:none;font-size:17px;cursor:pointer;padding:4px 6px;color:var(--ink-3);flex-shrink:0}
+
+/* 固定費 */
+.fx{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.fx:last-child{border-bottom:none}
+.fx-name{font-weight:700;font-size:15px}
+.fx-amt{font-weight:800;font-size:17px;color:#5b7fa6;font-family:var(--mono)}
+.fx-amt small{font-size:11px;color:var(--ink-3);font-weight:400;margin-left:3px;font-family:var(--ui)}
+
+/* 下から出てくる編集画面 */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:80;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);border-radius:18px 18px 0 0;width:100%;max-width:520px;
+  padding:20px 18px calc(26px + env(safe-area-inset-bottom,0px));max-height:92vh;overflow:auto}
+.sheet h3{font-size:15px;margin-bottom:14px}
+
+/* 人件費 */
+.lr{padding:11px 0;border-bottom:1px solid var(--line)}
+.lr:last-child{border-bottom:none}
+.lr-top{display:flex;align-items:center;gap:8px}
+.lr-name{font-weight:700;font-size:15px;flex:1;min-width:0;word-break:break-word}
+.lr-amt{font-family:var(--mono);font-weight:700;font-size:15px}
+.dot{width:11px;height:11px;border-radius:999px;display:inline-block;flex-shrink:0}
+.lr-sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px;font-size:12.5px;color:var(--ink-3)}
+.lr-sub input[type=time]{width:110px;padding:6px 8px;font-family:var(--mono)}
+.lr-sub input[type=number]{width:84px;padding:6px 8px;text-align:right;font-family:var(--mono)}
+.fg{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.lr-note{font-size:11.5px;color:var(--ink-3);margin-top:5px}
+.lr-note.warn{color:var(--warn);font-weight:600}
+.tag.sh{background:var(--accent-2);color:var(--accent)}
+.lr.on{background:#F1F8F3;border-radius:9px;padding-left:8px;padding-right:8px}
+.fill{font-size:11.5px;padding:2px 8px}
+table.sum{width:100%;border-collapse:collapse;font-size:12.5px}
+table.sum th{font-weight:500;color:var(--ink-3);text-align:right;padding:5px 4px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.sum th:first-child,table.sum td:first-child{text-align:left}
+table.sum td{text-align:right;padding:7px 4px;border-bottom:1px solid var(--line);font-family:var(--mono);white-space:nowrap}
+table.sum td:first-child{font-family:var(--ui);white-space:normal;word-break:break-word}
+table.sum tr.tot td{font-weight:700;border-bottom:none}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
+<header class="top"><div class="top-in"><div class="tabs">
+  <button class="tab" data-v="exp" aria-selected="true">変動費</button>
+  <button class="tab" data-v="fix" aria-selected="false">固定費</button>
+  <button class="tab" data-v="labor" aria-selected="false">人件費</button>
+</div></div></header>
+
+<main>
+  <div class="syncbar" id="syncBar"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
+
+  <!-- 変動費 -->
+  <section class="view" id="v-exp">
+    <div class="card">
+      <div class="card-h"><h2>経費を入力</h2></div>
+      <div class="card-b">
+        <div class="fld"><label for="eDate">日付</label><input type="date" id="eDate"></div>
+        <div class="fld"><label for="eCat">経費の種類</label><select id="eCat"></select></div>
+        <div class="fld"><label for="ePay">支払い方法</label><select id="ePay"></select></div>
+        <div class="fld"><label for="eAmt">金額（税込）</label>
+          <div class="yen"><input type="number" id="eAmt" inputmode="numeric" min="0" placeholder="0"><span>円</span></div></div>
+        <div class="fld"><label for="eMemo">メモ（任意）</label><input type="text" id="eMemo" placeholder="例：業者名・品目など" autocomplete="off"></div>
+        <button class="btn primary wide" id="eAdd">登録する</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-b">
+        <div class="nav"><button class="btn" data-mv="-1" aria-label="前の月">◀</button><b id="eMonth"></b><button class="btn" data-mv="1" aria-label="次の月">▶</button></div>
+        <button class="back" id="eNow" hidden>今月に戻る</button>
+        <div class="band" id="eBand"><span>月間の変動費合計</span><b id="eTotal">¥0</b></div>
+        <div id="eCats"></div>
+        <h3 class="lbl" style="margin:14px 0 4px">明細</h3>
+        <div id="eList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 固定費 -->
+  <section class="view" id="v-fix" data-off>
+    <div class="band blue"><span>月間の固定費合計</span><b id="fTotal">¥0</b></div>
+    <div class="card">
+      <div class="card-h"><h2>固定費リスト</h2><button class="btn sm primary" id="fAdd" style="margin-left:auto">＋ 追加</button></div>
+      <div class="card-b">
+        <div id="fList"></div>
+        <p class="note">家賃・リース料など、毎月決まって出ていくお金です。ここに入れた月額が、収支表の<b>どの月にもそのまま</b>入ります。行を押すと直したり消したりできます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 人件費 -->
+  <section class="view" id="v-labor" data-off>
+    <div class="card">
+      <div class="card-h"><h2>働いた時間を入れる</h2></div>
+      <div class="card-b">
+        <div class="nav"><button class="btn" data-dv="-1" aria-label="前の日">◀</button><b id="lDay"></b><button class="btn" data-dv="1" aria-label="次の日">▶</button></div>
+        <button class="back" id="lToday" hidden>今日に戻る</button>
+        <div id="lList"></div>
+        <p class="note">始まりと終わりの時刻を入れると、<b>名簿の時給 × 働いた時間</b>でお給料を出します。交通費はそのまま足します。<br>
+          日をまたぐときは、そのまま終わりを入れてください（例：18:00〜1:00 は7時間）。<br>
+          時刻を両方消すと、その日の記録は消えます。時給はシフト管理と同じ名簿（<a href="../settings/">設定 → スタッフ</a>）のものを使います。<br>
+          入れた時点の時給を一緒に残すので、あとで時給を変えても、過去の分は変わりません。</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h2 id="lMonthH">今月のお給料</h2></div>
+      <div class="card-b">
+        <div class="band org"><span>人件費の合計</span><b id="lTotal">¥0</b></div>
+        <div id="lSum"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="sheet-bg" id="sheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sTitle">
+    <h3 id="sTitle">固定費を追加</h3>
+    <div class="fld"><label for="sName">名称</label><input type="text" id="sName" placeholder="例：家賃・リース料など" autocomplete="off"></div>
+    <div class="fld"><label for="sAmt">金額（税込）</label>
+      <div class="yen"><input type="number" id="sAmt" inputmode="numeric" min="0" placeholder="0" style="padding-right:62px"><span>円/月</span></div></div>
+    <div class="fld"><label for="sPay">支払い方法</label><select id="sPay"></select></div>
+    <div class="fld"><label for="sMemo">メモ（任意）</label><input type="text" id="sMemo" placeholder="例：契約内容・備考など" autocomplete="off"></div>
+    <button class="btn primary wide" id="sSave">保存</button>
+    <button class="btn danger wide" id="sDel" style="margin-top:10px">削除</button>
+    <button class="btn ghost wide" id="sClose" style="margin-top:6px">閉じる</button>
+  </div>
+</div>
+
+<script src="../shared/sync.js"></script>
+<script src="../shared/books.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function yen(n){ return "¥"+Math.round(Number(n)||0).toLocaleString() }
+function pad(n){ return ("0"+n).slice(-2) }
+function ymd(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()) }
+function ymOf(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1) }
+function parseDay(s){ var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||""); return m?new Date(+m[1],+m[2]-1,+m[3]):null }
+function ymLabel(ym){ var p=ym.split("-"); return p[0]+"年"+(+p[1])+"月" }
+var WD="日月火水木金土";
+function dayLabel(s){ var d=parseDay(s); return (d.getMonth()+1)+"月"+d.getDate()+"日（"+WD[d.getDay()]+"）" }
+function hm(min){ var h=Math.floor(min/60), m=min%60; return h+"時間"+(m?m+"分":"") }
+
+/* みつ澤アプリと同じ、飲食店用の15科目 */
+var CATS=["食材費F","食材費D","消耗品費","衛生費","水道光熱費","通信費","旅費交通費","広告宣伝費",
+  "修繕費","接待交際費","会議費","支払い手数料","租税公課","研修費","雑費"];
+var PAYS=["Card払い","PayPay","現金","その他"];
+function opts(list){ return list.map(function(x){ return '<option>'+esc(x)+'</option>' }).join("") }
+$("#eCat").innerHTML=opts(CATS); $("#ePay").innerHTML=opts(PAYS); $("#sPay").innerHTML=opts(PAYS);
+
+var today=ymd(new Date());
+var ym=ymOf(new Date());   /* 変動費で見ている月 */
+var lday=today;            /* 人件費で見ている日 */
+$("#eDate").value=today;
+
+/* ---------- 変動費 ---------- */
+function renderExp(){
+  $("#eMonth").textContent=ymLabel(ym);
+  $("#eNow").hidden=(ym===ymOf(new Date()));
+  var list=Books.inPeriod("exp",ym).slice().sort(function(a,b){ return (b.day||"").localeCompare(a.day||"") });
+  var tot=0, by={};
+  list.forEach(function(r){ var a=Number(r.amount)||0; tot+=a; by[r.cat]=(by[r.cat]||0)+a });
+  $("#eTotal").textContent=yen(tot);
+  $("#eCats").innerHTML=Object.keys(by).sort(function(a,b){ return by[b]-by[a] }).map(function(c){
+    return '<div class="line"><span>'+esc(c)+'</span><b>'+yen(by[c])+'</b></div>';
+  }).join("");
+  $("#eList").innerHTML=list.length?list.map(function(r){
+    var d=parseDay(r.day);
+    return '<div class="it"><div class="it-main">'+
+      '<div class="it-top">'+(d?(d.getMonth()+1)+"/"+d.getDate():"")+
+        ' <span class="tag cat">'+esc(r.cat)+'</span>'+(r.pay?'<span class="tag">'+esc(r.pay)+'</span>':"")+'</div>'+
+      '<div class="it-amt">'+yen(r.amount)+'</div>'+
+      (r.memo?'<div class="it-memo">'+esc(r.memo)+'</div>':"")+
+      '</div><button class="del" data-del="'+esc(r.id)+'" aria-label="消す">🗑</button></div>';
+  }).join(""):'<div class="empty">この月の記録はありません</div>';
+}
+$("#eAdd").addEventListener("click",function(){
+  var day=$("#eDate").value, amt=parseInt($("#eAmt").value,10);
+  if(!parseDay(day)){ toast("日付を入れてください"); return }
+  if(isNaN(amt)||amt<=0){ toast("金額を入力してください"); return }
+  var r=Books.put({kind:"exp",day:day,cat:$("#eCat").value,pay:$("#ePay").value,amount:amt,memo:$("#eMemo").value.trim()});
+  if(!r){ toast("保存できませんでした"); return }
+  $("#eAmt").value=""; $("#eMemo").value="";
+  ym=day.slice(0,7); renderExp();
+  toast("✅ 登録しました");
+});
+$("#eList").addEventListener("click",function(e){
+  var b=e.target.closest("[data-del]"); if(!b) return;
+  if(!confirm("この経費を消しますか？")) return;
+  Books.remove(b.dataset.del);
+});
+document.querySelector("#v-exp .nav").addEventListener("click",function(e){
+  var b=e.target.closest("[data-mv]"); if(!b) return;
+  var p=ym.split("-"); ym=ymOf(new Date(+p[0],+p[1]-1+(+b.dataset.mv),1)); renderExp();
+});
+$("#eNow").addEventListener("click",function(){ ym=ymOf(new Date()); renderExp() });
+
+/* ---------- 固定費 ---------- */
+var editing=null;
+function renderFix(){
+  var list=Books.rows("fix");
+  var tot=list.reduce(function(s,r){ return s+(Number(r.amount)||0) },0);
+  $("#fTotal").textContent=yen(tot);
+  $("#fList").innerHTML=list.length?list.map(function(r){
+    return '<div class="fx" data-ed="'+esc(r.id)+'"><div class="it-main">'+
+      '<div class="row" style="gap:7px"><span class="fx-name">'+esc(r.name)+'</span>'+(r.pay?'<span class="tag">'+esc(r.pay)+'</span>':"")+'</div>'+
+      '<div class="fx-amt">'+yen(r.amount)+'<small>/月</small></div>'+
+      (r.memo?'<div class="it-memo">'+esc(r.memo)+'</div>':"")+
+      '</div><span class="btn sm">編集</span></div>';
+  }).join(""):'<div class="empty">固定費が登録されていません</div>';
+}
+function openSheet(r){
+  editing=r||null;
+  $("#sTitle").textContent=r?"固定費を編集":"固定費を追加";
+  $("#sName").value=r?r.name||"":""; $("#sAmt").value=r&&r.amount!=null?r.amount:"";
+  $("#sPay").value=r&&r.pay?r.pay:PAYS[0]; $("#sMemo").value=r?r.memo||"":"";
+  $("#sDel").hidden=!r; $("#sheet").hidden=false;
+}
+function closeSheet(){ $("#sheet").hidden=true; editing=null }
+$("#fAdd").addEventListener("click",function(){ openSheet(null) });
+$("#fList").addEventListener("click",function(e){
+  var el=e.target.closest("[data-ed]"); if(!el) return;
+  openSheet(Books.rows("fix").filter(function(r){ return r.id===el.dataset.ed })[0]);
+});
+$("#sSave").addEventListener("click",function(){
+  var name=$("#sName").value.trim(), amt=parseInt($("#sAmt").value,10);
+  if(!name){ toast("名称を入れてください"); return }
+  if(isNaN(amt)||amt<0){ toast("金額を入れてください"); return }
+  var r={kind:"fix",day:"",name:name,amount:amt,pay:$("#sPay").value,memo:$("#sMemo").value.trim()};
+  if(editing) r.id=editing.id;
+  if(!Books.put(r)){ toast("保存できませんでした"); return }
+  closeSheet(); toast("保存しました");
+});
+$("#sDel").addEventListener("click",function(){
+  if(!editing||!confirm("この固定費を削除しますか？")) return;
+  Books.remove(editing.id); closeSheet();
+});
+$("#sClose").addEventListener("click",closeSheet);
+$("#sheet").addEventListener("click",function(e){ if(e.target===this) closeSheet() });
+
+/* ---------- 人件費 ---------- */
+/* 確定シフトでその日に入っている人（シフト管理の②で決めたもの） */
+function shiftOn(day){
+  var m=Books.shiftMonths()[day.slice(0,7)], out={};
+  if(!m||!m.assign) return out;
+  (m.assign[String(+day.slice(8))]||[]).forEach(function(a){ out[a.s]=a.label||"終日" });
+  return out;
+}
+/* "13:00-17:00" のような時刻のラベルなら始まりと終わりに分ける */
+function splitTime(lab){
+  var m=/^(\d{1,2}):?(\d{2})?\s*[-〜~]\s*(\d{1,2}):?(\d{2})?$/.exec(String(lab||"").trim());
+  if(!m) return null;
+  return {start:pad(+m[1])+":"+(m[2]||"00"), end:pad(+m[3])+":"+(m[4]||"00")};
+}
+function laborRowsOf(day){ return Books.rows("labor").filter(function(r){ return r.day===day }) }
+function staffById(id){ return Books.staff().filter(function(s){ return s.id===id })[0] }
+/* その日に並べる人：確定シフトの人 → 記録のある人 → 名簿の残り */
+function peopleOf(day){
+  var on=shiftOn(day), recs=laborRowsOf(day), seen={}, out=[];
+  function add(sid,name,color){ if(seen[sid]) return; seen[sid]=1;
+    out.push({sid:sid,name:name,color:color,label:on[sid]||"",rec:recs.filter(function(r){ return r.sid===sid })[0]||null}) }
+  var staff=Books.staff();
+  staff.forEach(function(s){ if(on[s.id]) add(s.id,s.name,s.color) });
+  recs.forEach(function(r){ var s=staffById(r.sid); add(r.sid,s?s.name:r.name,s?s.color:"#999") });
+  staff.forEach(function(s){ add(s.id,s.name,s.color) });
+  return out;
+}
+function rowNote(p){
+  var s=staffById(p.sid), r=p.rec;
+  var wage=(r&&typeof r.wage==="number")?r.wage:(s&&typeof s.wage==="number"?s.wage:null);
+  if(wage==null) return {cls:"warn",text:"時給が名簿に入っていません（設定 → スタッフで入れてください）"};
+  if(!r) return {cls:"",text:"時給 "+wage.toLocaleString()+"円"};
+  var min=Books.minutes(r);
+  var t=(min?hm(min)+" × ":"")+"時給 "+wage.toLocaleString()+"円";
+  if(Number(r.fare)) t+=" ＋ 交通費 "+Number(r.fare).toLocaleString()+"円";
+  return {cls:"",text:t};
+}
+function lrHTML(p){
+  var r=p.rec, n=rowNote(p), st=splitTime(p.label);
+  return '<div class="lr'+(r?" on":"")+'" data-sid="'+esc(p.sid)+'">'+
+    '<div class="lr-top"><span class="dot" style="background:'+esc(p.color||"#999")+'"></span>'+
+      '<span class="lr-name">'+esc(p.name)+(p.label?' <span class="tag sh">シフト '+esc(p.label)+'</span>':"")+'</span>'+
+      '<span class="lr-amt">'+(r?yen(Books.laborCost(r)):"")+'</span></div>'+
+    '<div class="lr-sub">'+
+      '<input type="time" data-f="start" value="'+esc(r?r.start||"":"")+'" aria-label="始まり" step="300"> 〜 '+
+      '<input type="time" data-f="end" value="'+esc(r?r.end||"":"")+'" aria-label="終わり" step="300">'+
+      '<span class="fg">交通費 <input type="number" data-f="fare" min="0" step="10" inputmode="numeric" placeholder="0" value="'+(r&&Number(r.fare)?r.fare:"")+'"> 円</span>'+
+      (st&&!r?'<button class="btn sm fill" data-fill="'+esc(st.start+"|"+st.end)+'">シフトの時刻を入れる</button>':"")+
+    '</div>'+
+    '<div class="lr-note '+n.cls+'">'+esc(n.text)+'</div></div>';
+}
+function renderLaborList(){
+  $("#lDay").textContent=dayLabel(lday);
+  $("#lToday").hidden=(lday===today);
+  var ps=peopleOf(lday);
+  $("#lList").innerHTML=ps.length?ps.map(lrHTML).join(""):
+    '<div class="empty">名簿にスタッフがいません。<a href="../settings/">設定 → スタッフ</a>で登録してください。</div>';
+}
+function renderLaborSum(){
+  var mon=lday.slice(0,7);
+  $("#lMonthH").textContent=ymLabel(mon)+"のお給料";
+  var list=Books.inPeriod("labor",mon), by={}, order=[], tot={days:0,min:0,pay:0,fare:0};
+  list.forEach(function(r){
+    var s=staffById(r.sid), k=r.sid||r.name;
+    if(!by[k]){ by[k]={name:s?s.name:r.name,days:{},min:0,pay:0,fare:0}; order.push(k) }
+    var g=by[k]; g.days[r.day]=1; g.min+=Books.minutes(r); g.pay+=Books.pay(r); g.fare+=Number(r.fare)||0;
+  });
+  order.forEach(function(k){ var g=by[k]; g.n=Object.keys(g.days).length; tot.days+=g.n; tot.min+=g.min; tot.pay+=g.pay; tot.fare+=g.fare });
+  $("#lTotal").textContent=yen(tot.pay+tot.fare);
+  $("#lSum").innerHTML=order.length?
+    '<table class="sum"><tr><th>名前</th><th>日数</th><th>時間</th><th>お給料</th><th>交通費</th></tr>'+
+    order.map(function(k){ var g=by[k];
+      return '<tr><td>'+esc(g.name)+'</td><td>'+g.n+'日</td><td>'+(g.min/60).toFixed(1)+'h</td><td>'+yen(g.pay)+'</td><td>'+yen(g.fare)+'</td></tr>' }).join("")+
+    '<tr class="tot"><td>合計</td><td>'+tot.days+'日</td><td>'+(tot.min/60).toFixed(1)+'h</td><td>'+yen(tot.pay)+'</td><td>'+yen(tot.fare)+'</td></tr></table>'
+    :'<div class="empty">この月の記録はありません</div>';
+}
+/* 1行ぶんの入力をそのまま保存する */
+var selfEdit=false;
+function saveRow(row){
+  var sid=row.dataset.sid;
+  var start=row.querySelector('[data-f="start"]').value, end=row.querySelector('[data-f="end"]').value;
+  var fare=parseInt(row.querySelector('[data-f="fare"]').value,10); if(isNaN(fare)||fare<0) fare=0;
+  var cur=laborRowsOf(lday).filter(function(r){ return r.sid===sid })[0];
+  var note=row.querySelector(".lr-note");
+  if(!start&&!end&&!fare){
+    if(cur){ selfEdit=true; Books.remove(cur.id); selfEdit=false }
+    refreshRow(row,null); return;
+  }
+  if((start&&!end)||(!start&&end)){
+    note.className="lr-note warn"; note.textContent=start?"終わりの時刻も入れてください":"始まりの時刻も入れてください";
+    return;
+  }
+  var s=staffById(sid);
+  var wage=(cur&&typeof cur.wage==="number")?cur.wage:(s&&typeof s.wage==="number"?s.wage:null);
+  var r={kind:"labor",day:lday,sid:sid,name:s?s.name:(cur?cur.name:""),start:start,end:end,fare:fare};
+  if(wage!=null) r.wage=wage;
+  if(cur) r.id=cur.id;
+  selfEdit=true; var saved=Books.put(r); selfEdit=false;
+  if(!saved){ toast("保存できませんでした"); return }
+  refreshRow(row,saved);
+}
+function refreshRow(row,rec){
+  var p=peopleOf(lday).filter(function(x){ return x.sid===row.dataset.sid })[0]; if(!p) return;
+  var n=rowNote(p);
+  row.classList.toggle("on",!!rec);
+  row.querySelector(".lr-amt").textContent=rec?yen(Books.laborCost(rec)):"";
+  var note=row.querySelector(".lr-note"); note.className="lr-note "+n.cls; note.textContent=n.text;
+  var f=row.querySelector("[data-fill]"); if(f&&rec) f.remove();
+  renderLaborSum();
+}
+$("#lList").addEventListener("change",function(e){
+  var row=e.target.closest(".lr"); if(row) saveRow(row);
+});
+$("#lList").addEventListener("click",function(e){
+  var b=e.target.closest("[data-fill]"); if(!b) return;
+  var row=b.closest(".lr"), t=b.dataset.fill.split("|");
+  row.querySelector('[data-f="start"]').value=t[0]; row.querySelector('[data-f="end"]').value=t[1];
+  saveRow(row);
+});
+document.querySelector("#v-labor .nav").addEventListener("click",function(e){
+  var b=e.target.closest("[data-dv]"); if(!b) return;
+  var d=parseDay(lday); d.setDate(d.getDate()+(+b.dataset.dv)); lday=ymd(d);
+  renderLaborList(); renderLaborSum();
+});
+$("#lToday").addEventListener("click",function(){ lday=today; renderLaborList(); renderLaborSum() });
+
+/* ---------- 共通 ---------- */
+function renderSync(){
+  var s=Books.status();
+  if(!s.on){
+    $("#syncState").innerHTML="いまは<b>この端末だけ</b>に入っています。ほかの端末と同じにするには、"+
+      '<a href="../shift/#cfg">シフト管理 → ③設定</a>でつないでください。';
+    $("#syncNow").hidden=true; return;
+  }
+  $("#syncNow").hidden=false; $("#syncState").textContent=s.text;
+}
+function renderAll(){
+  renderSync(); renderExp(); renderFix();
+  /* 人件費を入力している最中は、打っている欄が消えないよう一覧は描き直さない */
+  var a=document.activeElement;
+  if(!(a&&$("#lList").contains(a))) renderLaborList();
+  renderLaborSum();
+}
+Books.onChange(function(){ if(selfEdit){ renderSync(); return } renderAll() });
+Books.onError=function(m){ toast("合わせられませんでした："+m) };
+$("#syncNow").addEventListener("click",function(){ Books.syncNow(false) });
+
+var VIEWS=["exp","fix","labor"];
+function show(v){
+  if(VIEWS.indexOf(v)<0) v="exp";
+  VIEWS.forEach(function(x){ $("#v-"+x).toggleAttribute("data-off",x!==v) });
+  document.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t.dataset.v===v)) });
+  try{ sessionStorage.setItem("cost.tab",v) }catch(e){}
+}
+document.querySelector(".tabs").addEventListener("click",function(e){
+  var b=e.target.closest(".tab[data-v]"); if(!b) return;
+  show(b.dataset.v); window.scrollTo({top:0});
+});
+var first=(location.hash||"").slice(1);
+if(!first){ try{ first=sessionStorage.getItem("cost.tab")||"" }catch(e){} }
+show(first);
+window.addEventListener("hashchange",function(){ show((location.hash||"").slice(1)) });
+
+var toastEl=null,tt=null;
+function toast(m){
+  if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }
+  toastEl.textContent=m; toastEl.hidden=false;
+  clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3000);
+}
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState!=="visible") return;
+  today=ymd(new Date());
+  Books.reload();
+  if(Books.syncOn()) Books.syncNow(true);
+});
+renderAll();
+if(Books.syncOn()) Books.syncNow(true);
+/* 開きっぱなしでも、ほかの端末で入れたものが入ってくるように1分おきに見に行く */
+setInterval(function(){
+  if(document.visibilityState!=="visible"||!Books.syncOn()) return;
+  Books.syncNow(true);
+},60000);
+
+/* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える */
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+  var swCheck=function(){
+    if(document.visibilityState!=="visible") return;
+    try{ navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update() }).catch(function(){}) }catch(e){}
+  };
+  document.addEventListener("visibilitychange",swCheck);
+  window.addEventListener("pageshow",swCheck);
+}
+/* ピンチやダブルタップでの拡大を止める */
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+document.addEventListener("dblclick",function(e){ e.preventDefault() },{passive:false});
+})();
+</script>
+</body>
+</html>

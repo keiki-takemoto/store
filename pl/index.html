@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>収支表</title>
+<meta name="description" content="売上・人件費・変動費・固定費・FL比率・営業利益を月別と年間で見る画面。">
+<meta name="theme-color" content="#2BA55F">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+html,body{touch-action:pan-x pan-y}
+
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+.top{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 14px 0}
+.top-in{max-width:760px;margin:0 auto}
+.tabs{display:flex;gap:4px}
+.tab{flex:1;border:none;background:transparent;border-bottom:3px solid transparent;padding:9px 4px 10px;
+  cursor:pointer;font-size:13.5px;color:var(--ink-3);font-weight:500;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:#2BA55F;font-weight:700}
+main{max-width:760px;margin:0 auto;padding:14px 14px calc(28px + env(safe-area-inset-bottom,0px))}
+.note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:8px 0 0}
+.syncbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px;
+  font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px;line-height:1.7}
+.syncbar #syncState{flex:1;min-width:150px}
+
+.nav{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.nav b{flex:1;text-align:center;font-size:16px}
+.nav .btn{min-width:44px;padding:7px 0}
+.back{display:block;text-align:center;font-size:12px;color:var(--accent);margin:-6px 0 10px;cursor:pointer;
+  background:none;border:none;width:100%}
+.years{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.years .chip{flex:1;justify-content:center}
+
+/* 1項目ずつのカード。押すと内訳が開く */
+.blk{border-radius:12px;margin-bottom:10px;color:#fff;overflow:hidden}
+.blk>summary,.blk>.head{list-style:none;display:flex;align-items:center;gap:8px;padding:13px 15px;cursor:pointer}
+.blk>summary::-webkit-details-marker{display:none}
+.blk .t{font-size:13px;opacity:.93;flex:1}
+.blk .v{font-size:22px;font-weight:800;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.blk .arw{font-size:11px;opacity:.8;transition:transform .15s}
+.blk[open] .arw{transform:rotate(90deg)}
+.blk .in{background:var(--surface);color:var(--ink);padding:6px 15px 10px;border:1px solid var(--line);border-top:none;border-radius:0 0 12px 12px}
+.b-sales{background:#2BA55F}
+.b-labor{background:#C2761E}
+.b-exp{background:#4E8A6E}
+.b-fix{background:#5b7fa6}
+.b-off{background:var(--surface-2);color:var(--ink-2);border:1px dashed var(--line-2)}
+.b-off .v{font-size:14px;font-weight:700;font-family:var(--ui)}
+.line{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.line:last-child{border-bottom:none}
+.line b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.line small{color:var(--ink-3);font-size:11.5px;margin-left:6px}
+.empty{font-size:12.5px;color:var(--ink-3);padding:6px 0}
+
+.card{padding:14px 15px;margin-bottom:10px}
+.card h3{font-size:13px;color:var(--ink-2);margin-bottom:8px}
+.big{font-size:26px;font-weight:800;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.judge{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 10px;margin-left:8px;vertical-align:middle}
+.j-ok{background:var(--ok-bg);color:var(--ok)}
+.j-mid{background:var(--warn-bg);color:var(--warn)}
+.j-ng{background:var(--ng-bg);color:var(--ng)}
+.sub{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.sub b{font-family:var(--mono)}
+.plus{color:var(--ok)} .minus{color:var(--ng)}
+.wait{font-size:13px;color:var(--ink-3)}
+table.mt{width:100%;border-collapse:collapse;font-size:11.5px}
+table.mt th{font-weight:500;color:var(--ink-3);text-align:right;padding:5px 3px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.mt td{text-align:right;padding:6px 3px;border-bottom:1px solid var(--line);font-family:var(--mono);white-space:nowrap}
+table.mt th:first-child,table.mt td:first-child{text-align:left}
+table.mt tr.tot td{font-weight:700;border-bottom:none}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
+<header class="top"><div class="top-in"><div class="tabs">
+  <button class="tab" data-v="m" aria-selected="true">📅 月別</button>
+  <button class="tab" data-v="y" aria-selected="false">📆 年間</button>
+</div></div></header>
+
+<main>
+  <div class="syncbar"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
+
+  <div id="pickM">
+    <div class="nav"><button class="btn" data-mv="-1" aria-label="前の月">◀</button><b id="mLabel"></b><button class="btn" data-mv="1" aria-label="次の月">▶</button></div>
+    <button class="back" id="mNow" hidden>今月に戻る</button>
+  </div>
+  <div id="pickY" hidden><div class="years" id="years"></div></div>
+
+  <div id="out"></div>
+  <p class="note">経費・人件費・固定費は<a href="../cost/">経費</a>の画面で入れたものです。金額はすべて税込です。</p>
+</main>
+
+<script src="../shared/sync.js"></script>
+<script src="../shared/books.js"></script>
+<script src="../shared/sales.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function yen(n){ n=Math.round(Number(n)||0); return (n<0?"▲":"")+"¥"+Math.abs(n).toLocaleString() }
+function pad(n){ return ("0"+n).slice(-2) }
+function ymOf(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1) }
+function lastDay(ym){ var p=ym.split("-"); return new Date(+p[0],+p[1],0).getDate() }
+
+var mode="m", ym=ymOf(new Date()), year=new Date().getFullYear();
+var FOOD=["食材費F","食材費D"];   /* FL比率の F（食材費）に入れる科目 */
+
+/* ---- 期間の数字をまとめる ---- */
+/* period は "2026-10"（月）か "2026"（年）。売上は Sales.get からだけ受け取る */
+function collect(period){
+  var isYear=period.length===4;
+  var from=isYear?period+"-01-01":period+"-01";
+  var to=isYear?period+"-12-31":period+"-"+pad(lastDay(period));
+  return Sales.get(from,to).then(function(sales){
+    var exp=Books.inPeriod("exp",period), labor=Books.inPeriod("labor",period), fix=Books.rows("fix");
+    var d={sales:sales&&sales.connected?sales:null, byCat:{}, byStaff:{}, staffOrder:[], months:{}};
+    d.expTotal=0; d.food=0;
+    exp.forEach(function(r){ var a=Number(r.amount)||0; d.expTotal+=a; d.byCat[r.cat]=(d.byCat[r.cat]||0)+a;
+      if(FOOD.indexOf(r.cat)>=0) d.food+=a; mon(d,r.day).exp+=a });
+    d.laborTotal=0;
+    labor.forEach(function(r){
+      var c=Books.laborCost(r), k=r.sid||r.name;
+      var s=Books.staff().filter(function(x){ return x.id===r.sid })[0];
+      if(!d.byStaff[k]){ d.byStaff[k]={name:s?s.name:r.name,amt:0,min:0}; d.staffOrder.push(k) }
+      d.byStaff[k].amt+=c; d.byStaff[k].min+=Books.minutes(r);
+      d.laborTotal+=c; mon(d,r.day).labor+=c;
+    });
+    if(d.sales&&d.sales.byDay) Object.keys(d.sales.byDay).forEach(function(k){ mon(d,k).sales+=Number(d.sales.byDay[k])||0 });
+    var fixMonth=fix.reduce(function(s,r){ return s+(Number(r.amount)||0) },0);
+    d.fixItems=fix; d.fixMonth=fixMonth;
+    if(isYear){
+      /* 年間の固定費は「月額 × 動きのあった月の数」で出す（みつ澤と同じ考え方）。
+         売上・経費・人件費のどれかが入っている月を数える。まだ来ていない月まで足さないため。 */
+      d.active=Object.keys(d.months).filter(function(k){ var m=d.months[k]; return m.sales||m.exp||m.labor }).length;
+      d.fixTotal=fixMonth*d.active;
+    }else d.fixTotal=fixMonth;
+    d.cost=d.laborTotal+d.expTotal+d.fixTotal;
+    return d;
+  });
+}
+function mon(d,day){ var k=String(day||"").slice(0,7); return d.months[k]||(d.months[k]={sales:0,exp:0,labor:0}) }
+
+/* ---- 描く ---- */
+function blk(cls,title,val,inner,open){
+  return '<details class="blk '+cls+'"'+(open?" open":"")+'><summary><span class="t">'+title+'</span><span class="v">'+val+'</span><span class="arw">▶</span></summary>'+
+    '<div class="in">'+inner+'</div></details>';
+}
+function lines(rows){ return rows.length?rows.join(""):'<div class="empty">記録はありません</div>' }
+function render(d,isYear){
+  var P=isYear?"年間":"当月", h="";
+  var S=d.sales?(Number(d.sales.total)||0):null;
+
+  /* 売上 */
+  if(d.sales) h+='<div class="blk b-sales"><div class="head"><span class="t">'+P+'の売上合計</span><span class="v">'+yen(S)+'</span></div></div>';
+  else h+='<div class="blk b-off"><div class="head"><span class="t">'+P+'の売上</span><span class="v">未接続</span></div>'+
+    '<div style="padding:0 15px 12px;font-size:12px;line-height:1.7">レジ機能を作ったら、ここに売上が自動で入ります。</div></div>';
+
+  /* 人件費 */
+  h+=blk("b-labor",P+"の人件費合計",yen(d.laborTotal),lines(d.staffOrder.map(function(k){ var g=d.byStaff[k];
+    return '<div class="line"><span>'+esc(g.name)+'<small>'+(g.min/60).toFixed(1)+'時間</small></span><b>'+yen(g.amt)+'</b></div>' })));
+
+  /* 変動費 */
+  h+=blk("b-exp",P+"の変動費合計",yen(d.expTotal),lines(Object.keys(d.byCat).sort(function(a,b){ return d.byCat[b]-d.byCat[a] }).map(function(c){
+    return '<div class="line"><span>'+esc(c)+'</span><b>'+yen(d.byCat[c])+'</b></div>' })));
+
+  /* 固定費 */
+  var mult=isYear?d.active:1;
+  h+=blk("b-fix",P+"の固定費合計",yen(d.fixTotal),lines(d.fixItems.map(function(r){
+    return '<div class="line"><span>'+esc(r.name)+(isYear?'<small>月'+yen(r.amount)+' × '+mult+'か月</small>':"")+'</span><b>'+yen((Number(r.amount)||0)*mult)+'</b></div>' }))+
+    (isYear?'<p class="note">固定費は月額なので、年間は「月額 × 記録のあった月の数（'+mult+'か月）」で出しています。</p>':""));
+
+  /* FL比率 ＝（食材費F＋食材費D＋人件費）÷ 売上 */
+  h+='<div class="card"><h3>FL比率（食材費と人件費が売上の何%か）</h3>';
+  if(S){
+    var fl=(d.food+d.laborTotal)/S*100, f=d.food/S*100, l=d.laborTotal/S*100;
+    var j=fl<=60?["j-ok","良好"]:fl<=70?["j-mid","やや高め"]:["j-ng","要改善"];
+    h+='<div><span class="big">'+fl.toFixed(1)+'%</span><span class="judge '+j[0]+'">'+j[1]+'</span></div>'+
+      '<div class="sub"><span>F 食材費 <b>'+f.toFixed(1)+'%</b>（'+yen(d.food)+'）</span><span>L 人件費 <b>'+l.toFixed(1)+'%</b>（'+yen(d.laborTotal)+'）</span></div>'+
+      '<p class="note">60%以下＝良好、60〜70%＝やや高め、70%超＝要改善。</p>';
+  }else{
+    h+='<div class="wait">売上がつながると出ます。</div>'+
+      '<div class="sub"><span>F 食材費 <b>'+yen(d.food)+'</b></span><span>L 人件費 <b>'+yen(d.laborTotal)+'</b></span><span>F＋L <b>'+yen(d.food+d.laborTotal)+'</b></span></div>';
+  }
+  h+='</div>';
+
+  /* 営業利益 ＝ 売上 − 人件費 − 変動費 − 固定費 */
+  h+='<div class="card"><h3>'+(isYear?"年間の":"")+'営業利益（売上 − 人件費 − 変動費 − 固定費）</h3>';
+  if(d.sales){
+    var p=S-d.cost;
+    h+='<div class="big '+(p>=0?"plus":"minus")+'">'+yen(p)+'</div>';
+  }else{
+    h+='<div class="wait">売上がつながると出ます。</div>';
+  }
+  h+='<div class="sub"><span>費用の合計 <b>'+yen(d.cost)+'</b></span></div></div>';
+
+  /* 年間は月ごとの表も出す。携帯の幅に収まるよう ¥ は付けず、0 は「—」にする */
+  if(isYear){
+    var rows="", t={s:0,l:0,e:0};
+    var n=function(v){ v=Math.round(v); return v?(v<0?"▲":"")+Math.abs(v).toLocaleString():"—" };
+    for(var m=1;m<=12;m++){
+      var k=year+"-"+pad(m), x=d.months[k]||{sales:0,exp:0,labor:0};
+      var on=x.sales||x.exp||x.labor, fx=on?d.fixMonth:0, pr=x.sales-x.labor-x.exp-fx;
+      t.s+=x.sales; t.l+=x.labor; t.e+=x.exp;
+      rows+='<tr><td>'+m+'月</td><td>'+(d.sales?n(x.sales):"—")+'</td><td>'+n(x.labor)+'</td><td>'+n(x.exp)+'</td><td>'+n(fx)+'</td>'+
+        '<td>'+(d.sales&&on?'<span class="'+(pr>=0?"plus":"minus")+'">'+n(pr)+'</span>':"—")+'</td></tr>';
+    }
+    h+='<div class="card"><h3>月ごとの内訳（円）</h3><div class="scroll"><table class="mt">'+
+      '<tr><th>月</th><th>売上</th><th>人件費</th><th>変動費</th><th>固定費</th><th>利益</th></tr>'+rows+
+      '<tr class="tot"><td>計</td><td>'+(d.sales?n(t.s):"—")+'</td><td>'+n(t.l)+'</td><td>'+n(t.e)+'</td><td>'+n(d.fixTotal)+'</td><td>'+(d.sales?n(t.s-d.cost):"—")+'</td></tr>'+
+      '</table></div></div>';
+  }
+  return h;
+}
+
+var drawSeq=0;
+function draw(){
+  var opened={};   /* 開いていた内訳は、描き直しても開いたままにする */
+  document.querySelectorAll("#out details").forEach(function(x,i){ if(x.open) opened[i]=1 });
+  var isYear=mode==="y", seq=++drawSeq;
+  $("#pickM").hidden=isYear; $("#pickY").hidden=!isYear;
+  $("#mLabel").textContent=ym.replace(/^(\d+)-0?(\d+)$/,"$1年$2月");
+  $("#mNow").hidden=(ym===ymOf(new Date()));
+  var cy=new Date().getFullYear(), yb="";
+  for(var y=cy-3;y<=cy;y++) yb+='<button class="chip" data-y="'+y+'" aria-pressed="'+(y===year)+'">'+y+'年</button>';
+  $("#years").innerHTML=yb;
+  collect(isYear?String(year):ym).then(function(d){
+    if(seq!==drawSeq) return;
+    $("#out").innerHTML=render(d,isYear);
+    document.querySelectorAll("#out details").forEach(function(x,i){ if(opened[i]) x.open=true });
+  });
+}
+function renderSync(){
+  var s=Books.status();
+  if(!s.on){
+    $("#syncState").innerHTML="いまは<b>この端末</b>で入れたものだけを集計しています。ほかの端末と同じにするには、"+
+      '<a href="../shift/#cfg">シフト管理 → ③設定</a>でつないでください。';
+    $("#syncNow").hidden=true; return;
+  }
+  $("#syncNow").hidden=false; $("#syncState").textContent=s.text;
+}
+Books.onChange(function(){ renderSync(); draw() });
+$("#syncNow").addEventListener("click",function(){ Books.syncNow(false) });
+
+document.querySelector(".tabs").addEventListener("click",function(e){
+  var b=e.target.closest(".tab[data-v]"); if(!b) return;
+  mode=b.dataset.v;
+  this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
+  draw(); window.scrollTo({top:0});
+});
+$("#pickM").addEventListener("click",function(e){
+  var b=e.target.closest("[data-mv]"); if(!b) return;
+  var p=ym.split("-"); ym=ymOf(new Date(+p[0],+p[1]-1+(+b.dataset.mv),1)); draw();
+});
+$("#mNow").addEventListener("click",function(){ ym=ymOf(new Date()); draw() });
+$("#years").addEventListener("click",function(e){
+  var b=e.target.closest("[data-y]"); if(!b) return;
+  year=+b.dataset.y; draw();
+});
+
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState!=="visible") return;
+  Books.reload();
+  if(Books.syncOn()) Books.syncNow(true);
+});
+renderSync(); draw();
+if(Books.syncOn()) Books.syncNow(true);
+
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+  var swCheck=function(){
+    if(document.visibilityState!=="visible") return;
+    try{ navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update() }).catch(function(){}) }catch(e){}
+  };
+  document.addEventListener("visibilitychange",swCheck);
+  window.addEventListener("pageshow",swCheck);
+}
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+document.addEventListener("dblclick",function(e){ e.preventDefault() },{passive:false});
+})();
+</script>
+</body>
+</html>
