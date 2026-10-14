@@ -99,3 +99,88 @@ grant execute on function shift_submit_request(text, text, text, jsonb, text)   
 grant execute on function shift_list_requests(text, text)                           to anon, authenticated;
 grant execute on function shift_publish(text, text, jsonb, jsonb)                   to anon, authenticated;
 grant execute on function shift_get(text, text)                                     to anon, authenticated;
+
+-- ========================================================================
+-- 商品リスト（店舗管理の「設定 → 商品」）
+-- 店長用キーだけが触れる。スタッフ用の合言葉では読めないので、
+-- 仕入れ値や原価率がスタッフのURLから見えることはない。
+-- ========================================================================
+
+create table if not exists store_items (
+  id         text primary key,
+  no         text    not null default '',
+  name       text    not null default '',
+  cat        text    not null default '',
+  price      integer,
+  cost       integer,
+  stock      integer,
+  alert      integer,
+  deleted    boolean not null default false,   -- 消した印。ほかの端末にも消したことを伝えるため残す
+  updated_at timestamptz not null default now()
+);
+create index if not exists store_items_upd on store_items (updated_at);
+
+-- カテゴリーの並びなど、商品以外のちょっとしたもの
+create table if not exists store_meta (
+  k          text primary key,
+  v          jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table store_items enable row level security;
+alter table store_meta  enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：商品を受け取る（p_since より後に変わったものだけ。空なら全部）
+create or replace function store_items_get(p_key text, p_since text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb; v_cats jsonb; v_since timestamptz;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  v_since := case when coalesce(p_since,'') = '' then null else p_since::timestamptz end;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', i.id, 'no', i.no, 'name', i.name, 'cat', i.cat,
+           'price', i.price, 'cost', i.cost, 'stock', i.stock, 'alert', i.alert,
+           'deleted', i.deleted,
+           'upd', to_char(i.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+         ) order by i.updated_at), '[]'::jsonb)
+    into v_items
+    from store_items i
+   where v_since is null or i.updated_at > v_since;
+  select v into v_cats from store_meta where k = 'cats';
+  -- 5秒だけ手前を返す。ちょうど同じ瞬間に書かれたものを取りこぼさないため。
+  return jsonb_build_object('ok', true, 'items', v_items,
+    'cats', coalesce(v_cats, '[]'::jsonb),
+    'now', to_char((now() - interval '5 seconds') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+end $$;
+
+-- 店長：商品を書き込む（同じ id は上書き）
+create or replace function store_items_put(p_key text, p_items jsonb, p_cats jsonb default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if p_items is not null and jsonb_typeof(p_items) = 'array' then
+    insert into store_items (id, no, name, cat, price, cost, stock, alert, deleted, updated_at)
+    select x->>'id',
+           coalesce(x->>'no',''), coalesce(x->>'name',''), coalesce(x->>'cat',''),
+           nullif(x->>'price','')::integer, nullif(x->>'cost','')::integer,
+           nullif(x->>'stock','')::integer, nullif(x->>'alert','')::integer,
+           coalesce((x->>'deleted')::boolean, false), now()
+      from jsonb_array_elements(p_items) x
+     where coalesce(x->>'id','') <> ''
+    on conflict (id) do update
+      set no = excluded.no, name = excluded.name, cat = excluded.cat,
+          price = excluded.price, cost = excluded.cost,
+          stock = excluded.stock, alert = excluded.alert,
+          deleted = excluded.deleted, updated_at = now();
+  end if;
+  if p_cats is not null and jsonb_typeof(p_cats) = 'array' then
+    insert into store_meta (k, v, updated_at) values ('cats', p_cats, now())
+    on conflict (k) do update set v = excluded.v, updated_at = now();
+  end if;
+  return jsonb_build_object('ok', true,
+    'now', to_char(now() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+end $$;
+
+grant execute on function store_items_get(text, text)        to anon, authenticated;
+grant execute on function store_items_put(text, jsonb, jsonb) to anon, authenticated;

@@ -68,6 +68,10 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .empty{font-size:12.5px;color:var(--ink-3);padding:4px 0}
 .filter input[type=text]{flex:1;min-width:140px;padding:6px 10px}
 .morerow{padding:10px 0 2px;text-align:center}
+.syncbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:11px;
+  font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px;line-height:1.7}
+.syncbar #syncState{flex:1;min-width:150px}
 #impInfo{margin-left:0}
 </style>
 </head>
@@ -107,6 +111,7 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
     <div class="card">
       <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
       <div class="sec">
+        <div class="syncbar"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
         <div class="filter">表示 <select id="catFilter"></select>
           <input type="text" id="q" placeholder="商品名・Noで探す" autocomplete="off" enterkeyhint="search">
           <span class="sum" id="itemShown"></span></div>
@@ -152,6 +157,7 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
   </section>
 </main>
 
+<script src="../shared/sync.js"></script>
 <script>
 (function(){
 "use strict";
@@ -184,6 +190,9 @@ function loadItems(){
 function saveItems(v){ try{ localStorage.setItem(K_ITEM,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
 
 var DB=loadShift(), IT=loadItems();
+if(window.Sync) Sync.configure(DB.sync&&DB.sync.url?DB.sync:null);
+/* 消した印（del）が付いたものは、まだ送っていないだけなので画面には出さない */
+function live(){ return IT.items.filter(function(x){ return !x.del }) }
 
 /* ---------- スタッフ ---------- */
 function renderStaff(){
@@ -287,7 +296,7 @@ function addCat(){
   var v=prompt("新しいカテゴリーの名前（例）雑貨","");
   if(v===null) return null;
   v=v.trim(); if(!v) return null;
-  if(IT.cats.indexOf(v)<0){ IT.cats.push(v); IT.cats.sort(); saveItems(IT) }
+  if(IT.cats.indexOf(v)<0){ IT.cats.push(v); IT.cats.sort(); IT.catsDirty=1; saveItems(IT); queueSync() }
   return v;
 }
 function renderCatPickers(){
@@ -320,10 +329,11 @@ function matchQ(it,q){
 }
 function renderItems(){
   renderCatPickers();
-  var n=IT.items.length, low=IT.items.filter(isLow).length;
+  var all=live();
+  var n=all.length, low=all.filter(isLow).length;
   $("#itemCount").textContent=n?(n+"点"+(low?" ・ 在庫少 "+low:"")):"";
   var f=$("#catFilter").value, q=$("#q").value.trim().toLowerCase();
-  var list=IT.items.filter(function(x){
+  var list=all.filter(function(x){
     if(f==="__none__"){ if(x.cat) return false } else if(f&&x.cat!==f) return false;
     return matchQ(x,q);
   });
@@ -352,6 +362,7 @@ function renderItems(){
         (isLow(it)?'<span class="fg low">少なくなっています</span>':'')+'</div>'+
       '</div>';
   }).join("");
+  renderSync();
 }
 $("#more").addEventListener("click",function(){ shown+=200; renderItems() });
 var qT=null;
@@ -360,12 +371,12 @@ $("#q").addEventListener("input",function(){
 });
 function itemByName(n){
   var k=normName(n);
-  return IT.items.filter(function(x){ return normName(x.name)===k })[0];
+  return live().filter(function(x){ return normName(x.name)===k })[0];
 }
 function itemByNo(no){
   var k=String(no||"").trim();
   if(!k) return null;
-  return IT.items.filter(function(x){ return String(x.no||"").trim()===k })[0]||null;
+  return live().filter(function(x){ return String(x.no||"").trim()===k })[0]||null;
 }
 $("#addItem").addEventListener("click",function(){
   var name=$("#nName").value.trim();
@@ -381,7 +392,7 @@ $("#addItem").addEventListener("click",function(){
     var v=parseInt($(pair[1]).value,10);
     if(!isNaN(v)&&v>=0) it[pair[0]]=v;
   });
-  IT.items.push(it); saveItems(IT);
+  touch(it); IT.items.push(it); saveItems(IT); queueSync();
   ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
   renderItems(); $("#nNo").focus();      /* カテゴリーは続けて登録しやすいよう残す */
   toast(name+" を登録しました");
@@ -404,11 +415,11 @@ $("#itemTbl").addEventListener("change",function(e){
     var it0=IT.items.filter(function(x){ return x.id===cs.dataset.cat })[0]; if(!it0) return;
     if(cs.value===NEWCAT){
       var nv=addCat();
-      if(nv) it0.cat=nv; 
-      saveItems(IT); renderItems(); return;
+      if(nv) it0.cat=nv;
+      touch(it0); saveItems(IT); queueSync(); renderItems(); return;
     }
     if(cs.value) it0.cat=cs.value; else delete it0.cat;
-    saveItems(IT); renderItems(); return;
+    touch(it0); saveItems(IT); queueSync(); renderItems(); return;
   }
   var el=e.target.closest("[data-f]"); if(!el) return;
   var it=IT.items.filter(function(x){ return x.id===el.dataset.id })[0]; if(!it) return;
@@ -418,7 +429,7 @@ $("#itemTbl").addEventListener("change",function(e){
     var v=parseInt(el.value,10);
     if(el.value===""||isNaN(v)||v<0){ delete it[f]; el.value="" } else { it[f]=v }
   }
-  saveItems(IT); renderItems();
+  touch(it); saveItems(IT); queueSync(); renderItems();
 });
 $("#itemTbl").addEventListener("click",function(e){
   var r=e.target.closest("[data-iren]"), d=e.target.closest("[data-idel]");
@@ -429,16 +440,114 @@ $("#itemTbl").addEventListener("click",function(e){
     v=v.trim(); if(!v) return;
     var other=itemByName(v);
     if(other&&other.id!==it.id){ toast("同じ名前の商品があります"); return }
-    it.name=v; saveItems(IT); renderItems();
+    it.name=v; touch(it); saveItems(IT); queueSync(); renderItems();
     return;
   }
   if(d){
     var it2=IT.items.filter(function(x){ return x.id===d.dataset.idel })[0]; if(!it2) return;
     if(!confirm(it2.name+" を削除します。よろしいですか？")) return;
-    IT.items=IT.items.filter(function(x){ return x.id!==it2.id });
-    saveItems(IT); renderItems(); toast(it2.name+" を削除しました");
+    if(syncOn()){ it2.del=1; it2.d=1 }           /* ほかの端末にも消したことを伝える */
+    else IT.items=IT.items.filter(function(x){ return x.id!==it2.id });
+    saveItems(IT); queueSync(); renderItems(); toast(it2.name+" を削除しました");
   }
 });
+
+/* ---- ほかの端末と同じにする（Supabase） ---- */
+/* 商品は「店長用キー」が要る関数だけを通す。スタッフ用の合言葉では呼べないので、
+   仕入れ値や原価率がスタッフのURLから見えることはない。
+   つなぎ先は シフト管理 → ④設定 で入れたものを、そのまま借りている。 */
+function syncOn(){ return !!(window.Sync && DB.sync && DB.sync.url && DB.sync.anon && DB.sync.key) }
+function touch(it){ if(it) it.d=1 }                      /* d=1 … まだ送っていない印 */
+var syncBusy=false, syncT=null, syncMsg="", syncErr="";
+
+function chunk(a,n){ var o=[]; for(var i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o }
+function putChunks(list,cats){
+  /* 794点を一度に送ると重いので、200点ずつに分けて順番に送る */
+  var parts=list.length?chunk(list,200):[[]], p=Promise.resolve(), first=true;
+  parts.forEach(function(part){
+    p=p.then(function(){
+      var c=first?cats:null; first=false;
+      return Sync.itemsPut(part,c);
+    });
+  });
+  return p;
+}
+function pushDirty(){
+  var dirty=IT.items.filter(function(x){ return x.d });
+  var cats=IT.catsDirty?(IT.cats||[]):null;
+  if(!dirty.length && !cats) return Promise.resolve(0);
+  var pay=dirty.map(function(x){
+    return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
+      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:numOf(x.alert),
+      deleted:!!x.del};
+  });
+  return putChunks(pay,cats).then(function(){
+    dirty.forEach(function(x){ delete x.d });
+    delete IT.catsDirty;
+    IT.items=IT.items.filter(function(x){ return !x.del });   /* 消したことは伝えたので手元から外す */
+    saveItems(IT);
+    return dirty.length;
+  });
+}
+function pullItems(){
+  return Sync.itemsGet(IT.pulledAt||null).then(function(r){
+    var byId={}; IT.items.forEach(function(x){ byId[x.id]=x });
+    var n=0;
+    (r.items||[]).forEach(function(sr){
+      var cur=byId[sr.id];
+      if(cur&&cur.d) return;                 /* この端末で直したものは残す。次に送る */
+      if(sr.deleted){ if(cur){ cur.del=1; n++ } return }
+      var it=cur||{id:sr.id};
+      it.name=String(sr.name||"");
+      if(sr.no) it.no=String(sr.no); else delete it.no;
+      if(sr.cat) it.cat=String(sr.cat); else delete it.cat;
+      ["price","cost","stock","alert"].forEach(function(f){
+        if(typeof sr[f]==="number") it[f]=sr[f]; else delete it[f];
+      });
+      if(!cur){ IT.items.push(it); byId[sr.id]=it }
+      n++;
+    });
+    IT.items=IT.items.filter(function(x){ return !(x.del&&!x.d) });
+    if(Array.isArray(r.cats)&&!IT.catsDirty) IT.cats=r.cats.slice();
+    if(r.now) IT.pulledAt=r.now;
+    saveItems(IT);
+    return n;
+  });
+}
+function hhmm(){ var d=new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2) }
+function renderSync(){
+  var st=$("#syncState"), b=$("#syncNow");
+  if(!syncOn()){
+    st.innerHTML="いまは<b>この端末だけ</b>に入っています。ほかの端末と同じにするには、"+
+      '<a href="../shift/#cfg">シフト管理 → ④設定</a>でつないでください。';
+    b.hidden=true; return;
+  }
+  b.hidden=false;
+  var w=IT.items.filter(function(x){ return x.d }).length;
+  st.textContent = syncBusy ? "合わせています…"
+    : (w ? ("まだ送っていないもの "+w+"点"+(syncErr?"／"+syncErr:"（まもなく送ります）"))
+         : (syncErr||syncMsg||"ほかの端末と同じにしています"));
+}
+function syncNow(quiet){
+  if(!syncOn()||syncBusy) return Promise.resolve();
+  clearTimeout(syncT);
+  syncBusy=true; renderSync();
+  return pushDirty().then(pullItems).then(function(){
+    syncBusy=false; syncErr=""; syncMsg="ほかの端末と同じです（"+hhmm()+" に確認）";
+    renderItems();
+  }).catch(function(e){
+    syncBusy=false;
+    syncErr=(e&&e.message)||"つながりませんでした";
+    renderSync();
+    if(!quiet) toast("合わせられませんでした："+syncErr);
+  });
+}
+function queueSync(){
+  if(!syncOn()) return;
+  clearTimeout(syncT); syncT=setTimeout(function(){ syncNow(true) },1200);
+  renderSync();
+}
+$("#syncNow").addEventListener("click",function(){ syncMsg=""; syncNow(false) });
 
 /* ---- 原価表（items.json）の読み込み ---- */
 /* 商品は数が多くて手で入れるのが大変なので、お店の原価表を
@@ -454,7 +563,7 @@ function loadSeed(){
 }
 function mergeSeed(src){
   var byId={},byNo={},byName={};
-  IT.items.forEach(function(x){
+  live().forEach(function(x){
     byId[x.id]=x;
     var k=String(x.no==null?"":x.no).trim();
     if(k&&!byNo[k]) byNo[k]=x;
@@ -474,17 +583,17 @@ function mergeSeed(src){
       if(k) cur.no=k;
       if(typeof sr.price==="number") cur.price=sr.price; else delete cur.price;
       if(typeof sr.cost==="number") cur.cost=sr.cost; else delete cur.cost;
-      upd++;
+      touch(cur); upd++;
     }else{
       var it={id:sr.id,name:sr.name};
       if(k) it.no=k;
       if(typeof sr.price==="number") it.price=sr.price;
       if(typeof sr.cost==="number") it.cost=sr.cost;
-      IT.items.push(it);
+      touch(it); IT.items.push(it);
       add++;
     }
   });
-  saveItems(IT);
+  saveItems(IT); queueSync();
   return {add:add,upd:upd};
 }
 $("#impBtn").addEventListener("click",function(){
@@ -517,20 +626,28 @@ function toast(m){
 /* ほかの画面で名簿が変わっていたら読み直す */
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState!=="visible") return;
-  DB=loadShift(); IT=loadItems(); renderStaff(); renderItems();
+  DB=loadShift(); IT=loadItems();
+  if(window.Sync) Sync.configure(DB.sync&&DB.sync.url?DB.sync:null);
+  renderStaff(); renderItems();
+  if(syncOn()) syncNow(true);
 });
 renderStaff(); renderItems();
 
 /* まだ1点も入っていなければ、原価表を自動で入れておく */
-if(!IT.items.length){
+function autoSeed(){
+  if(live().length) return;
   loadSeed().then(function(src){
-    if(IT.items.length) return;
+    if(live().length) return;
     var r=mergeSeed(src);
     shown=LIMIT; renderItems();
     $("#impInfo").textContent="追加 "+r.add+"点";
     toast("商品 "+r.add+"点を読み込みました");
   }).catch(function(){});
 }
+/* つないであるなら、まずほかの端末の分を受け取る。
+   それでも1点も無いときだけ原価表を入れる（2台目で二重に入らないように）。 */
+if(syncOn()) syncNow(true).then(autoSeed);
+else autoSeed();
 
 /* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える */
 if("serviceWorker" in navigator){

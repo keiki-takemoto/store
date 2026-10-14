@@ -79,6 +79,13 @@
     },
     getShift: function (month) {
       return rpc("shift_get", { p_code: (CFG && (CFG.code || CFG.key)) || "", p_month: month });
+    },
+    /* 商品リスト（店長用キーだけ。スタッフ用の合言葉では読めない） */
+    itemsGet: function (since) {
+      return rpc("store_items_get", { p_key: (CFG && CFG.key) || "", p_since: since || null });
+    },
+    itemsPut: function (items, cats) {
+      return rpc("store_items_put", { p_key: (CFG && CFG.key) || "", p_items: items || [], p_cats: cats || null });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1128,6 +1128,13 @@ document.querySelector(".tabs").addEventListener("click",function(e){
   if(b.dataset.v!=="cfg") requestAnimationFrame(fitAll);
   window.scrollTo({top:0});
 });
+/* ほかの画面から #cfg のように指定して開けるようにする（設定への案内用） */
+(function(){
+  var h=String(location.hash||"").replace("#","");
+  if(["req","cal","fix","cfg"].indexOf(h)<0) return;
+  var t=document.querySelector('.tab[data-v="'+h+'"]');
+  if(t) setTimeout(function(){ t.click() },0);
+})();
 var toastEl=null,tt=null;
 function toast(m){
   if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }

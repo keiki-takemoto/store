@@ -155,6 +155,91 @@ grant execute on function shift_submit_request(text, text, text, jsonb, text)   
 grant execute on function shift_list_requests(text, text)                           to anon, authenticated;
 grant execute on function shift_publish(text, text, jsonb, jsonb)                   to anon, authenticated;
 grant execute on function shift_get(text, text)                                     to anon, authenticated;
+
+-- ========================================================================
+-- 商品リスト（店舗管理の「設定 → 商品」）
+-- 店長用キーだけが触れる。スタッフ用の合言葉では読めないので、
+-- 仕入れ値や原価率がスタッフのURLから見えることはない。
+-- ========================================================================
+
+create table if not exists store_items (
+  id         text primary key,
+  no         text    not null default &#x27;&#x27;,
+  name       text    not null default &#x27;&#x27;,
+  cat        text    not null default &#x27;&#x27;,
+  price      integer,
+  cost       integer,
+  stock      integer,
+  alert      integer,
+  deleted    boolean not null default false,   -- 消した印。ほかの端末にも消したことを伝えるため残す
+  updated_at timestamptz not null default now()
+);
+create index if not exists store_items_upd on store_items (updated_at);
+
+-- カテゴリーの並びなど、商品以外のちょっとしたもの
+create table if not exists store_meta (
+  k          text primary key,
+  v          jsonb not null default &#x27;{}&#x27;::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table store_items enable row level security;
+alter table store_meta  enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：商品を受け取る（p_since より後に変わったものだけ。空なら全部）
+create or replace function store_items_get(p_key text, p_since text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb; v_cats jsonb; v_since timestamptz;
+begin
+  if p_key is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then raise exception &#x27;bad_key&#x27;; end if;
+  v_since := case when coalesce(p_since,&#x27;&#x27;) = &#x27;&#x27; then null else p_since::timestamptz end;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           &#x27;id&#x27;, i.id, &#x27;no&#x27;, i.no, &#x27;name&#x27;, i.name, &#x27;cat&#x27;, i.cat,
+           &#x27;price&#x27;, i.price, &#x27;cost&#x27;, i.cost, &#x27;stock&#x27;, i.stock, &#x27;alert&#x27;, i.alert,
+           &#x27;deleted&#x27;, i.deleted,
+           &#x27;upd&#x27;, to_char(i.updated_at at time zone &#x27;UTC&#x27;,&#x27;YYYY-MM-DD"T"HH24:MI:SS.MS"Z"&#x27;)
+         ) order by i.updated_at), &#x27;[]&#x27;::jsonb)
+    into v_items
+    from store_items i
+   where v_since is null or i.updated_at &gt; v_since;
+  select v into v_cats from store_meta where k = &#x27;cats&#x27;;
+  -- 5秒だけ手前を返す。ちょうど同じ瞬間に書かれたものを取りこぼさないため。
+  return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;items&#x27;, v_items,
+    &#x27;cats&#x27;, coalesce(v_cats, &#x27;[]&#x27;::jsonb),
+    &#x27;now&#x27;, to_char((now() - interval &#x27;5 seconds&#x27;) at time zone &#x27;UTC&#x27;,&#x27;YYYY-MM-DD"T"HH24:MI:SS.MS"Z"&#x27;));
+end $$;
+
+-- 店長：商品を書き込む（同じ id は上書き）
+create or replace function store_items_put(p_key text, p_items jsonb, p_cats jsonb default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then raise exception &#x27;bad_key&#x27;; end if;
+  if p_items is not null and jsonb_typeof(p_items) = &#x27;array&#x27; then
+    insert into store_items (id, no, name, cat, price, cost, stock, alert, deleted, updated_at)
+    select x-&gt;&gt;&#x27;id&#x27;,
+           coalesce(x-&gt;&gt;&#x27;no&#x27;,&#x27;&#x27;), coalesce(x-&gt;&gt;&#x27;name&#x27;,&#x27;&#x27;), coalesce(x-&gt;&gt;&#x27;cat&#x27;,&#x27;&#x27;),
+           nullif(x-&gt;&gt;&#x27;price&#x27;,&#x27;&#x27;)::integer, nullif(x-&gt;&gt;&#x27;cost&#x27;,&#x27;&#x27;)::integer,
+           nullif(x-&gt;&gt;&#x27;stock&#x27;,&#x27;&#x27;)::integer, nullif(x-&gt;&gt;&#x27;alert&#x27;,&#x27;&#x27;)::integer,
+           coalesce((x-&gt;&gt;&#x27;deleted&#x27;)::boolean, false), now()
+      from jsonb_array_elements(p_items) x
+     where coalesce(x-&gt;&gt;&#x27;id&#x27;,&#x27;&#x27;) &lt;&gt; &#x27;&#x27;
+    on conflict (id) do update
+      set no = excluded.no, name = excluded.name, cat = excluded.cat,
+          price = excluded.price, cost = excluded.cost,
+          stock = excluded.stock, alert = excluded.alert,
+          deleted = excluded.deleted, updated_at = now();
+  end if;
+  if p_cats is not null and jsonb_typeof(p_cats) = &#x27;array&#x27; then
+    insert into store_meta (k, v, updated_at) values (&#x27;cats&#x27;, p_cats, now())
+    on conflict (k) do update set v = excluded.v, updated_at = now();
+  end if;
+  return jsonb_build_object(&#x27;ok&#x27;, true,
+    &#x27;now&#x27;, to_char(now() at time zone &#x27;UTC&#x27;,&#x27;YYYY-MM-DD"T"HH24:MI:SS.MS"Z"&#x27;));
+end $$;
+
+grant execute on function store_items_get(text, text)        to anon, authenticated;
+grant execute on function store_items_put(text, jsonb, jsonb) to anon, authenticated;
 </pre>
     </li>
     <li>
@@ -183,13 +268,16 @@ grant execute on function shift_get(text, text)                                 
 
   <div class="warn">
     <b>知っておいてほしいこと</b><br>
-    ・表そのものは鍵をかけてあり（RLS）、上のSQLで作った5つの関数だけが中身に触れます。
+    ・表そのものは鍵をかけてあり（RLS）、上のSQLで作った7つの関数だけが中身に触れます。
       合言葉を知らなければ、anonキーだけでは何も読めません。<br>
     ・<b>管理用キーは店長だけ</b>のものです。スタッフに配るURLには入りません。<br>
     ・無料プランは1週間まったく使わないと一時停止します。毎日使うぶんには止まりませんし、
       止まってもSupabaseの画面から再開できます。<br>
     ・届いた希望は、Supabaseの <span class="pick">Table Editor</span> の <code class="k">shift_requests</code> でそのまま見られます。<br>
-    ・合言葉を変えるときは、上のSQLの2か所を書き換えてもう一度 Run してください。
+    ・<b>商品リスト（設定 → 商品）もここに入ります</b>（<code class="k">store_items</code>）。
+      商品は<b>管理用キーが無いと読めません</b>ので、仕入れ値や原価率がスタッフに見えることはありません。<br>
+    ・合言葉を変えるときは、上のSQLに出てくる合言葉を<b>全部</b>書き換えて（スタッフ用3か所・店長用6か所）、
+      もう一度 Run してください。
   </div>
 </main>
 <script>
