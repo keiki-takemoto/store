@@ -56,6 +56,8 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .rate{font-family:var(--mono);color:var(--ink-2)}
 .low{color:var(--warn);font-weight:700}
 .rowitem.lowstock{background:var(--warn-bg);border-radius:9px;padding-left:9px;padding-right:9px}
+/* 登録したばかりのものは、794点の中で迷子にならないよう上に出して目印を付ける */
+.rowitem.just{outline:2px solid var(--accent);outline-offset:2px;border-radius:9px}
 .newform{margin-top:16px;padding:13px 13px 14px;border:1px solid var(--line);border-radius:11px;background:var(--surface-2)}
 .newform h3{margin-bottom:10px}
 .nf-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;row-gap:9px;font-size:12.5px;color:var(--ink-3)}
@@ -322,7 +324,7 @@ function fld(it,f,label,unit,step){
     ' <input type="number" class="num" data-f="'+f+'" data-id="'+esc(it.id)+'" min="0" step="'+(step||10)+'" '+
     'inputmode="numeric" value="'+(numOf(it[f])!==null?it[f]:"")+'" placeholder="—">'+(unit?" "+unit:"")+'</span>';
 }
-var LIMIT=40, shown=LIMIT;
+var LIMIT=40, shown=LIMIT, justAdded=null;
 function matchQ(it,q){
   if(!q) return true;
   return (String(it.name)+" "+String(it.no||"")).toLowerCase().indexOf(q)>=0;
@@ -344,12 +346,17 @@ function renderItems(){
   }
   /* 商品が何百点もあるので、一度に出すのは少しだけにする。
      ぜんぶ出すと携帯では重くて動かなくなるため。 */
-  var view=list.slice(0,shown), rest=list.length-view.length;
+  var view=list.slice(0,shown);
+  if(justAdded){
+    var j=list.filter(function(x){ return x.id===justAdded })[0];
+    if(j&&view.indexOf(j)<0){ view=[j].concat(view.slice(0,shown-1)) }
+  }
+  var rest=list.length-view.length;
   $("#itemShown").textContent=list.length?(rest>0?view.length+" / "+list.length+"点":list.length+"点"):"";
   $("#more").hidden=rest<=0;
   $("#more").textContent="のこり "+rest+"点を表示";
   $("#itemTbl").innerHTML=view.map(function(it){
-    return '<div class="rowitem'+(isLow(it)?" lowstock":"")+'">'+
+    return '<div class="rowitem'+(isLow(it)?" lowstock":"")+(it.id===justAdded?" just":"")+'">'+
       '<div class="ri-top">'+
         '<input type="text" class="no" data-f="no" data-id="'+esc(it.id)+'" value="'+esc(it.no||"")+'" placeholder="No">'+
         '<span class="ri-name">'+esc(it.name)+'</span>'+
@@ -393,6 +400,7 @@ $("#addItem").addEventListener("click",function(){
     if(!isNaN(v)&&v>=0) it[pair[0]]=v;
   });
   touch(it); IT.items.push(it); saveItems(IT); queueSync();
+  justAdded=it.id;
   ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
   renderItems(); $("#nNo").focus();      /* カテゴリーは続けて登録しやすいよう残す */
   toast(name+" を登録しました");
@@ -648,6 +656,14 @@ function autoSeed(){
    それでも1点も無いときだけ原価表を入れる（2台目で二重に入らないように）。 */
 if(syncOn()) syncNow(true).then(autoSeed);
 else autoSeed();
+
+/* 開きっぱなしでも、ほかの端末で登録・削除したものが入ってくるように
+   1分おきに見に行く（画面を見ているときだけ）。 */
+setInterval(function(){
+  if(document.visibilityState!=="visible") return;
+  if(!syncOn()||syncBusy) return;
+  syncNow(true);
+},60000);
 
 /* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える */
 if("serviceWorker" in navigator){
