@@ -119,8 +119,8 @@
     staffPut: function (rows) {
       return rpc("staff_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
     },
-    staffMe: function (name) {
-      return rpc("staff_me", { p_code: (CFG && CFG.code) || "", p_name: name || "" });
+    staffMe: function () {
+      return rpc("staff_me", { p_code: (CFG && CFG.code) || "" });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

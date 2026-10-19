@@ -458,6 +458,138 @@ end $$;
 
 grant execute on function staff_put(text, jsonb) to anon, authenticated;
 grant execute on function staff_me(text, text)   to anon, authenticated;
+
+-- ========================================================================
+-- スタッフひとりひとりの合言葉（個人用リンク）
+-- これまでは全員が同じ合言葉だったので、名前を入れ替えれば人の時給も
+-- 見られてしまった。ひとりに1つ合言葉を持たせて、そこから本人を引く。
+-- 店長が名簿に追加すると自動で作られ、個人用のURLに入る。
+-- ========================================================================
+
+alter table store_staff add column if not exists tok text not null default &#x27;&#x27;;
+create unique index if not exists store_staff_tok on store_staff (tok) where tok &lt;&gt; &#x27;&#x27;;
+
+-- 合言葉として通すかどうか（みんな共通の合言葉か、誰かの個人用か）
+create or replace function code_ok(p_code text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select btrim(coalesce(p_code,&#x27;&#x27;)) = &#x27;iq9kbjfflg&#x27;
+      or exists (select 1 from store_staff s
+                  where s.tok &lt;&gt; &#x27;&#x27; and s.tok = btrim(coalesce(p_code,&#x27;&#x27;)));
+$$;
+-- この関数はアプリには公開しない（中の関数からだけ呼ぶ）。
+
+-- スタッフ：自分の時給を見る（個人用の合言葉だけ。名前では引けない）
+drop function if exists staff_me(text, text);
+create or replace function staff_me(p_code text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_row store_staff%rowtype;
+begin
+  select * into v_row from store_staff
+   where tok &lt;&gt; &#x27;&#x27; and tok = btrim(coalesce(p_code,&#x27;&#x27;));
+  if not found then
+    -- 個人用のリンクではない（昔の共通リンク）
+    return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;personal&#x27;, false, &#x27;found&#x27;, false);
+  end if;
+  return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;personal&#x27;, true, &#x27;found&#x27;, true,
+    &#x27;disp&#x27;, v_row.disp, &#x27;wage&#x27;, v_row.wage);
+end $$;
+
+-- 個人用の合言葉でも通るようにする（共通の合言葉もしばらく使える）
+create or replace function shift_submit_request(p_code text, p_name text, p_month text, p_days jsonb, p_note text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_name text := btrim(coalesce(p_name,&#x27;&#x27;));
+begin
+  if not code_ok(p_code) then raise exception &#x27;bad_code&#x27;; end if;
+  if v_name = &#x27;&#x27; or p_month !~ &#x27;^[0-9]{4}-[0-9]{2}$&#x27; then raise exception &#x27;bad_input&#x27;; end if;
+  insert into shift_requests (month, name, days, note, updated_at)
+  values (p_month, v_name, coalesce(p_days,&#x27;{}&#x27;::jsonb), coalesce(p_note,&#x27;&#x27;), now())
+  on conflict (month, name) do update
+    set days = excluded.days, note = excluded.note, updated_at = now();
+  return jsonb_build_object(&#x27;ok&#x27;, true,
+    &#x27;at&#x27;, to_char(now() at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI:SS&#x27;));
+end $$;
+
+create or replace function shift_get(p_code text, p_month text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_row shift_published%rowtype;
+begin
+  if not code_ok(p_code) and p_code is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then
+    raise exception &#x27;bad_code&#x27;;
+  end if;
+  select * into v_row from shift_published where month = p_month;
+  if not found then
+    return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;month&#x27;, p_month, &#x27;days&#x27;, null, &#x27;closed&#x27;, &#x27;[]&#x27;::jsonb, &#x27;publishedAt&#x27;, &#x27;&#x27;);
+  end if;
+  return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;month&#x27;, v_row.month, &#x27;days&#x27;, v_row.days, &#x27;closed&#x27;, v_row.closed,
+    &#x27;publishedAt&#x27;, to_char(v_row.published_at at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI:SS&#x27;));
+end $$;
+
+create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id text := btrim(coalesce(p_id,&#x27;&#x27;));
+begin
+  if not code_ok(p_code) then raise exception &#x27;bad_code&#x27;; end if;
+  if v_id = &#x27;&#x27; or btrim(coalesce(p_body,&#x27;&#x27;)) = &#x27;&#x27; then raise exception &#x27;bad_input&#x27;; end if;
+  insert into store_reports (id, name, title, body, created_at)
+  values (v_id, btrim(coalesce(p_name,&#x27;&#x27;)), btrim(coalesce(p_title,&#x27;&#x27;)), p_body, now())
+  on conflict (id) do nothing;
+  return jsonb_build_object(&#x27;ok&#x27;, true,
+    &#x27;at&#x27;, to_char(now() at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;));
+end $$;
+
+create or replace function report_list_mine(p_code text, p_ids jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb;
+begin
+  if not code_ok(p_code) then raise exception &#x27;bad_code&#x27;; end if;
+  if p_ids is null or jsonb_typeof(p_ids) &lt;&gt; &#x27;array&#x27; then
+    return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;items&#x27;, &#x27;[]&#x27;::jsonb);
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           &#x27;id&#x27;, r.id, &#x27;title&#x27;, r.title, &#x27;body&#x27;, r.body,
+           &#x27;reply&#x27;, r.reply, &#x27;replied&#x27;, r.replied,
+           &#x27;at&#x27;, to_char(r.created_at at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;),
+           &#x27;replyAt&#x27;, case when r.replied_at is null then &#x27;&#x27;
+                      else to_char(r.replied_at at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;) end
+         ) order by r.created_at desc), &#x27;[]&#x27;::jsonb)
+    into v_items
+    from store_reports r
+   where r.id in (select jsonb_array_elements_text(p_ids));
+  return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;items&#x27;, v_items);
+end $$;
+
+create or replace function report_cancel(p_code text, p_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_n int;
+begin
+  if not code_ok(p_code) then raise exception &#x27;bad_code&#x27;; end if;
+  delete from store_reports where id = p_id and replied = false;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then raise exception &#x27;already_replied&#x27;; end if;
+  return jsonb_build_object(&#x27;ok&#x27;, true);
+end $$;
+
+-- 店長：名簿を出す（個人用の合言葉もいっしょに預ける）
+create or replace function staff_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then raise exception &#x27;bad_key&#x27;; end if;
+  if p_rows is null or jsonb_typeof(p_rows) &lt;&gt; &#x27;array&#x27; then raise exception &#x27;bad_input&#x27;; end if;
+  delete from store_staff
+   where name not in (select coalesce(x-&gt;&gt;&#x27;name&#x27;,&#x27;&#x27;) from jsonb_array_elements(p_rows) x);
+  insert into store_staff (name, disp, wage, tok, updated_at)
+  select x-&gt;&gt;&#x27;name&#x27;, coalesce(x-&gt;&gt;&#x27;disp&#x27;,&#x27;&#x27;), nullif(x-&gt;&gt;&#x27;wage&#x27;,&#x27;&#x27;)::integer,
+         coalesce(x-&gt;&gt;&#x27;tok&#x27;,&#x27;&#x27;), now()
+    from jsonb_array_elements(p_rows) x
+   where coalesce(x-&gt;&gt;&#x27;name&#x27;,&#x27;&#x27;) &lt;&gt; &#x27;&#x27;
+  on conflict (name) do update
+    set disp = excluded.disp, wage = excluded.wage,
+        tok = case when excluded.tok &lt;&gt; &#x27;&#x27; then excluded.tok else store_staff.tok end,
+        updated_at = now();
+  return jsonb_build_object(&#x27;ok&#x27;, true);
+end $$;
+
+grant execute on function staff_me(text) to anon, authenticated;
 </pre>
     </li>
     <li>

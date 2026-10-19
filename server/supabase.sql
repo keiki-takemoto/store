@@ -402,3 +402,135 @@ end $$;
 
 grant execute on function staff_put(text, jsonb) to anon, authenticated;
 grant execute on function staff_me(text, text)   to anon, authenticated;
+
+-- ========================================================================
+-- スタッフひとりひとりの合言葉（個人用リンク）
+-- これまでは全員が同じ合言葉だったので、名前を入れ替えれば人の時給も
+-- 見られてしまった。ひとりに1つ合言葉を持たせて、そこから本人を引く。
+-- 店長が名簿に追加すると自動で作られ、個人用のURLに入る。
+-- ========================================================================
+
+alter table store_staff add column if not exists tok text not null default '';
+create unique index if not exists store_staff_tok on store_staff (tok) where tok <> '';
+
+-- 合言葉として通すかどうか（みんな共通の合言葉か、誰かの個人用か）
+create or replace function code_ok(p_code text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select btrim(coalesce(p_code,'')) = 'iq9kbjfflg'
+      or exists (select 1 from store_staff s
+                  where s.tok <> '' and s.tok = btrim(coalesce(p_code,'')));
+$$;
+-- この関数はアプリには公開しない（中の関数からだけ呼ぶ）。
+
+-- スタッフ：自分の時給を見る（個人用の合言葉だけ。名前では引けない）
+drop function if exists staff_me(text, text);
+create or replace function staff_me(p_code text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_row store_staff%rowtype;
+begin
+  select * into v_row from store_staff
+   where tok <> '' and tok = btrim(coalesce(p_code,''));
+  if not found then
+    -- 個人用のリンクではない（昔の共通リンク）
+    return jsonb_build_object('ok', true, 'personal', false, 'found', false);
+  end if;
+  return jsonb_build_object('ok', true, 'personal', true, 'found', true,
+    'disp', v_row.disp, 'wage', v_row.wage);
+end $$;
+
+-- 個人用の合言葉でも通るようにする（共通の合言葉もしばらく使える）
+create or replace function shift_submit_request(p_code text, p_name text, p_month text, p_days jsonb, p_note text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_name text := btrim(coalesce(p_name,''));
+begin
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
+  if v_name = '' or p_month !~ '^[0-9]{4}-[0-9]{2}$' then raise exception 'bad_input'; end if;
+  insert into shift_requests (month, name, days, note, updated_at)
+  values (p_month, v_name, coalesce(p_days,'{}'::jsonb), coalesce(p_note,''), now())
+  on conflict (month, name) do update
+    set days = excluded.days, note = excluded.note, updated_at = now();
+  return jsonb_build_object('ok', true,
+    'at', to_char(now() at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI:SS'));
+end $$;
+
+create or replace function shift_get(p_code text, p_month text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_row shift_published%rowtype;
+begin
+  if not code_ok(p_code) and p_code is distinct from 'eu5gh80n32faz4m2hv0zgwui' then
+    raise exception 'bad_code';
+  end if;
+  select * into v_row from shift_published where month = p_month;
+  if not found then
+    return jsonb_build_object('ok', true, 'month', p_month, 'days', null, 'closed', '[]'::jsonb, 'publishedAt', '');
+  end if;
+  return jsonb_build_object('ok', true, 'month', v_row.month, 'days', v_row.days, 'closed', v_row.closed,
+    'publishedAt', to_char(v_row.published_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI:SS'));
+end $$;
+
+create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id text := btrim(coalesce(p_id,''));
+begin
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
+  if v_id = '' or btrim(coalesce(p_body,'')) = '' then raise exception 'bad_input'; end if;
+  insert into store_reports (id, name, title, body, created_at)
+  values (v_id, btrim(coalesce(p_name,'')), btrim(coalesce(p_title,'')), p_body, now())
+  on conflict (id) do nothing;
+  return jsonb_build_object('ok', true,
+    'at', to_char(now() at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'));
+end $$;
+
+create or replace function report_list_mine(p_code text, p_ids jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb;
+begin
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
+  if p_ids is null or jsonb_typeof(p_ids) <> 'array' then
+    return jsonb_build_object('ok', true, 'items', '[]'::jsonb);
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', r.id, 'title', r.title, 'body', r.body,
+           'reply', r.reply, 'replied', r.replied,
+           'at', to_char(r.created_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'),
+           'replyAt', case when r.replied_at is null then ''
+                      else to_char(r.replied_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI') end
+         ) order by r.created_at desc), '[]'::jsonb)
+    into v_items
+    from store_reports r
+   where r.id in (select jsonb_array_elements_text(p_ids));
+  return jsonb_build_object('ok', true, 'items', v_items);
+end $$;
+
+create or replace function report_cancel(p_code text, p_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_n int;
+begin
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
+  delete from store_reports where id = p_id and replied = false;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then raise exception 'already_replied'; end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 店長：名簿を出す（個人用の合言葉もいっしょに預ける）
+create or replace function staff_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
+  delete from store_staff
+   where name not in (select coalesce(x->>'name','') from jsonb_array_elements(p_rows) x);
+  insert into store_staff (name, disp, wage, tok, updated_at)
+  select x->>'name', coalesce(x->>'disp',''), nullif(x->>'wage','')::integer,
+         coalesce(x->>'tok',''), now()
+    from jsonb_array_elements(p_rows) x
+   where coalesce(x->>'name','') <> ''
+  on conflict (name) do update
+    set disp = excluded.disp, wage = excluded.wage,
+        tok = case when excluded.tok <> '' then excluded.tok else store_staff.tok end,
+        updated_at = now();
+  return jsonb_build_object('ok', true);
+end $$;
+
+grant execute on function staff_me(text) to anon, authenticated;
