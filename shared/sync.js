@@ -25,6 +25,7 @@
     if (code === "bad_code") return "合言葉が違います";
     if (code === "bad_key") return "管理用キーが違います";
     if (code === "bad_input") return "送る内容に不足があります";
+    if (code === "already_replied") return "店長がもう返事を書いています";
     if (code === "no_function") return "SQLがまだ流されていないようです（はじめの設定をご確認ください）";
     if (code === "bad_anon") return "anonキーかURLが違います";
     if (code === "offline") return "つながりませんでした";
@@ -56,6 +57,7 @@
       if (/bad_code/.test(m)) throw err("bad_code", messageFor("bad_code"));
       if (/bad_key/.test(m)) throw err("bad_key", messageFor("bad_key"));
       if (/bad_input/.test(m)) throw err("bad_input", messageFor("bad_input"));
+      if (/already_replied/.test(m)) throw err("already_replied", messageFor("already_replied"));
       throw err("error", m || "うまくいきませんでした");
     }
     if (!data || data.ok !== true) throw err("bad_response", "返事を読み取れませんでした");
@@ -109,6 +111,9 @@
     },
     reportReply: function (id, reply) {
       return rpc("report_reply", { p_key: (CFG && CFG.key) || "", p_id: id, p_reply: reply });
+    },
+    reportCancel: function (id) {
+      return rpc("report_cancel", { p_code: (CFG && CFG.code) || "", p_id: id });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

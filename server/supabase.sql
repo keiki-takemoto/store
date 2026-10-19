@@ -336,7 +336,20 @@ begin
     'at', to_char(now() at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'));
 end $$;
 
+-- スタッフ：送ったものを取り消す（店長がまだ返事を書いていないときだけ）
+create or replace function report_cancel(p_code text, p_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_n int;
+begin
+  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  delete from store_reports where id = p_id and replied = false;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then raise exception 'already_replied'; end if;   -- 返事ずみか、もう無い
+  return jsonb_build_object('ok', true);
+end $$;
+
 grant execute on function report_submit(text, text, text, text, text) to anon, authenticated;
+grant execute on function report_cancel(text, text)                   to anon, authenticated;
 grant execute on function report_list_mine(text, jsonb)               to anon, authenticated;
 grant execute on function report_list(text)                           to anon, authenticated;
 grant execute on function report_reply(text, text, text)              to anon, authenticated;
