@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>ご意見箱</title>
+<meta name="description" content="スタッフから届いた報告を読んで、返事を書く画面。返事を書くと一覧から消える。">
+<meta name="theme-color" content="#2BA55F">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* 画面が勝手に拡大・縮小しないようにする。スクロール中に指が当たって
+   拡大されると、どこを見ているか分からなくなるため。 */
+html,body{touch-action:pan-x pan-y}
+
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+main{max-width:760px;margin:0 auto;padding:14px 14px calc(28px + env(safe-area-inset-bottom,0px))}
+.sec{padding:14px 15px}
+.note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:10px 0 0}
+
+.it{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:var(--surface)}
+.it+.it{margin-top:11px}
+.ih{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.who{font-size:13px;font-weight:800;color:var(--ink)}
+.when{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);margin-left:auto}
+.ttl2{font-size:15.5px;font-weight:700;margin-top:7px;line-height:1.5}
+.bd{font-size:13.5px;color:var(--ink-2);line-height:1.85;margin-top:7px;white-space:pre-wrap;word-break:break-word}
+/* iPhoneは文字が16pxより小さい入力欄を押すと画面を勝手に拡大するので、16px以上にすること。 */
+textarea{width:100%;font-size:16px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-2);
+  border-radius:10px;padding:10px 12px;font-family:inherit;line-height:1.7;min-height:80px;resize:vertical;margin-top:11px}
+textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.ra{display:flex;gap:9px;align-items:center;margin-top:9px;flex-wrap:wrap}
+.empty{font-size:13px;color:var(--ink-3);padding:10px 2px;line-height:1.9}
+.empty a{color:var(--accent)}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
+
+<main>
+  <div class="card">
+    <div class="card-h"><h2>ご意見箱</h2><span class="hint" id="cnt"></span></div>
+    <div class="sec">
+      <div class="row" style="margin-bottom:12px">
+        <button class="btn sm ghost" id="reload">受け取り直す</button>
+        <span class="lbl" id="log"></span>
+      </div>
+      <div id="list"></div>
+      <p class="note">スタッフ用アプリの<b>「店長へ報告」</b>から届きます。<br>
+        <b>返事を書いて「返信する」を押すと、この一覧からは消えます。</b>返事はスタッフの画面に出ます。<br>
+        返事をしないかぎり消えないので、ここに貯まったままになります。</p>
+    </div>
+  </div>
+</main>
+
+<script src="../shared/sync.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+/* つなぎ先はシフト管理の⑤設定で入れたものを、そのまま借りている */
+var K_SHIFT="shiftadmin.v1";
+function cfg(){
+  try{ var v=JSON.parse(localStorage.getItem(K_SHIFT)); return (v&&v.sync)||null }catch(e){ return null }
+}
+function syncOn(){ var c=cfg(); return !!(window.Sync&&c&&c.url&&c.anon&&c.key) }
+if(window.Sync) Sync.configure(cfg());
+
+var items=[], busy=false;
+function hhmm(){ var d=new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2) }
+
+function render(){
+  $("#cnt").textContent=items.length?items.length+"件":"";
+  if(!syncOn()){
+    $("#list").innerHTML='<div class="empty">まだ置き場所につないでいません。<br>'+
+      '<a href="../shift/#cfg">シフト管理 → ⑤設定</a>でつないでください。</div>';
+    return;
+  }
+  if(!items.length){ $("#list").innerHTML='<div class="empty">返事待ちの報告はありません。</div>'; return }
+  $("#list").innerHTML=items.map(function(x){
+    return '<div class="it" data-id="'+esc(x.id)+'">'+
+      '<div class="ih"><span class="who">'+esc(x.name||"（名前なし）")+'</span>'+
+        '<span class="when">'+esc(x.at||"")+'</span></div>'+
+      '<div class="ttl2">'+esc(x.title||"（題名なし）")+'</div>'+
+      '<div class="bd">'+esc(x.body||"")+'</div>'+
+      '<textarea data-reply="'+esc(x.id)+'" placeholder="返事を書く（スタッフの画面に出ます）"></textarea>'+
+      '<div class="ra"><button class="btn sm primary" data-send="'+esc(x.id)+'">返信する</button>'+
+        '<span class="lbl" data-note="'+esc(x.id)+'"></span></div>'+
+      '</div>';
+  }).join("");
+}
+
+async function load(quiet){
+  if(!syncOn()){ render(); return }
+  if(busy) return;
+  busy=true; $("#log").textContent="受け取っています…";
+  try{
+    var r=await Sync.reportList();
+    items=r.items||[];
+    $("#log").textContent=(items.length?items.length+"件 ・ ":"")+hhmm()+" に確認";
+    render();
+  }catch(e){
+    $("#log").textContent="受け取れませんでした："+((e&&e.message)||"");
+    if(!quiet) toast("受け取れませんでした");
+  }
+  busy=false;
+}
+
+$("#reload").addEventListener("click",function(){ load(false) });
+$("#list").addEventListener("click",async function(e){
+  var b=e.target.closest("[data-send]"); if(!b) return;
+  var id=b.dataset.send;
+  var ta=$("#list").querySelector('[data-reply="'+id+'"]');
+  var note=$("#list").querySelector('[data-note="'+id+'"]');
+  var txt=((ta&&ta.value)||"").trim();
+  if(!txt){ note.textContent="返事を書いてください"; if(ta) ta.focus(); return }
+  b.disabled=true; note.textContent="送っています…";
+  try{
+    await Sync.reportReply(id,txt);
+    items=items.filter(function(x){ return x.id!==id });
+    render();
+    toast("返信しました");
+  }catch(err){
+    b.disabled=false; note.textContent=(err&&err.message)||"送れませんでした";
+  }
+});
+
+var toastEl=null,tt=null;
+function toast(m){
+  if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }
+  toastEl.textContent=m; toastEl.hidden=false;
+  clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3000);
+}
+
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState!=="visible") return;
+  if(window.Sync) Sync.configure(cfg());
+  load(true);
+});
+render(); load(true);
+
+/* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える */
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+  var swCheck=function(){
+    if(document.visibilityState!=="visible") return;
+    try{ navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update() }).catch(function(){}) }catch(e){}
+  };
+  document.addEventListener("visibilitychange",swCheck);
+  window.addEventListener("pageshow",swCheck);
+}
+/* ピンチやダブルタップでの拡大を止める（iOSはviewportの指定を無視するので、
+   指の動きそのものを受け止めて打ち消す） */
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+document.addEventListener("dblclick",function(e){ e.preventDefault() },{passive:false});
+})();
+</script>
+</body>
+</html>
