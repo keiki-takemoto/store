@@ -197,6 +197,19 @@ if(window.Sync) Sync.configure(DB.sync&&DB.sync.url?DB.sync:null);
 function live(){ return IT.items.filter(function(x){ return !x.del }) }
 
 /* ---------- スタッフ ---------- */
+/* 時給をスタッフ用アプリの「ステータス」に出すため、名簿を置き場所にも送る。
+   名前は空白を取り除いたもので引く（スタッフ側の名前と合わせるため）。 */
+var staffT=null;
+function pushStaff(){
+  if(!syncOn()) return;
+  clearTimeout(staffT);
+  staffT=setTimeout(function(){
+    var rows=DB.staff.map(function(x){
+      return {name:normName(x.name), disp:x.name, wage:(typeof x.wage==="number"?x.wage:null)};
+    }).filter(function(x){ return x.name });
+    Sync.staffPut(rows).catch(function(){});
+  },800);
+}
 function renderStaff(){
   var n=DB.staff.length;
   $("#staffCount").textContent=n?n+"人":"";
@@ -234,7 +247,7 @@ $("#addStaff").addEventListener("click",function(){
   var s={id:uid(),name:v,color:COLORS[DB.staff.length%COLORS.length]};
   if(!isNaN(w)&&w>=0) s.wage=w;
   DB.staff.push(s);
-  saveShift(DB);
+  saveShift(DB); pushStaff();
   $("#newStaff").value=""; $("#newWage").value="";
   renderStaff(); toast(v+" さんを追加しました");
 });
@@ -246,7 +259,7 @@ $("#staffTbl").addEventListener("change",function(e){
   var s=DB.staff.filter(function(x){ return x.id===w.dataset.wage })[0]; if(!s) return;
   var v=parseInt(w.value,10);
   if(w.value===""||isNaN(v)||v<0){ delete s.wage; w.value="" } else { s.wage=v }
-  saveShift(DB);
+  saveShift(DB); pushStaff();
 });
 $("#staffTbl").addEventListener("click",function(e){
   var r=e.target.closest("[data-ren]"), d=e.target.closest("[data-del]");
@@ -257,7 +270,7 @@ $("#staffTbl").addEventListener("click",function(e){
     v=v.trim(); if(!v) return;
     var other=staffByName(v);
     if(other&&other.id!==s.id){ toast("同じ名前の人がいます"); return }
-    s.name=v; saveShift(DB); renderStaff();
+    s.name=v; saveShift(DB); pushStaff(); renderStaff();
     return;
   }
   if(d){
@@ -274,7 +287,7 @@ $("#staffTbl").addEventListener("click",function(e){
     });
     DB.hidden=DB.hidden||[];
     if(DB.hidden.indexOf(normName(st.name))<0) DB.hidden.push(normName(st.name));
-    saveShift(DB); renderStaff(); toast(st.name+" さんを削除しました");
+    saveShift(DB); pushStaff(); renderStaff(); toast(st.name+" さんを削除しました");
   }
 });
 $("#hiddenList").addEventListener("click",function(e){
@@ -654,7 +667,7 @@ function autoSeed(){
 }
 /* つないであるなら、まずほかの端末の分を受け取る。
    それでも1点も無いときだけ原価表を入れる（2台目で二重に入らないように）。 */
-if(syncOn()) syncNow(true).then(autoSeed);
+if(syncOn()){ syncNow(true).then(autoSeed); pushStaff() }
 else autoSeed();
 
 /* 開きっぱなしでも、ほかの端末で登録・削除したものが入ってくるように

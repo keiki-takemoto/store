@@ -353,3 +353,52 @@ grant execute on function report_cancel(text, text)                   to anon, a
 grant execute on function report_list_mine(text, jsonb)               to anon, authenticated;
 grant execute on function report_list(text)                           to anon, authenticated;
 grant execute on function report_reply(text, text, text)              to anon, authenticated;
+
+-- ========================================================================
+-- スタッフ名簿（時給）
+-- 店長の「設定 → スタッフ」で入れた時給を、スタッフ用アプリの
+-- 「ステータス」に出すためだけの置き場所。
+-- 名前は空白を取り除いたもので引く。
+-- ========================================================================
+
+create table if not exists store_staff (
+  name       text primary key,          -- 空白を取り除いた名前
+  disp       text not null default '',  -- 表示用の名前
+  wage       integer,
+  updated_at timestamptz not null default now()
+);
+
+alter table store_staff enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：名簿をまるごと出す（ここに無い人は消える）
+create or replace function staff_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
+  delete from store_staff
+   where name not in (select coalesce(x->>'name','') from jsonb_array_elements(p_rows) x);
+  insert into store_staff (name, disp, wage, updated_at)
+  select x->>'name', coalesce(x->>'disp',''), nullif(x->>'wage','')::integer, now()
+    from jsonb_array_elements(p_rows) x
+   where coalesce(x->>'name','') <> ''
+  on conflict (name) do update
+    set disp = excluded.disp, wage = excluded.wage, updated_at = now();
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- スタッフ：自分の時給を見る
+create or replace function staff_me(p_code text, p_name text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_row store_staff%rowtype;
+begin
+  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  select * into v_row from store_staff where name = btrim(coalesce(p_name,''));
+  if not found then return jsonb_build_object('ok', true, 'found', false); end if;
+  return jsonb_build_object('ok', true, 'found', true,
+    'disp', v_row.disp, 'wage', v_row.wage);
+end $$;
+
+grant execute on function staff_put(text, jsonb) to anon, authenticated;
+grant execute on function staff_me(text, text)   to anon, authenticated;

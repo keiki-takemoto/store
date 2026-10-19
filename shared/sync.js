@@ -114,6 +114,13 @@
     },
     reportCancel: function (id) {
       return rpc("report_cancel", { p_code: (CFG && CFG.code) || "", p_id: id });
+    },
+    /* スタッフ名簿（時給）。出すのは店長用キー、自分のぶんを見るのは合言葉 */
+    staffPut: function (rows) {
+      return rpc("staff_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
+    },
+    staffMe: function (name) {
+      return rpc("staff_me", { p_code: (CFG && CFG.code) || "", p_name: name || "" });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);
