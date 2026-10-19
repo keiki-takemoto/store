@@ -93,6 +93,22 @@
     },
     booksPut: function (rows) {
       return rpc("store_books_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
+    },
+    /* 店長へ報告（ご意見箱）。送るのは合言葉、読む・返すのは店長用キー */
+    reportSubmit: function (r) {
+      return rpc("report_submit", {
+        p_code: (CFG && CFG.code) || "", p_id: r.id,
+        p_name: r.name || "", p_title: r.title || "", p_body: r.body || ""
+      });
+    },
+    reportListMine: function (ids) {
+      return rpc("report_list_mine", { p_code: (CFG && CFG.code) || "", p_ids: ids || [] });
+    },
+    reportList: function () {
+      return rpc("report_list", { p_key: (CFG && CFG.key) || "" });
+    },
+    reportReply: function (id, reply) {
+      return rpc("report_reply", { p_key: (CFG && CFG.key) || "", p_id: id, p_reply: reply });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

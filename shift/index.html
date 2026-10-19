@@ -18,9 +18,30 @@ html,body{touch-action:pan-x pan-y}
 .homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
 .top{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 14px 0}
 .top-in{max-width:1400px;margin:0 auto}
-.tabs{display:flex;gap:4px}
-.tab{flex:1;border:none;background:transparent;border-bottom:3px solid transparent;padding:9px 4px 10px;
-  cursor:pointer;font-size:13.5px;color:var(--ink-3);font-weight:500;white-space:nowrap}
+/* タブが5つになって文字が重なるので、縮めずに並べて、入らないときだけ横に送る */
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1 1 auto;min-width:max-content;border:none;background:transparent;border-bottom:3px solid transparent;
+  padding:9px 6px 10px;cursor:pointer;font-size:12.5px;color:var(--ink-3);font-weight:500;white-space:nowrap}
+/* 携帯では5つ全部が一度に見えるように、少し小さくする */
+@media (max-width:430px){ .tab{font-size:11px;padding:9px 3px 10px;letter-spacing:-.03em}
+  .badge{min-width:15px;font-size:10px;line-height:15px;margin-left:3px} }
+.badge{display:inline-block;min-width:17px;margin-left:4px;padding:0 4px;border-radius:999px;
+  background:var(--warn);color:#fff;font-size:10.5px;font-weight:800;line-height:17px;vertical-align:1px}
+
+/* ---- ご意見箱 ---- */
+.box .it{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:var(--surface)}
+.box .it+.it{margin-top:11px}
+.box .ih{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+.box .who{font-size:13px;font-weight:800;color:var(--ink)}
+.box .when{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);margin-left:auto}
+.box .ttl2{font-size:15.5px;font-weight:700;margin-top:7px;line-height:1.5}
+.box .bd{font-size:13.5px;color:var(--ink-2);line-height:1.85;margin-top:7px;white-space:pre-wrap;word-break:break-word}
+.box textarea{width:100%;font-size:16px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line-2);
+  border-radius:10px;padding:10px 12px;font-family:inherit;line-height:1.7;min-height:76px;resize:vertical;margin-top:11px}
+.box .ra{display:flex;gap:8px;align-items:center;margin-top:9px}
+.box .ra .btn{flex:0 0 auto}
+.box .empty{font-size:13px;color:var(--ink-3);padding:10px 2px;line-height:1.9}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:#2BA55F;font-weight:700}
 main{max-width:1400px;margin:0 auto;padding:14px;--g:5px}
 @media (max-width:760px){ main{padding:8px 6px;--g:3px} }
@@ -165,7 +186,8 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <button class="tab" data-v="req" aria-selected="true">① 届いた希望</button>
   <button class="tab" data-v="cal" aria-selected="false">② 編集</button>
   <button class="tab" data-v="fix" aria-selected="false">③ 確定シフト</button>
-  <button class="tab" data-v="cfg" aria-selected="false">④ 設定</button>
+  <button class="tab" data-v="box" aria-selected="false">④ ご意見箱<span class="badge" id="boxBadge" hidden></span></button>
+  <button class="tab" data-v="cfg" aria-selected="false">⑤ 設定</button>
 </div></div></header>
 
 <main>
@@ -237,7 +259,23 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
       <b>「お知らせ文」</b>を押すと、そのときの状態に合ったLINE用の文章がコピーされます。</p>
   </section>
 
-  <!-- ④ 設定 -->
+  <!-- ④ ご意見箱 -->
+  <section class="view" id="v-box" data-off>
+    <div class="card"><div class="sec">
+      <h3>スタッフから届いた報告</h3>
+      <div class="row noprint" style="margin-bottom:10px">
+        <button class="btn sm ghost" id="boxReload">受け取り直す</button>
+        <span class="lbl" id="boxLog"></span>
+      </div>
+      <div class="box" id="boxList"></div>
+      <p class="note">スタッフ用アプリの<b>「店長へ報告」</b>から届きます。<br>
+        <b>返事を書いて「返信する」を押すと、この一覧からは消えます。</b>
+        返事はスタッフの画面に出ます。<br>
+        返事をしないかぎり消えないので、ここに貯まったままになります。</p>
+    </div></div>
+  </section>
+
+  <!-- ⑤ 設定 -->
   <section class="view" id="v-cfg" data-off>
     <div class="card">
       <div class="sec">
@@ -491,7 +529,7 @@ async function pull(silent){
   }finally{ pulling=false }
 }
 setInterval(function(){
-  if(syncOn()&&document.visibilityState==="visible"&&Date.now()-lastPull>55000) pull(true);
+  if(syncOn()&&document.visibilityState==="visible"&&Date.now()-lastPull>55000){ pull(true); loadBox(true) }
 },60000);
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="visible"&&syncOn()&&Date.now()-lastPull>30000) pull(true);
@@ -1114,24 +1152,86 @@ $("#wipe").addEventListener("click",function(){
 /* ================= 共通 ================= */
 $("#prevM").addEventListener("click",function(){ view.setMonth(view.getMonth()-1); rememberMonth(); renderAll() });
 $("#nextM").addEventListener("click",function(){ view.setMonth(view.getMonth()+1); rememberMonth(); renderAll() });
+/* ---------- ご意見箱 ---------- */
+/* 返事を書くと replied が立って、ここからは消える。
+   返事をしないかぎり残るので、取りこぼしがない。 */
+var boxItems=[], boxBusy=false;
+function renderBox(){
+  var n=boxItems.length, bd=$("#boxBadge");
+  bd.textContent=n||""; bd.hidden=!n;
+  if(!syncOn()){
+    $("#boxList").innerHTML='<div class="empty">まだ置き場所につないでいません。⑤設定でつないでください。</div>';
+    return;
+  }
+  if(!n){ $("#boxList").innerHTML='<div class="empty">返事待ちの報告はありません。</div>'; return }
+  $("#boxList").innerHTML=boxItems.map(function(x){
+    return '<div class="it" data-id="'+esc(x.id)+'">'+
+      '<div class="ih"><span class="who">'+esc(x.name||"（名前なし）")+'</span>'+
+        '<span class="when">'+esc(x.at||"")+'</span></div>'+
+      '<div class="ttl2">'+esc(x.title||"（題名なし）")+'</div>'+
+      '<div class="bd">'+esc(x.body||"")+'</div>'+
+      '<textarea data-reply="'+esc(x.id)+'" placeholder="返事を書く（スタッフの画面に出ます）"></textarea>'+
+      '<div class="ra"><button class="btn sm primary" data-send="'+esc(x.id)+'">返信する</button>'+
+        '<span class="lbl" data-note="'+esc(x.id)+'"></span></div>'+
+      '</div>';
+  }).join("");
+}
+async function loadBox(quiet){
+  if(!syncOn()){ renderBox(); return }
+  if(boxBusy) return;
+  boxBusy=true; $("#boxLog").textContent="受け取っています…";
+  try{
+    var r=await Sync.reportList();
+    boxItems=r.items||[];
+    $("#boxLog").textContent=boxItems.length
+      ? boxItems.length+"件 ・ "+hhmmNow()+" に確認"
+      : hhmmNow()+" に確認";
+    renderBox();
+  }catch(e){
+    $("#boxLog").textContent="受け取れませんでした："+((e&&e.message)||"");
+    if(!quiet) toast("受け取れませんでした");
+  }
+  boxBusy=false;
+}
+function hhmmNow(){ var d=new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2) }
+$("#boxReload").addEventListener("click",function(){ loadBox(false) });
+$("#boxList").addEventListener("click",async function(e){
+  var b=e.target.closest("[data-send]"); if(!b) return;
+  var id=b.dataset.send;
+  var ta=$("#boxList").querySelector('[data-reply="'+id+'"]');
+  var note=$("#boxList").querySelector('[data-note="'+id+'"]');
+  var txt=(ta&&ta.value||"").trim();
+  if(!txt){ note.textContent="返事を書いてください"; if(ta) ta.focus(); return }
+  b.disabled=true; note.textContent="送っています…";
+  try{
+    await Sync.reportReply(id,txt);
+    boxItems=boxItems.filter(function(x){ return x.id!==id });
+    renderBox();
+    toast("返信しました");
+  }catch(err){
+    b.disabled=false; note.textContent=(err&&err.message)||"送れませんでした";
+  }
+});
+
 document.querySelector(".tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
   curTab=b.dataset.v;
-  ["req","cal","fix","cfg"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  ["req","cal","fix","box","cfg"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
-  $("#monthbar").hidden=(b.dataset.v==="cfg");
+  $("#monthbar").hidden=(b.dataset.v==="cfg"||b.dataset.v==="box");
   if(b.dataset.v==="cfg"){
     fillCfg(); renderStaff(); renderSyncUI();
   }
   if(b.dataset.v==="req") pull(true);
+  if(b.dataset.v==="box") loadBox(true);
   renderStat(); renderReq();
-  if(b.dataset.v!=="cfg") requestAnimationFrame(fitAll);
+  if(b.dataset.v!=="cfg"&&b.dataset.v!=="box") requestAnimationFrame(fitAll);
   window.scrollTo({top:0});
 });
 /* ほかの画面から #cfg のように指定して開けるようにする（設定への案内用） */
 (function(){
   var h=String(location.hash||"").replace("#","");
-  if(["req","cal","fix","cfg"].indexOf(h)<0) return;
+  if(["req","cal","fix","box","cfg"].indexOf(h)<0) return;
   var t=document.querySelector('.tab[data-v="'+h+'"]');
   if(t) setTimeout(function(){ t.click() },0);
 })();
@@ -1143,7 +1243,7 @@ function toast(m){
 }
 function renderAll(){ renderCal(); renderReq(); renderOut(); renderPub(); }
 fillCfg(); renderAll(); renderSyncUI();
-if(syncOn()) pull(true);
+if(syncOn()){ pull(true); loadBox(true) }
 /* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える。
    ホーム画面のアプリは、閉じずに切り替えて戻るとページが読み直されず、
    直したものがいつまでも届かないため。 */

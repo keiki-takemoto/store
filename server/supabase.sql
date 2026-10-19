@@ -246,3 +246,97 @@ end $$;
 
 grant execute on function store_books_get(text, text)  to anon, authenticated;
 grant execute on function store_books_put(text, jsonb) to anon, authenticated;
+
+-- ========================================================================
+-- 店長へ報告（スタッフ用アプリ）と、ご意見箱（店長の画面）
+-- 送るのはスタッフ用の合言葉。読むのと返すのは店長用キー。
+-- 返事を書くと replied が立ち、店長のご意見箱からは消える。
+-- スタッフは、自分の端末に控えてあるID ぶんだけ見られる。
+-- （合言葉はみんな同じなので、名前で引くと人の報告も読めてしまうため）
+-- ========================================================================
+
+create table if not exists store_reports (
+  id         text primary key,
+  name       text    not null default '',
+  title      text    not null default '',
+  body       text    not null default '',
+  reply      text    not null default '',
+  replied    boolean not null default false,
+  created_at timestamptz not null default now(),
+  replied_at timestamptz
+);
+create index if not exists store_reports_open on store_reports (replied, created_at);
+
+alter table store_reports enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- スタッフ：報告を送る
+create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id text := btrim(coalesce(p_id,''));
+begin
+  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  if v_id = '' or btrim(coalesce(p_body,'')) = '' then raise exception 'bad_input'; end if;
+  insert into store_reports (id, name, title, body, created_at)
+  values (v_id, btrim(coalesce(p_name,'')), btrim(coalesce(p_title,'')), p_body, now())
+  on conflict (id) do nothing;       -- 二重送信はそのまま受け流す
+  return jsonb_build_object('ok', true,
+    'at', to_char(now() at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'));
+end $$;
+
+-- スタッフ：自分が出した報告と、店長からの返事を見る
+create or replace function report_list_mine(p_code text, p_ids jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb;
+begin
+  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  if p_ids is null or jsonb_typeof(p_ids) <> 'array' then
+    return jsonb_build_object('ok', true, 'items', '[]'::jsonb);
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', r.id, 'title', r.title, 'body', r.body,
+           'reply', r.reply, 'replied', r.replied,
+           'at', to_char(r.created_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'),
+           'replyAt', case when r.replied_at is null then ''
+                      else to_char(r.replied_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI') end
+         ) order by r.created_at desc), '[]'::jsonb)
+    into v_items
+    from store_reports r
+   where r.id in (select jsonb_array_elements_text(p_ids));
+  return jsonb_build_object('ok', true, 'items', v_items);
+end $$;
+
+-- 店長：まだ返事をしていない報告を受け取る
+create or replace function report_list(p_key text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', r.id, 'name', r.name, 'title', r.title, 'body', r.body,
+           'at', to_char(r.created_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI')
+         ) order by r.created_at), '[]'::jsonb)
+    into v_items
+    from store_reports r
+   where r.replied = false;
+  return jsonb_build_object('ok', true, 'items', v_items);
+end $$;
+
+-- 店長：返事を書く（書いたらご意見箱からは消える）
+create or replace function report_reply(p_key text, p_id text, p_reply text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if btrim(coalesce(p_reply,'')) = '' then raise exception 'bad_input'; end if;
+  update store_reports
+     set reply = p_reply, replied = true, replied_at = now()
+   where id = p_id;
+  if not found then raise exception 'bad_input'; end if;
+  return jsonb_build_object('ok', true,
+    'at', to_char(now() at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'));
+end $$;
+
+grant execute on function report_submit(text, text, text, text, text) to anon, authenticated;
+grant execute on function report_list_mine(text, jsonb)               to anon, authenticated;
+grant execute on function report_list(text)                           to anon, authenticated;
+grant execute on function report_reply(text, text, text)              to anon, authenticated;

@@ -240,6 +240,162 @@ end $$;
 
 grant execute on function store_items_get(text, text)        to anon, authenticated;
 grant execute on function store_items_put(text, jsonb, jsonb) to anon, authenticated;
+
+-- ========================================================================
+-- 帳簿（店舗管理の「経費」と「収支表」）
+-- 変動費・固定費・人件費を1つの表にまとめて入れる。kind で見分ける。
+--   exp   … 変動費（day＝使った日。data に 科目・支払い方法・金額・メモ）
+--   fix   … 固定費（day は空。data に 名称・月額・支払い方法・メモ）
+--   labor … 人件費（day＝働いた日。data に スタッフ・始まり・終わり・その時の時給・交通費）
+-- お給料や経費はスタッフに見せないので、店長用キーだけが触れる。
+-- ========================================================================
+
+create table if not exists store_books (
+  id         text primary key,
+  kind       text    not null default &#x27;&#x27;,
+  day        text    not null default &#x27;&#x27;,
+  data       jsonb   not null default &#x27;{}&#x27;::jsonb,
+  deleted    boolean not null default false,   -- 消した印。ほかの端末にも消したことを伝えるため残す
+  updated_at timestamptz not null default now()
+);
+create index if not exists store_books_upd on store_books (updated_at);
+
+alter table store_books enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：帳簿を受け取る（p_since より後に変わったものだけ。空なら全部）
+create or replace function store_books_get(p_key text, p_since text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_rows jsonb; v_since timestamptz;
+begin
+  if p_key is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then raise exception &#x27;bad_key&#x27;; end if;
+  v_since := case when coalesce(p_since,&#x27;&#x27;) = &#x27;&#x27; then null else p_since::timestamptz end;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           &#x27;id&#x27;, b.id, &#x27;kind&#x27;, b.kind, &#x27;day&#x27;, b.day, &#x27;data&#x27;, b.data, &#x27;deleted&#x27;, b.deleted
+         ) order by b.updated_at), &#x27;[]&#x27;::jsonb)
+    into v_rows
+    from store_books b
+   where v_since is null or b.updated_at &gt; v_since;
+  -- 5秒だけ手前を返す。ちょうど同じ瞬間に書かれたものを取りこぼさないため。
+  return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;rows&#x27;, v_rows,
+    &#x27;now&#x27;, to_char((now() - interval &#x27;5 seconds&#x27;) at time zone &#x27;UTC&#x27;,&#x27;YYYY-MM-DD"T"HH24:MI:SS.MS"Z"&#x27;));
+end $$;
+
+-- 店長：帳簿を書き込む（同じ id は上書き）
+create or replace function store_books_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then raise exception &#x27;bad_key&#x27;; end if;
+  if p_rows is not null and jsonb_typeof(p_rows) = &#x27;array&#x27; then
+    insert into store_books (id, kind, day, data, deleted, updated_at)
+    select x-&gt;&gt;&#x27;id&#x27;, coalesce(x-&gt;&gt;&#x27;kind&#x27;,&#x27;&#x27;), coalesce(x-&gt;&gt;&#x27;day&#x27;,&#x27;&#x27;),
+           coalesce(x-&gt;&#x27;data&#x27;,&#x27;{}&#x27;::jsonb), coalesce((x-&gt;&gt;&#x27;deleted&#x27;)::boolean, false), now()
+      from jsonb_array_elements(p_rows) x
+     where coalesce(x-&gt;&gt;&#x27;id&#x27;,&#x27;&#x27;) &lt;&gt; &#x27;&#x27;
+    on conflict (id) do update
+      set kind = excluded.kind, day = excluded.day, data = excluded.data,
+          deleted = excluded.deleted, updated_at = now();
+  end if;
+  return jsonb_build_object(&#x27;ok&#x27;, true,
+    &#x27;now&#x27;, to_char(now() at time zone &#x27;UTC&#x27;,&#x27;YYYY-MM-DD"T"HH24:MI:SS.MS"Z"&#x27;));
+end $$;
+
+grant execute on function store_books_get(text, text)  to anon, authenticated;
+grant execute on function store_books_put(text, jsonb) to anon, authenticated;
+
+-- ========================================================================
+-- 店長へ報告（スタッフ用アプリ）と、ご意見箱（店長の画面）
+-- 送るのはスタッフ用の合言葉。読むのと返すのは店長用キー。
+-- 返事を書くと replied が立ち、店長のご意見箱からは消える。
+-- スタッフは、自分の端末に控えてあるID ぶんだけ見られる。
+-- （合言葉はみんな同じなので、名前で引くと人の報告も読めてしまうため）
+-- ========================================================================
+
+create table if not exists store_reports (
+  id         text primary key,
+  name       text    not null default &#x27;&#x27;,
+  title      text    not null default &#x27;&#x27;,
+  body       text    not null default &#x27;&#x27;,
+  reply      text    not null default &#x27;&#x27;,
+  replied    boolean not null default false,
+  created_at timestamptz not null default now(),
+  replied_at timestamptz
+);
+create index if not exists store_reports_open on store_reports (replied, created_at);
+
+alter table store_reports enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- スタッフ：報告を送る
+create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id text := btrim(coalesce(p_id,&#x27;&#x27;));
+begin
+  if p_code is distinct from &#x27;iq9kbjfflg&#x27; then raise exception &#x27;bad_code&#x27;; end if;
+  if v_id = &#x27;&#x27; or btrim(coalesce(p_body,&#x27;&#x27;)) = &#x27;&#x27; then raise exception &#x27;bad_input&#x27;; end if;
+  insert into store_reports (id, name, title, body, created_at)
+  values (v_id, btrim(coalesce(p_name,&#x27;&#x27;)), btrim(coalesce(p_title,&#x27;&#x27;)), p_body, now())
+  on conflict (id) do nothing;       -- 二重送信はそのまま受け流す
+  return jsonb_build_object(&#x27;ok&#x27;, true,
+    &#x27;at&#x27;, to_char(now() at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;));
+end $$;
+
+-- スタッフ：自分が出した報告と、店長からの返事を見る
+create or replace function report_list_mine(p_code text, p_ids jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb;
+begin
+  if p_code is distinct from &#x27;iq9kbjfflg&#x27; then raise exception &#x27;bad_code&#x27;; end if;
+  if p_ids is null or jsonb_typeof(p_ids) &lt;&gt; &#x27;array&#x27; then
+    return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;items&#x27;, &#x27;[]&#x27;::jsonb);
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           &#x27;id&#x27;, r.id, &#x27;title&#x27;, r.title, &#x27;body&#x27;, r.body,
+           &#x27;reply&#x27;, r.reply, &#x27;replied&#x27;, r.replied,
+           &#x27;at&#x27;, to_char(r.created_at at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;),
+           &#x27;replyAt&#x27;, case when r.replied_at is null then &#x27;&#x27;
+                      else to_char(r.replied_at at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;) end
+         ) order by r.created_at desc), &#x27;[]&#x27;::jsonb)
+    into v_items
+    from store_reports r
+   where r.id in (select jsonb_array_elements_text(p_ids));
+  return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;items&#x27;, v_items);
+end $$;
+
+-- 店長：まだ返事をしていない報告を受け取る
+create or replace function report_list(p_key text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb;
+begin
+  if p_key is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then raise exception &#x27;bad_key&#x27;; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           &#x27;id&#x27;, r.id, &#x27;name&#x27;, r.name, &#x27;title&#x27;, r.title, &#x27;body&#x27;, r.body,
+           &#x27;at&#x27;, to_char(r.created_at at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;)
+         ) order by r.created_at), &#x27;[]&#x27;::jsonb)
+    into v_items
+    from store_reports r
+   where r.replied = false;
+  return jsonb_build_object(&#x27;ok&#x27;, true, &#x27;items&#x27;, v_items);
+end $$;
+
+-- 店長：返事を書く（書いたらご意見箱からは消える）
+create or replace function report_reply(p_key text, p_id text, p_reply text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from &#x27;eu5gh80n32faz4m2hv0zgwui&#x27; then raise exception &#x27;bad_key&#x27;; end if;
+  if btrim(coalesce(p_reply,&#x27;&#x27;)) = &#x27;&#x27; then raise exception &#x27;bad_input&#x27;; end if;
+  update store_reports
+     set reply = p_reply, replied = true, replied_at = now()
+   where id = p_id;
+  if not found then raise exception &#x27;bad_input&#x27;; end if;
+  return jsonb_build_object(&#x27;ok&#x27;, true,
+    &#x27;at&#x27;, to_char(now() at time zone &#x27;Asia/Tokyo&#x27;,&#x27;YYYY-MM-DD HH24:MI&#x27;));
+end $$;
+
+grant execute on function report_submit(text, text, text, text, text) to anon, authenticated;
+grant execute on function report_list_mine(text, jsonb)               to anon, authenticated;
+grant execute on function report_list(text)                           to anon, authenticated;
+grant execute on function report_reply(text, text, text)              to anon, authenticated;
 </pre>
     </li>
     <li>
@@ -268,7 +424,7 @@ grant execute on function store_items_put(text, jsonb, jsonb) to anon, authentic
 
   <div class="warn">
     <b>知っておいてほしいこと</b><br>
-    ・表そのものは鍵をかけてあり（RLS）、上のSQLで作った7つの関数だけが中身に触れます。
+    ・表そのものは鍵をかけてあり（RLS）、上のSQLで作った関数だけが中身に触れます。
       合言葉を知らなければ、anonキーだけでは何も読めません。<br>
     ・<b>管理用キーは店長だけ</b>のものです。スタッフに配るURLには入りません。<br>
     ・無料プランは1週間まったく使わないと一時停止します。毎日使うぶんには止まりませんし、
