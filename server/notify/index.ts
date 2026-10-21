@@ -54,16 +54,20 @@ try {
     "VAPID_PRIVATE の長さ:", VAPID_PRIVATE.length);
 }
 
-const db = (path: string, init: RequestInit = {}) =>
-  fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...init,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-    },
-  });
+// 新しい形式のキー（sb_secret_… など）はJWTではないので、Authorization に載せると
+// 読み取れずに「匿名」として扱われ、表に触れなくなる。ey… のJWTのときだけ付ける。
+// スタッフ用アプリの shared/sync.js と同じ扱い。
+const isJwt = /^ey/.test(SERVICE_KEY);
+
+const db = (path: string, init: RequestInit = {}) => {
+  const headers: Record<string, string> = {
+    apikey: SERVICE_KEY,
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string> ?? {}),
+  };
+  if (isJwt) headers.Authorization = `Bearer ${SERVICE_KEY}`;
+  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...init, headers });
+};
 
 function cut(s: string, n: number) {
   s = String(s ?? "").replace(/\s+/g, " ").trim();
@@ -77,6 +81,7 @@ Deno.serve(async (req) => {
   }
 
   console.log("DBの鍵:", keyFrom || "見つかりません",
+    "形式:", SERVICE_KEY ? (isJwt ? "JWT(ey…)" : SERVICE_KEY.slice(0, 12) + "…") : "なし",
     "URL:", SUPABASE_URL ? "あり" : "なし");
   if (!SERVICE_KEY) {
     console.error(
