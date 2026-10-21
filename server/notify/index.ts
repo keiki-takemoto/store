@@ -82,21 +82,36 @@ Deno.serve(async (req) => {
   });
 
   const res = await db("store_push?select=endpoint,p256dh,auth");
-  if (!res.ok) return new Response("db error", { status: 500 });
+  if (!res.ok) {
+    const t = await res.text();
+    console.error("通知先の一覧を読めません:", res.status, t);
+    return new Response("db error", { status: 500 });
+  }
   const subs = (await res.json()) as Array<
     { endpoint: string; p256dh: string; auth: string }
   >;
+  console.log("通知を出す端末:", subs.length, "台");
+  if (subs.length === 0) {
+    console.warn("1台も登録されていません。ご意見箱の「このスマホに通知を出す」を押してください。");
+  }
 
   let sent = 0, gone = 0;
+  const failed: string[] = [];
   for (const s of subs) {
+    const where = new URL(s.endpoint).host;
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
       );
       sent++;
+      console.log("送れました:", where);
     } catch (e) {
-      const code = (e as { statusCode?: number })?.statusCode;
+      const err = e as { statusCode?: number; body?: string; message?: string };
+      const code = err?.statusCode ?? 0;
+      console.error("送れません:", where, "status:", code,
+        "body:", String(err?.body ?? err?.message ?? e).slice(0, 300));
+      failed.push(`${where}:${code}`);
       // その端末がもう受け取れない（アプリを消した等）なら、覚えておく必要がない
       if (code === 404 || code === 410) {
         await db(`store_push?endpoint=eq.${encodeURIComponent(s.endpoint)}`, {
@@ -107,7 +122,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, sent, gone }), {
+  console.log("おわり 送れた:", sent, "消した:", gone, "失敗:", failed.join(","));
+  return new Response(JSON.stringify({ ok: true, subs: subs.length, sent, gone, failed }), {
     headers: { "Content-Type": "application/json" },
   });
 });
