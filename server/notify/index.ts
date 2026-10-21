@@ -19,7 +19,21 @@ function env(name: string) {
 }
 
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").trim();
-const SERVICE_KEY = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+
+// データベースを読むための鍵。Supabaseが自動で入れてくれる名前は版によって違うので、
+// 考えられるものを順に探す。見つからなければ DB_KEY を自分で足してもらう。
+const KEY_NAMES = [
+  "DB_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SB_SECRET_KEY",
+  "SUPABASE_SECRET_KEY",
+];
+let keyFrom = "";
+let SERVICE_KEY = "";
+for (const n of KEY_NAMES) {
+  const v = (Deno.env.get(n) ?? "").trim();
+  if (v) { SERVICE_KEY = v; keyFrom = n; break; }
+}
 const VAPID_PUBLIC = env("VAPID_PUBLIC");
 const VAPID_PRIVATE = env("VAPID_PRIVATE");
 const NOTIFY_KEY = (Deno.env.get("NOTIFY_KEY") ?? "").trim();
@@ -60,6 +74,19 @@ Deno.serve(async (req) => {
   // 合言葉が合わないものは受け付けない
   if (!NOTIFY_KEY || req.headers.get("x-notify-key") !== NOTIFY_KEY) {
     return new Response("forbidden", { status: 401 });
+  }
+
+  console.log("DBの鍵:", keyFrom || "見つかりません",
+    "URL:", SUPABASE_URL ? "あり" : "なし");
+  if (!SERVICE_KEY) {
+    console.error(
+      "データベースを読む鍵がありません。Secrets に DB_KEY という名前で、" +
+      "Project Settings → API Keys の service_role（または secret）キーを足してください。",
+    );
+    return new Response(JSON.stringify({ ok: false, error: "no_db_key" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   if (vapidError) {
