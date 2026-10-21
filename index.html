@@ -67,6 +67,11 @@ main{max-width:560px;margin:0 auto;
 .tile .ic{font-size:40px;line-height:1.1;margin-bottom:6px}
 .tile .nm{color:var(--green);font-weight:700;font-size:19px;letter-spacing:.01em}
 .tile .ds{color:var(--ink-2);font-size:13.5px;line-height:1.5;word-break:auto-phrase}
+/* まだ返事をしていない報告の数。タイルの右上に出す */
+.tile{position:relative}
+.tile .cnt{position:absolute;top:12px;right:12px;min-width:28px;height:28px;border-radius:999px;
+  background:#D1452B;color:#fff;font-size:15px;font-weight:800;line-height:28px;text-align:center;
+  padding:0 7px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
 
 /* これから作る、の知らせ */
 .sheet{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;
@@ -102,6 +107,7 @@ main{max-width:560px;margin:0 auto;
   </div>
 </div>
 
+<script src="./shared/sync.js"></script>
 <script>
 (function(){
 "use strict";
@@ -140,6 +146,42 @@ $("#grid").addEventListener("click",function(e){
   $("#sIcon").textContent=t.ic; $("#sTitle").textContent=t.nm; $("#sDesc").textContent=t.ds;
   $("#sheet").hidden=false;
 });
+/* ご意見箱に、まだ返事をしていない報告がいくつあるか出す。
+   通知は飛ばせないので、せめてホームを開けば分かるようにしてある。 */
+var K_SHIFT="shiftadmin.v1";
+function cfg(){
+  try{ var v=JSON.parse(localStorage.getItem(K_SHIFT)); return (v&&v.sync)||null }catch(e){ return null }
+}
+function syncOn(){ var c=cfg(); return !!(window.Sync&&c&&c.url&&c.anon&&c.key) }
+function showCount(n){
+  var tile=$('.tile[data-k="box"]'); if(!tile) return;
+  var el=tile.querySelector(".cnt");
+  if(!n){ if(el) el.remove(); return }
+  if(!el){ el=document.createElement("span"); el.className="cnt"; tile.appendChild(el) }
+  el.textContent=n>99?"99+":n;
+  tile.setAttribute("aria-label","ご意見箱　未返信 "+n+"件");
+}
+var boxBusy=false;
+async function loadBoxCount(){
+  if(!syncOn()||boxBusy) return;
+  boxBusy=true;
+  try{
+    if(window.Sync) Sync.configure(cfg());
+    var r=await Sync.reportList();
+    showCount((r.items||[]).length);
+  }catch(e){}
+  boxBusy=false;
+}
+loadBoxCount();
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible") loadBoxCount();
+});
+/* 返信してホームに戻ってきたときも数え直す（戻るで復元されると上は鳴らないため） */
+window.addEventListener("pageshow",function(){ loadBoxCount() });
+setInterval(function(){
+  if(document.visibilityState==="visible") loadBoxCount();
+},60000);
+
 $("#sClose").addEventListener("click",function(){ $("#sheet").hidden=true });
 $("#sheet").addEventListener("click",function(e){ if(e.target===this) this.hidden=true });
 document.addEventListener("keydown",function(e){ if(e.key==="Escape") $("#sheet").hidden=true });
