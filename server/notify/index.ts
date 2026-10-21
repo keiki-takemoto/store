@@ -12,18 +12,33 @@
 
 import webpush from "npm:web-push@3.6.7";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const VAPID_PUBLIC = Deno.env.get("VAPID_PUBLIC") ?? "";
-const VAPID_PRIVATE = Deno.env.get("VAPID_PRIVATE") ?? "";
-const NOTIFY_KEY = Deno.env.get("NOTIFY_KEY") ?? "";
+// 画面から貼るときに改行や空白が混ざりやすいので、取り除いてから使う。
+// base64url の末尾の "=" も、web-push が嫌うので落とす。
+function env(name: string) {
+  return (Deno.env.get(name) ?? "").trim().replace(/\s+/g, "").replace(/=+$/, "");
+}
+
+const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+const SERVICE_KEY = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "").trim();
+const VAPID_PUBLIC = env("VAPID_PUBLIC");
+const VAPID_PRIVATE = env("VAPID_PRIVATE");
+const NOTIFY_KEY = (Deno.env.get("NOTIFY_KEY") ?? "").trim();
 
 // 連絡先として、お店のページのURLを渡す（メールアドレスは渡さない）
-webpush.setVapidDetails(
-  "https://keiki-takemoto.github.io/store/",
-  VAPID_PUBLIC,
-  VAPID_PRIVATE,
-);
+// かぎが入っていないときにここで落ちると原因が分からないので、理由を残す。
+let vapidError = "";
+try {
+  webpush.setVapidDetails(
+    "https://keiki-takemoto.github.io/store/",
+    VAPID_PUBLIC,
+    VAPID_PRIVATE,
+  );
+} catch (e) {
+  vapidError = String((e as Error)?.message ?? e);
+  console.error("VAPIDのかぎが読めません:", vapidError,
+    "VAPID_PUBLIC の長さ:", VAPID_PUBLIC.length,
+    "VAPID_PRIVATE の長さ:", VAPID_PRIVATE.length);
+}
 
 const db = (path: string, init: RequestInit = {}) =>
   fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -45,6 +60,13 @@ Deno.serve(async (req) => {
   // 合言葉が合わないものは受け付けない
   if (!NOTIFY_KEY || req.headers.get("x-notify-key") !== NOTIFY_KEY) {
     return new Response("forbidden", { status: 401 });
+  }
+
+  if (vapidError) {
+    return new Response(
+      JSON.stringify({ ok: false, error: "vapid", detail: vapidError }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
