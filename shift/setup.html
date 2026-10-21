@@ -633,6 +633,10 @@ end $$;
 
 grant execute on function push_put(text, text, text, text, text) to anon, authenticated;
 grant execute on function push_del(text, text)                   to anon, authenticated;
+
+-- 通知を送る Edge Function は、この表だけを直接読む（ほかの表はすべて関数ごし）。
+-- 既定では service_role に権限が無く、42501（権限がありません）で止まるので与えておく。
+grant select, delete on table store_push to service_role;
 </pre>
     </li>
     <li>
