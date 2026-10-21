@@ -534,3 +534,46 @@ begin
 end $$;
 
 grant execute on function staff_me(text) to anon, authenticated;
+
+-- ========================================================================
+-- スマホへの通知（プッシュ通知）
+-- 通知を受け取る端末を覚えておくための表。
+-- 実際に送るのは Supabase の Edge Function（server/notify/index.ts）。
+-- 秘密のかぎは Edge Function の Secrets にだけ置く。ここには書かない。
+-- ========================================================================
+
+create table if not exists store_push (
+  endpoint   text primary key,
+  p256dh     text not null default '',
+  auth       text not null default '',
+  label      text not null default '',
+  created_at timestamptz not null default now()
+);
+
+alter table store_push enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：この端末に通知を出すよう登録する
+create or replace function push_put(p_key text, p_endpoint text, p_p256dh text, p_auth text, p_label text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if btrim(coalesce(p_endpoint,'')) = '' then raise exception 'bad_input'; end if;
+  insert into store_push (endpoint, p256dh, auth, label, created_at)
+  values (p_endpoint, coalesce(p_p256dh,''), coalesce(p_auth,''), coalesce(p_label,''), now())
+  on conflict (endpoint) do update
+    set p256dh = excluded.p256dh, auth = excluded.auth, label = excluded.label;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 店長：この端末への通知をやめる
+create or replace function push_del(p_key text, p_endpoint text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  delete from store_push where endpoint = p_endpoint;
+  return jsonb_build_object('ok', true);
+end $$;
+
+grant execute on function push_put(text, text, text, text, text) to anon, authenticated;
+grant execute on function push_del(text, text)                   to anon, authenticated;

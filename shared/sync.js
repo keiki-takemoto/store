@@ -121,6 +121,15 @@
     },
     staffMe: function () {
       return rpc("staff_me", { p_code: (CFG && CFG.code) || "" });
+    },
+    /* スマホへの通知。登録と解除は店長用キー */
+    pushPut: function (sub, label) {
+      var k = (sub && sub.keys) || {};
+      return rpc("push_put", { p_key: (CFG && CFG.key) || "", p_endpoint: sub.endpoint,
+        p_p256dh: k.p256dh || "", p_auth: k.auth || "", p_label: label || "" });
+    },
+    pushDel: function (endpoint) {
+      return rpc("push_del", { p_key: (CFG && CFG.key) || "", p_endpoint: endpoint });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

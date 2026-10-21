@@ -34,12 +34,24 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .ra{display:flex;gap:9px;align-items:center;margin-top:9px;flex-wrap:wrap}
 .empty{font-size:13px;color:var(--ink-3);padding:10px 2px;line-height:1.9}
 .empty a{color:var(--accent)}
+/* 通知の設定 */
+#pushState{font-size:14px;font-weight:700;line-height:1.6;margin-bottom:10px}
+#pushState.on{color:var(--ok)} #pushState.off{color:var(--ink-2)} #pushState.ng{color:var(--warn)}
 </style>
 </head>
 <body>
 <a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
 
 <main>
+  <div class="card">
+    <div class="card-h"><h2>通知</h2></div>
+    <div class="sec">
+      <div id="pushState" class="off">—</div>
+      <div class="row"><button class="btn sm" id="pushBtn" hidden></button></div>
+      <p class="note" id="pushNote"></p>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-h"><h2>ご意見箱</h2><span class="hint" id="cnt"></span></div>
     <div class="sec">
@@ -129,6 +141,87 @@ $("#list").addEventListener("click",async function(e){
   }
 });
 
+/* ---------- スマホへの通知 ---------- */
+/* 公開してよいほうのかぎ。秘密のかぎは Supabase の Edge Function にだけ置く。 */
+var VAPID_PUBLIC="BI4XfIE1XB9Di8C1KYEBtcPLcSDC0MfQzy9UhuBa8v5aExgzlwyvKE26w6Onf67A8sNHNBVpyOQeO_n5AJ3vt2c";
+function b64ToBytes(b64){
+  var t=(b64+"=".repeat((4-b64.length%4)%4)).replace(/-/g,"+").replace(/_/g,"/");
+  var raw=atob(t), a=new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++) a[i]=raw.charCodeAt(i);
+  return a;
+}
+function pushSupported(){ return ("serviceWorker" in navigator)&&("PushManager" in window)&&("Notification" in window) }
+/* iPhoneは、ホーム画面に追加したアプリでしか通知を出せない */
+function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) }
+function isStandalone(){
+  return window.navigator.standalone===true ||
+    (window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);
+}
+function setPush(cls,txt,btn,note){
+  var st=$("#pushState"); st.className=cls; st.textContent=txt;
+  var b=$("#pushBtn");
+  if(btn){ b.hidden=false; b.textContent=btn } else { b.hidden=true }
+  $("#pushNote").innerHTML=note||"";
+}
+async function renderPush(){
+  if(!pushSupported()){
+    setPush("ng","この端末では通知を出せません","",
+      "通知はiPhoneなら iOS 16.4 以降で使えます。パソコンのブラウザでも出せます。");
+    return;
+  }
+  if(isIOS()&&!isStandalone()){
+    setPush("ng","まだ通知を出せません","",
+      "iPhoneでは<b>ホーム画面に追加したアプリ</b>からでないと通知を出せません。<br>"+
+      "下の共有ボタン → <b>ホーム画面に追加</b> をしてから、そのアイコンで開いてください。");
+    return;
+  }
+  if(!syncOn()){
+    setPush("ng","まだ置き場所につないでいません","",
+      '<a href="../shift/#cfg">シフト管理 → ④設定</a>でつないでください。');
+    return;
+  }
+  var reg=null;
+  try{ reg=await navigator.serviceWorker.ready }catch(e){}
+  var sub=null;
+  if(reg) try{ sub=await reg.pushManager.getSubscription() }catch(e){}
+  if(Notification.permission==="denied"){
+    setPush("ng","通知が止められています","",
+      isIOS()
+        ? "iPhoneの<b>設定 → 通知 → 店舗管理</b>から、通知を許可してください。"
+        : "ブラウザのアドレス欄の左にある印から、このサイトの通知を<b>許可</b>に変えてください。");
+    return;
+  }
+  if(sub){
+    setPush("on","この端末に通知が出ます","通知をやめる",
+      "スタッフから報告が届くと、このスマホに通知が出ます。押すとご意見箱が開きます。");
+  }else{
+    setPush("off","この端末には通知が出ません","このスマホに通知を出す",
+      "押すと許可を聞かれます。<b>許可</b>を選んでください。");
+  }
+}
+$("#pushBtn").addEventListener("click",async function(){
+  var b=this; b.disabled=true;
+  try{
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(sub){
+      try{ await Sync.pushDel(sub.endpoint) }catch(e){}
+      await sub.unsubscribe();
+      toast("通知をやめました");
+    }else{
+      var perm=await Notification.requestPermission();
+      if(perm!=="granted"){ toast("通知が許可されませんでした"); b.disabled=false; renderPush(); return }
+      sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:b64ToBytes(VAPID_PUBLIC)
+      });
+      await Sync.pushPut(sub.toJSON(), navigator.userAgent.slice(0,80));
+      toast("この端末に通知が出ます");
+    }
+  }catch(e){ toast((e&&e.message)||"うまくいきませんでした") }
+  b.disabled=false; renderPush();
+});
+
 var toastEl=null,tt=null;
 function toast(m){
   if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }
@@ -139,9 +232,9 @@ function toast(m){
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState!=="visible") return;
   if(window.Sync) Sync.configure(cfg());
-  load(true);
+  load(true); renderPush();
 });
-render(); load(true);
+render(); load(true); renderPush();
 
 /* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える */
 if("serviceWorker" in navigator){
