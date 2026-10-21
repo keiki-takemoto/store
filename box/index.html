@@ -150,6 +150,7 @@ function b64ToBytes(b64){
   for(var i=0;i<raw.length;i++) a[i]=raw.charCodeAt(i);
   return a;
 }
+var pushErr="";
 function pushSupported(){ return ("serviceWorker" in navigator)&&("PushManager" in window)&&("Notification" in window) }
 /* iPhoneは、ホーム画面に追加したアプリでしか通知を出せない */
 function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) }
@@ -196,7 +197,10 @@ async function renderPush(){
       "スタッフから報告が届くと、このスマホに通知が出ます。押すとご意見箱が開きます。");
   }else{
     setPush("off","この端末には通知が出ません","このスマホに通知を出す",
-      "押すと許可を聞かれます。<b>許可</b>を選んでください。");
+      pushErr
+        ? "うまくいきませんでした：<b>"+esc(pushErr)+"</b><br>"+
+          "置き場所の用意（SQL）がまだかもしれません。"
+        : "押すと許可を聞かれます。<b>許可</b>を選んでください。");
   }
 }
 $("#pushBtn").addEventListener("click",async function(){
@@ -215,7 +219,17 @@ $("#pushBtn").addEventListener("click",async function(){
         userVisibleOnly:true,
         applicationServerKey:b64ToBytes(VAPID_PUBLIC)
       });
-      await Sync.pushPut(sub.toJSON(), navigator.userAgent.slice(0,80));
+      /* 置き場所に覚えてもらえなければ通知は出ない。
+         登録できたように見せてしまうと気づけないので、取り消して理由を出す。 */
+      try{
+        await Sync.pushPut(sub.toJSON(), navigator.userAgent.slice(0,80));
+      }catch(err){
+        try{ await sub.unsubscribe() }catch(_){}
+        pushErr=(err&&err.message)||"置き場所に登録できませんでした";
+        toast("登録できませんでした："+pushErr);
+        b.disabled=false; renderPush(); return;
+      }
+      pushErr="";
       toast("この端末に通知が出ます");
     }
   }catch(e){ toast((e&&e.message)||"うまくいきませんでした") }
