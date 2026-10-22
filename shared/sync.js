@@ -141,6 +141,16 @@
     staffMe: function () {
       return rpc("staff_me", { p_code: (CFG && CFG.code) || "" });
     },
+    /* レジ（会計）。店長用キーだけ。レジは店舗管理アプリの中にある */
+    salePut: function (rows) {
+      return rpc("sale_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
+    },
+    salesGet: function (from, to) {
+      return rpc("sales_get", { p_key: (CFG && CFG.key) || "", p_from: from || null, p_to: to || null });
+    },
+    saleVoid: function (id) {
+      return rpc("sale_void", { p_key: (CFG && CFG.key) || "", p_id: id });
+    },
     /* スマホへの通知。登録と解除は店長用キー */
     pushPut: function (sub, label) {
       var k = (sub && sub.keys) || {};

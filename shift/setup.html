@@ -646,7 +646,126 @@ grant execute on function push_del(text, text)                   to anon, authen
 
 -- 通知を送る Edge Function は、この表だけを直接読む（ほかの表はすべて関数ごし）。
 -- 既定では service_role に権限が無く、42501（権限がありません）で止まるので与えておく。
-grant select, delete on table store_push to service_role;</pre>
+grant select, delete on table store_push to service_role;
+
+-- ========================================================================
+-- レジ（会計の記録）
+-- 1回の会計を1行で持つ。中身（何がいくつ）は lines にまとめて入れる。
+-- 売価も仕入れ値も「売った時点の値」を写して残す。あとから原価表を直しても、
+-- 過去の利益が変わらないようにするため。金額はすべて税込。
+-- 店長用キーだけが触れる。レジは店舗管理アプリの中にあるので同じキーでよい。
+-- ========================================================================
+
+create table if not exists store_sales (
+  id         text primary key,                   -- 端末で作る。二度送っても増えない
+  at         timestamptz not null default now(), -- 会計した時刻
+  staff      text    not null default '',        -- 誰が売ったか
+  pay        text    not null default 'cash',    -- cash（現金）／card（カード）
+  subtotal   integer not null default 0,         -- 値引き前
+  discount   integer not null default 0,         -- 値引き
+  total      integer not null default 0,         -- 受け取った額（subtotal - discount）
+  cost       integer not null default 0,         -- 売った時点の仕入れ値の合計
+  qty        integer not null default 0,         -- 点数
+  lines      jsonb   not null default '[]'::jsonb,
+  note       text    not null default '',
+  voided     boolean not null default false,     -- 打ち消した会計
+  created_at timestamptz not null default now()
+);
+create index if not exists store_sales_at on store_sales (at);
+
+alter table store_sales enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：会計を記録する（まとめて送れる。つながらなかったぶんを後から流すため）
+-- 新しく入った会計のぶんだけ、商品の在庫を減らす。
+create or replace function sale_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_new int := 0; v_stock int := 0;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) &lt;&gt; 'array' then raise exception 'bad_input'; end if;
+
+  with ins as (
+    insert into store_sales (id, at, staff, pay, subtotal, discount, total, cost, qty, lines, note)
+    select x-&gt;&gt;'id',
+           coalesce(nullif(x-&gt;&gt;'at','')::timestamptz, now()),
+           btrim(coalesce(x-&gt;&gt;'staff','')),
+           case when x-&gt;&gt;'pay' = 'card' then 'card' else 'cash' end,
+           coalesce(nullif(x-&gt;&gt;'subtotal','')::integer, 0),
+           coalesce(nullif(x-&gt;&gt;'discount','')::integer, 0),
+           coalesce(nullif(x-&gt;&gt;'total','')::integer, 0),
+           coalesce(nullif(x-&gt;&gt;'cost','')::integer, 0),
+           coalesce(nullif(x-&gt;&gt;'qty','')::integer, 0),
+           case when jsonb_typeof(x-&gt;'lines') = 'array' then x-&gt;'lines' else '[]'::jsonb end,
+           coalesce(x-&gt;&gt;'note','')
+      from jsonb_array_elements(p_rows) x
+     where coalesce(x-&gt;&gt;'id','') &lt;&gt; ''
+    on conflict (id) do nothing          -- 同じ会計を二度送っても増えない
+    returning id, lines
+  ), sold as (
+    select l-&gt;&gt;'id' as item_id, sum(coalesce(nullif(l-&gt;&gt;'qty','')::integer, 0)) as n
+      from ins, jsonb_array_elements(ins.lines) l
+     where coalesce(l-&gt;&gt;'id','') &lt;&gt; ''
+     group by 1
+  ), upd as (
+    -- 在庫を入れていない商品（stock が空）は、そのまま空にしておく
+    update store_items i
+       set stock = i.stock - s.n, updated_at = now()
+      from sold s
+     where i.id = s.item_id and i.stock is not null
+    returning i.id
+  )
+  select (select count(*) from ins), (select count(*) from upd) into v_new, v_stock;
+
+  return jsonb_build_object('ok', true, 'added', v_new, 'stock', v_stock);
+end $$;
+
+-- 店長：会計を受け取る（p_from / p_to は "2026-10-01" の形。両端を含む）
+create or replace function sales_get(p_key text, p_from text default null, p_to text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb; v_from date; v_to date;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  v_from := case when coalesce(p_from,'') = '' then null else p_from::date end;
+  v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
+  -- 日付は日本時間で見る（サーバーのUTCで切ると、夜の会計が前の日に入ってしまう）
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', s.id, 'staff', s.staff, 'pay', s.pay,
+           'subtotal', s.subtotal, 'discount', s.discount, 'total', s.total,
+           'cost', s.cost, 'qty', s.qty, 'lines', s.lines, 'note', s.note,
+           'voided', s.voided,
+           'day', to_char(s.at at time zone 'Asia/Tokyo','YYYY-MM-DD'),
+           'at',  to_char(s.at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI')
+         ) order by s.at desc), '[]'::jsonb)
+    into v_items
+    from store_sales s
+   where (v_from is null or (s.at at time zone 'Asia/Tokyo')::date &gt;= v_from)
+     and (v_to   is null or (s.at at time zone 'Asia/Tokyo')::date &lt;= v_to);
+  return jsonb_build_object('ok', true, 'items', v_items);
+end $$;
+
+-- 店長：打ち間違えた会計を取り消す（在庫は戻す）
+create or replace function sale_void(p_key text, p_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_lines jsonb;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  update store_sales set voided = true where id = p_id and voided = false
+  returning lines into v_lines;
+  if v_lines is null then raise exception 'bad_input'; end if;   -- もう無いか、取り消しずみ
+  update store_items i
+     set stock = i.stock + s.n, updated_at = now()
+    from (select l-&gt;&gt;'id' as item_id, sum(coalesce(nullif(l-&gt;&gt;'qty','')::integer, 0)) as n
+            from jsonb_array_elements(v_lines) l
+           where coalesce(l-&gt;&gt;'id','') &lt;&gt; ''
+           group by 1) s
+   where i.id = s.item_id and i.stock is not null;
+  return jsonb_build_object('ok', true);
+end $$;
+
+grant execute on function sale_put(text, jsonb)       to anon, authenticated;
+grant execute on function sales_get(text, text, text) to anon, authenticated;
+grant execute on function sale_void(text, text)       to anon, authenticated;</pre>
     </li>
     <li>
       <h2>URLとキーをコピーする</h2>
