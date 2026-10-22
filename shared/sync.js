@@ -64,7 +64,25 @@
     return data;
   }
 
+  /* 店長への報告の「種類」。言葉を変えたいときは nm だけ直す。
+     k（req / stock …）は変えないこと。変えると、もう届いている報告の
+     種類が分からなくなる。順番はそのまま画面に並ぶ。 */
+  var CATS = [
+    { k: "req",   nm: "要望",            ic: "🙋" },
+    { k: "stock", nm: "在庫の不足",      ic: "📦" },
+    { k: "fix",   nm: "設備の不具合",      ic: "🔧" },
+    { k: "cust",  nm: "お客さまの声",     ic: "💬" },
+    { k: "shift", nm: "シフトのこと",     ic: "🗓️" },
+    { k: "other", nm: "その他",          ic: "📝" }
+  ];
+  function catOf(k) {
+    for (var i = 0; i < CATS.length; i++) if (CATS[i].k === k) return CATS[i];
+    return { k: "", nm: "未分類", ic: "▫️" };   // 種類が付く前に届いた報告
+  }
+
   root.Sync = {
+    CATS: CATS,
+    catOf: catOf,
     configure: configure, config: config, isOn: isOn, messageFor: messageFor,
     ping: function () { return rpc("shift_ping", {}) },
     submitRequest: function (r) {
@@ -100,7 +118,8 @@
     reportSubmit: function (r) {
       return rpc("report_submit", {
         p_code: (CFG && CFG.code) || "", p_id: r.id,
-        p_name: r.name || "", p_title: r.title || "", p_body: r.body || ""
+        p_name: r.name || "", p_title: r.title || "", p_body: r.body || "",
+        p_cat: r.cat || ""
       });
     },
     reportListMine: function (ids) {

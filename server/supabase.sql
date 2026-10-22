@@ -267,18 +267,26 @@ create table if not exists store_reports (
 );
 create index if not exists store_reports_open on store_reports (replied, created_at);
 
+-- あとから足した「種類」。要望・在庫の不足…を入れる。
+-- 入っていない古い報告は '' のまま＝未分類として出る。
+alter table store_reports add column if not exists cat text not null default '';
+
 alter table store_reports enable row level security;
 -- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
 
 -- スタッフ：報告を送る
-create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text)
+-- 「種類」を足したぶん引数が1つ増えたので、前の形（5つ）は捨ててから作り直す。
+drop function if exists report_submit(text, text, text, text, text);
+create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text,
+                                          p_cat text default '')
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_id text := btrim(coalesce(p_id,''));
 begin
   if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
   if v_id = '' or btrim(coalesce(p_body,'')) = '' then raise exception 'bad_input'; end if;
-  insert into store_reports (id, name, title, body, created_at)
-  values (v_id, btrim(coalesce(p_name,'')), btrim(coalesce(p_title,'')), p_body, now())
+  insert into store_reports (id, name, title, body, cat, created_at)
+  values (v_id, btrim(coalesce(p_name,'')), btrim(coalesce(p_title,'')), p_body,
+          btrim(coalesce(p_cat,'')), now())
   on conflict (id) do nothing;       -- 二重送信はそのまま受け流す
   return jsonb_build_object('ok', true,
     'at', to_char(now() at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'));
@@ -294,7 +302,7 @@ begin
     return jsonb_build_object('ok', true, 'items', '[]'::jsonb);
   end if;
   select coalesce(jsonb_agg(jsonb_build_object(
-           'id', r.id, 'title', r.title, 'body', r.body,
+           'id', r.id, 'title', r.title, 'body', r.body, 'cat', r.cat,
            'reply', r.reply, 'replied', r.replied,
            'at', to_char(r.created_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'),
            'replyAt', case when r.replied_at is null then ''
@@ -313,7 +321,7 @@ declare v_items jsonb;
 begin
   if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
-           'id', r.id, 'name', r.name, 'title', r.title, 'body', r.body,
+           'id', r.id, 'name', r.name, 'title', r.title, 'body', r.body, 'cat', r.cat,
            'at', to_char(r.created_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI')
          ) order by r.created_at), '[]'::jsonb)
     into v_items
@@ -348,7 +356,7 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
-grant execute on function report_submit(text, text, text, text, text) to anon, authenticated;
+grant execute on function report_submit(text, text, text, text, text, text) to anon, authenticated;
 grant execute on function report_cancel(text, text)                   to anon, authenticated;
 grant execute on function report_list_mine(text, jsonb)               to anon, authenticated;
 grant execute on function report_list(text)                           to anon, authenticated;
@@ -468,14 +476,16 @@ begin
     'publishedAt', to_char(v_row.published_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI:SS'));
 end $$;
 
-create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text)
+create or replace function report_submit(p_code text, p_id text, p_name text, p_title text, p_body text,
+                                          p_cat text default '')
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_id text := btrim(coalesce(p_id,''));
 begin
   if not code_ok(p_code) then raise exception 'bad_code'; end if;
   if v_id = '' or btrim(coalesce(p_body,'')) = '' then raise exception 'bad_input'; end if;
-  insert into store_reports (id, name, title, body, created_at)
-  values (v_id, btrim(coalesce(p_name,'')), btrim(coalesce(p_title,'')), p_body, now())
+  insert into store_reports (id, name, title, body, cat, created_at)
+  values (v_id, btrim(coalesce(p_name,'')), btrim(coalesce(p_title,'')), p_body,
+          btrim(coalesce(p_cat,'')), now())
   on conflict (id) do nothing;
   return jsonb_build_object('ok', true,
     'at', to_char(now() at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'));
@@ -490,7 +500,7 @@ begin
     return jsonb_build_object('ok', true, 'items', '[]'::jsonb);
   end if;
   select coalesce(jsonb_agg(jsonb_build_object(
-           'id', r.id, 'title', r.title, 'body', r.body,
+           'id', r.id, 'title', r.title, 'body', r.body, 'cat', r.cat,
            'reply', r.reply, 'replied', r.replied,
            'at', to_char(r.created_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI'),
            'replyAt', case when r.replied_at is null then ''

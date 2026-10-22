@@ -20,6 +20,30 @@ main{max-width:760px;margin:0 auto;padding:14px 14px calc(28px + env(safe-area-i
 .sec{padding:14px 15px}
 .note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:10px 0 0}
 
+/* しぼりこみ（種類・人） */
+.filters{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);padding:11px 12px;margin-bottom:14px}
+.frow{display:flex;gap:9px;align-items:flex-start}
+.frow+.frow{margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+.frow>.fl{flex:0 0 42px;font-size:12px;font-weight:700;color:var(--ink-2);padding-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;flex:1}
+.chips button{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;
+  padding:7px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;line-height:1.2}
+.chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:#fff}
+.chips button .n{font-family:var(--mono);opacity:.75;margin-left:5px;font-size:11.5px}
+@media (max-width:520px){
+  .frow{display:block}
+  .frow>.fl{padding:0 0 7px}
+  .chips button{padding:6px 10px;font-size:12px}
+}
+
+/* 種類ごとの見出し */
+.grp+.grp{margin-top:18px}
+.grp>.gh{display:flex;align-items:baseline;gap:8px;margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+.grp>.gh .t{font-size:13.5px;font-weight:800}
+.grp>.gh .n{font-size:12px;color:var(--ink-3);font-family:var(--mono)}
+.cbadge{display:inline-block;font-size:11.5px;font-weight:700;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+
 .it{border:1px solid var(--line);border-radius:12px;padding:13px 14px;background:var(--surface)}
 .it+.it{margin-top:11px}
 .ih{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
@@ -59,8 +83,13 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
         <button class="btn sm ghost" id="reload">受け取り直す</button>
         <span class="lbl" id="log"></span>
       </div>
+      <div class="filters" id="filters" hidden>
+        <div class="frow"><span class="fl">種類</span><div class="chips" id="fCat"></div></div>
+        <div class="frow"><span class="fl">人</span><div class="chips" id="fWho"></div></div>
+      </div>
       <div id="list"></div>
-      <p class="note">スタッフ用アプリの<b>「店長へ報告」</b>から届きます。<br>
+      <p class="note">種類はスタッフが送るときに選びます。<b>未分類</b>は、種類が付く前に届いたものです。<br>
+        スタッフ用アプリの<b>「店長へ報告」</b>から届きます。<br>
         <b>返事を書いて「返信する」を押すと、この一覧からは消えます。</b>返事はスタッフの画面に出ます。<br>
         返事をしないかぎり消えないので、ここに貯まったままになります。</p>
     </div>
@@ -85,26 +114,112 @@ if(window.Sync) Sync.configure(cfg());
 var items=[], busy=false;
 function hhmm(){ var d=new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2) }
 
+/* しぼりこみ。"" はどちらも「すべて」 */
+var fCat="", fWho="";
+/* 「すべて」を "" で表しているので、未分類は "-" という目印にしておく */
+function catOf(k){ return window.Sync?Sync.catOf(k==="-"?"":k):{k:"-",nm:"未分類",ic:""} }
+
+/* 種類の並び順。最後に「未分類」を置く */
+function catOrder(){
+  var ks=((window.Sync&&Sync.CATS)||[]).map(function(c){ return c.k });
+  ks.push("-");
+  return ks;
+}
+function keyOf(x){ var k=x.cat||"-"; return catOrder().indexOf(k)<0 ? "-" : k }
+
+/* 片方のしぼりこみだけを当てて数える。選んだ側の件数が0にならないようにするため */
+function countBy(pick,other){
+  var n={};
+  items.forEach(function(x){
+    if(!other(x)) return;
+    var k=pick(x); n[k]=(n[k]||0)+1;
+  });
+  return n;
+}
+function chip(val,cur,label,cnt){
+  return '<button type="button" data-v="'+esc(val)+'" aria-pressed="'+(cur===val)+'">'+
+    esc(label)+(cnt==null?"":'<span class="n">'+cnt+'</span>')+'</button>';
+}
+function renderFilters(){
+  var byCat=countBy(keyOf,function(x){ return !fWho||(x.name||"")===fWho });
+  var byWho=countBy(function(x){ return x.name||"" },function(x){ return !fCat||keyOf(x)===fCat });
+
+  var h=chip("",fCat,"すべて",items.length);
+  catOrder().forEach(function(k){
+    if(!byCat[k]) return;                 /* 1件も無い種類は出さない */
+    var c=catOf(k);
+    h+=chip(k,fCat,(c.ic?c.ic+" ":"")+c.nm,byCat[k]);
+  });
+  $("#fCat").innerHTML=h;
+
+  var whos=Object.keys(byWho).sort(function(a,b){ return a.localeCompare(b,"ja") });
+  var h2=chip("",fWho,"すべて",items.length);
+  whos.forEach(function(w){ h2+=chip(w,fWho,w||"（名前なし）",byWho[w]) });
+  $("#fWho").innerHTML=h2;
+}
+
+function card(x,withCat){
+  var c=catOf(keyOf(x));
+  return '<div class="it" data-id="'+esc(x.id)+'">'+
+    '<div class="ih"><span class="who">'+esc(x.name||"（名前なし）")+'</span>'+
+      '<span class="when">'+esc(x.at||"")+'</span></div>'+
+    '<div class="ttl2">'+esc(x.title||"（題名なし）")+'</div>'+
+    '<div class="bd">'+esc(x.body||"")+'</div>'+
+    '<textarea data-reply="'+esc(x.id)+'" placeholder="返事を書く（スタッフの画面に出ます）"></textarea>'+
+    '<div class="ra"><button class="btn sm primary" data-send="'+esc(x.id)+'">返信する</button>'+
+      '<span class="lbl" data-note="'+esc(x.id)+'"></span>'+
+      (withCat?'<span class="cbadge" style="margin-left:auto">'+esc((c.ic?c.ic+" ":"")+c.nm)+'</span>':"")+
+      '</div>'+
+    '</div>';
+}
+
 function render(){
   $("#cnt").textContent=items.length?items.length+"件":"";
   if(!syncOn()){
+    $("#filters").hidden=true;
     $("#list").innerHTML='<div class="empty">まだ置き場所につないでいません。<br>'+
       '<a href="../shift/#cfg">シフト管理 → ⑤設定</a>でつないでください。</div>';
     return;
   }
-  if(!items.length){ $("#list").innerHTML='<div class="empty">返事待ちの報告はありません。</div>'; return }
-  $("#list").innerHTML=items.map(function(x){
-    return '<div class="it" data-id="'+esc(x.id)+'">'+
-      '<div class="ih"><span class="who">'+esc(x.name||"（名前なし）")+'</span>'+
-        '<span class="when">'+esc(x.at||"")+'</span></div>'+
-      '<div class="ttl2">'+esc(x.title||"（題名なし）")+'</div>'+
-      '<div class="bd">'+esc(x.body||"")+'</div>'+
-      '<textarea data-reply="'+esc(x.id)+'" placeholder="返事を書く（スタッフの画面に出ます）"></textarea>'+
-      '<div class="ra"><button class="btn sm primary" data-send="'+esc(x.id)+'">返信する</button>'+
-        '<span class="lbl" data-note="'+esc(x.id)+'"></span></div>'+
-      '</div>';
-  }).join("");
+  if(!items.length){
+    $("#filters").hidden=true;
+    $("#list").innerHTML='<div class="empty">返事待ちの報告はありません。</div>';
+    return;
+  }
+  /* 選んでいた人や種類が、返信してもう無くなっていたら「すべて」に戻す */
+  if(fCat&&!items.some(function(x){ return keyOf(x)===fCat })) fCat="";
+  if(fWho&&!items.some(function(x){ return (x.name||"")===fWho })) fWho="";
+
+  $("#filters").hidden=false;
+  renderFilters();
+
+  var show=items.filter(function(x){
+    return (!fCat||keyOf(x)===fCat) && (!fWho||(x.name||"")===fWho);
+  });
+  if(!show.length){ $("#list").innerHTML='<div class="empty">この組み合わせでは1件もありません。</div>'; return }
+
+  /* 種類を選んでいないときは、種類ごとにまとめて出す */
+  if(fCat){ $("#list").innerHTML=show.map(function(x){ return card(x,true) }).join(""); return }
+  var h="";
+  catOrder().forEach(function(k){
+    var g=show.filter(function(x){ return keyOf(x)===k });
+    if(!g.length) return;
+    var c=catOf(k);
+    h+='<div class="grp"><div class="gh"><span class="t">'+esc((c.ic?c.ic+" ":"")+c.nm)+'</span>'+
+       '<span class="n">'+g.length+'件</span></div>'+
+       g.map(function(x){ return card(x,false) }).join("")+'</div>';
+  });
+  $("#list").innerHTML=h;
 }
+
+$("#fCat").addEventListener("click",function(e){
+  var b=e.target.closest("[data-v]"); if(!b) return;
+  fCat=b.dataset.v; render(); window.scrollTo({top:0});
+});
+$("#fWho").addEventListener("click",function(e){
+  var b=e.target.closest("[data-v]"); if(!b) return;
+  fWho=b.dataset.v; render(); window.scrollTo({top:0});
+});
 
 async function load(quiet){
   if(!syncOn()){ render(); return }
@@ -171,7 +286,7 @@ function setPush(cls,txt,btn,note){
   $("#pushNote").innerHTML=note||"";
 }
 async function renderPush(){
-  if(!PUSH_UI){ var card=$("#pushCard"); if(card) card.hidden=true; return }
+  if(!PUSH_UI){ var pc=$("#pushCard"); if(pc) pc.hidden=true; return }
   $("#pushCard").hidden=false;
   if(!pushSupported()){
     setPush("ng","この端末では通知を出せません","",
