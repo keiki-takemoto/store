@@ -165,7 +165,6 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
   <button class="tab" data-v="req" aria-selected="true">① 届いた希望</button>
   <button class="tab" data-v="cal" aria-selected="false">② 編集</button>
   <button class="tab" data-v="fix" aria-selected="false">③ 確定シフト</button>
-  <button class="tab" data-v="cfg" aria-selected="false">④ 設定</button>
 </div></div></header>
 
 <main>
@@ -237,70 +236,6 @@ pre.out{background:var(--surface-2);border:1px solid var(--line);border-radius:1
       <b>「お知らせ文」</b>を押すと、そのときの状態に合ったLINE用の文章がコピーされます。</p>
   </section>
 
-  <!-- ④ 設定 -->
-  <section class="view" id="v-cfg" data-off>
-    <div class="card">
-      <div class="sec">
-        <h3>スタッフから自動で受け取る（Supabase）</h3>
-        <div class="field">
-          <div><div class="lbl">Project URL</div>
-            <input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" style="width:100%" spellcheck="false"></div>
-          <div><div class="lbl">anon public key</div>
-            <input type="text" id="cfgAnon" placeholder="eyJhbGciOi…" style="width:100%" spellcheck="false"></div>
-          <div class="row">
-            <div style="flex:1;min-width:150px"><div class="lbl">合言葉（スタッフ用）</div><input type="text" id="cfgCode" style="width:100%" spellcheck="false"></div>
-            <div style="flex:1;min-width:150px"><div class="lbl">管理用キー（店長用）</div><input type="text" id="cfgKey" style="width:100%" spellcheck="false"></div>
-          </div>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <button class="btn sm" id="cfgSave">保存してつなぐ</button>
-          <button class="btn sm ghost" id="cfgTest">つながるか試す</button>
-          <span class="lbl" id="cfgState"></span>
-        </div>
-        <p class="note">まだ置き場所を作っていない場合は <a href="./setup.html" target="_blank" rel="noopener">はじめの設定</a>（10分ほど）。
-          つなぐまで、スタッフの希望は届きません。</p>
-        <p class="note">Supabaseの <b>Project Settings → API</b> にある Project URL と anon public key を貼ってください。
-          合言葉の2つは、はじめの設定のページに書いてあります。</p>
-      </div>
-      <div class="sec">
-        <h3>スタッフ</h3>
-        <div id="staffList"></div>
-        <div class="row" style="margin-top:10px">
-          <input type="text" id="newStaff" placeholder="名前を入れて追加" style="flex:1;min-width:140px">
-          <button class="btn sm" id="addStaff">追加</button>
-        </div>
-        <div class="row" id="hiddenRow" hidden style="margin-top:10px">
-          <span class="lbl" style="width:100%">受け取らない名前（削除した人）</span>
-          <span id="hiddenList" class="row" style="gap:6px"></span>
-        </div>
-        <p class="note">名前の左の丸を押すと、その人の色を変えられます。
-          希望を受け取ると、知らない名前は自動で追加されます。
-          削除した人の名前は、あとから同じ名前で届いても取り込みません（上の「戻す」で解除できます）。</p>
-      </div>
-      <div class="sec">
-        <h3>スタッフに配るもの</h3>
-        <div class="row">
-          <button class="btn sm" id="copyStaffUrl">希望を出すページのURLをコピー</button>
-          <button class="btn sm ghost" id="copyAnn">お願いの文面をコピー</button>
-          <button class="btn sm ghost" id="copyRemind">未提出の人への催促文をコピー</button>
-        </div>
-        <p class="note">URLをLINEで配ってください。スタッフはそこで希望を入力して送ります。<br>
-          <b>ホーム画面に追加してもらうときは、必ずこのURLから開いた画面で追加してもらってください。</b>
-          検索やブックマークから開いた画面で追加すると、店長とつながっていない状態になり、送れなくなります。
-          そうなった場合も、スタッフの画面に出る「リンクを貼ってつなぐ」からこのURLを貼れば直ります。</p>
-      </div>
-      <div class="sec">
-        <h3>データ</h3>
-        <div class="row">
-          <button class="btn sm" id="backup">バックアップを保存</button>
-          <button class="btn sm" id="restoreBtn">読み込む</button>
-          <input type="file" id="restoreFile" accept="application/json,.json" hidden>
-          <button class="btn sm danger" id="wipe">全部消す</button>
-        </div>
-        <p class="note">この端末のブラウザの中だけに保存されています。ときどきバックアップを取ってください。</p>
-      </div>
-    </div>
-  </section>
 </main>
 
 <div class="sheet" id="addSheet" hidden><div class="sheet-in" role="dialog" aria-modal="true" aria-label="シフトに入れる">
@@ -785,7 +720,7 @@ function openAdd(d){
 }
 function renderAddList(){
   if(!DB.staff.length){
-    $("#addList").innerHTML='<p class="note">スタッフがまだいません。③設定で追加してください。</p>';
+    $("#addList").innerHTML='<p class="note">スタッフがまだいません。ホーム → 設定 → スタッフ で追加してください。</p>';
     return;
   }
   var M=mon(ym()), key=String(addDay);
@@ -870,14 +805,9 @@ function renderOut(){
         '<td class="mono"'+(off?' style="color:var(--warn)"':'')+'>'+(x.has?off+"日":"—")+'</td></tr>';
     }).join("");
 }
-function download(name,text,type){
-  var url=URL.createObjectURL(new Blob([text],{type:type||"text/plain;charset=utf-8"}));
-  var a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click();
-  setTimeout(function(){ URL.revokeObjectURL(url); a.remove() },1500);
-}
 /* 仮で共有／確定。どちらも同じ場所に上書きし、「仮かどうか」の印だけを添える。 */
 async function publish(draft,btn){
-  if(!syncOn()){ toast("③設定で置き場所につなぐと、スタッフの画面に反映できます"); return }
+  if(!syncOn()){ toast("設定 → 置き場所 でつなぐと、スタッフの画面に反映できます"); return }
   var mth=(view.getMonth()+1);
   if(!confirm(mth+"月のシフトを"+(draft?"「仮」として":"確定として")+"スタッフの画面に出します。よろしいですか？")) return;
   var label=btn.textContent;
@@ -944,172 +874,8 @@ $("#copyShare").addEventListener("click",function(){
     "お知らせ文をコピーしました");
 });
 
-/* ================= ③ 設定 ================= */
-var colorFor=null;   /* 色を選んでいる最中の人 */
-function renderStaff(){
-  if(!DB.staff.length){ $("#staffList").innerHTML='<p class="note">まだ登録がありません。</p>'; return }
-  $("#staffList").innerHTML='<table class="tbl">'+DB.staff.map(function(s){
-    var row='<tr><td><button class="dotbtn" data-col="'+s.id+'" title="色を変える" style="background:'+s.color+'"></button>'+esc(s.name)+'</td>'+
-      '<td style="text-align:right;white-space:nowrap"><button class="btn sm ghost" data-ren="'+s.id+'">名前</button>'+
-      '<button class="btn sm ghost" data-del="'+s.id+'">削除</button></td></tr>';
-    if(colorFor===s.id){
-      row+='<tr><td colspan="2" style="padding-top:0"><div class="swatches">'+
-        COLORS.map(function(c){
-          return '<button class="sw'+(c===s.color?" on":"")+'" data-setcol="'+s.id+'" data-c="'+c+'" style="background:'+c+'"></button>';
-        }).join("")+'</div></td></tr>';
-    }
-    return row;
-  }).join("")+'</table>';
-  renderHidden();
-}
-function renderHidden(){
-  var h=DB.hidden||[];
-  $("#hiddenRow").hidden=!h.length;
-  $("#hiddenList").innerHTML=h.map(function(n){
-    return '<span class="memo">'+esc(n)+' <button class="btn sm ghost" data-unhide="'+esc(n)+'" style="margin-left:4px">戻す</button></span>';
-  }).join("");
-}
-$("#staffList").addEventListener("click",function(e){
-  var cb=e.target.closest("[data-col]"), sc=e.target.closest("[data-setcol]");
-  if(sc){
-    var st2=staffById(sc.dataset.setcol);
-    if(st2){ st2.color=sc.dataset.c; colorFor=null; save(); renderAll(); renderStaff() }
-    return;
-  }
-  if(cb){ colorFor=(colorFor===cb.dataset.col)?null:cb.dataset.col; renderStaff(); return }
-  var r=e.target.closest("[data-ren]"), d=e.target.closest("[data-del]");
-  if(r){ var s=staffById(r.dataset.ren); var v=prompt("名前",s.name); if(v&&v.trim()){ s.name=v.trim(); save(); renderAll(); renderStaff() } }
-  if(d){
-    var st=staffById(d.dataset.del);
-    if(!confirm(st.name+" さんを削除します。この人の希望と割り当ても消えます。\n"+
-      "これから「"+st.name+"」という名前で届く希望も、受け取らないようにします。よろしいですか？")) return;
-    DB.staff=DB.staff.filter(function(x){return x.id!==st.id});
-    Object.keys(DB.months).forEach(function(k){
-      delete DB.months[k].req[st.id];
-      Object.keys(DB.months[k].assign).forEach(function(d2){
-        DB.months[k].assign[d2]=DB.months[k].assign[d2].filter(function(a){return a.s!==st.id});
-      });
-    });
-    DB.hidden=DB.hidden||[];
-    if(!isHidden(st.name)) DB.hidden.push(normName(st.name));
-    save(); renderAll(); renderStaff();
-  }
-});
-$("#hiddenList").addEventListener("click",function(e){
-  var b=e.target.closest("[data-unhide]"); if(!b) return;
-  var n=b.dataset.unhide;
-  DB.hidden=(DB.hidden||[]).filter(function(x){return x!==n});
-  save(); renderStaff(); toast("「"+n+"」の希望をまた受け取ります");
-  if(syncOn()) pull(false);
-});
-$("#addStaff").addEventListener("click",function(){
-  var v=$("#newStaff").value.trim(); if(!v) return;
-  if(staffByName(v)){ toast("同じ名前の人がいます"); return }
-  DB.hidden=(DB.hidden||[]).filter(function(x){return x!==normName(v)});   /* 入れ直したら受け取る */
-  addStaff(v); $("#newStaff").value=""; save(); renderAll(); renderStaff();
-});
-function cfgFields(){
-  return { url:$("#cfgUrl").value.trim(), anon:$("#cfgAnon").value.trim(),
-           code:$("#cfgCode").value.trim(), key:$("#cfgKey").value.trim() };
-}
-function fillCfg(){
-  var d=DB.cfgDraft||DB.sync||{};
-  $("#cfgUrl").value=d.url||""; $("#cfgAnon").value=d.anon||"";
-  $("#cfgCode").value=d.code||""; $("#cfgKey").value=d.key||"";
-}
-/* 打ちかけでも消えないよう、入力のたびに控える。
-   URLとキーがそろっていれば、そのまま接続先として使う（押し忘れで消えないように）。 */
-function stashCfg(){
-  var c=cfgFields();
-  DB.cfgDraft=c;
-  if(c.url&&c.anon){ DB.sync=c; if(window.Sync) Sync.configure(DB.sync); }
-  save(); renderSyncUI();
-}
-function renderSyncUI(){
-  var t="まだつないでいません";
-  if(syncOn()) t="つないでいます（保存ずみ）";
-  else{ var d=DB.cfgDraft||{}; if(d.url||d.anon) t="入力中（ここまでは控えてあります）" }
-  $("#cfgState").textContent=t;
-}
-["#cfgUrl","#cfgAnon","#cfgCode","#cfgKey"].forEach(function(sel){
-  $(sel).addEventListener("input",stashCfg);
-  $(sel).addEventListener("change",stashCfg);
-});
-$("#cfgSave").addEventListener("click",function(){
-  var c=cfgFields();
-  DB.cfgDraft=c;
-  DB.sync=(c.url&&c.anon)?c:null;
-  save(); if(window.Sync) Sync.configure(DB.sync);
-  renderSyncUI(); renderReq(); toast(DB.sync?"保存しました":"接続をやめました");
-  if(DB.sync) pull(false);
-});
-$("#cfgTest").addEventListener("click",async function(){
-  var c=cfgFields();
-  if(!c.url||!c.anon){ toast("URLとanonキーを入れてください"); return }
-  var keep=DB.sync;
-  if(window.Sync) Sync.configure(c);
-  $("#cfgState").textContent="試しています…";
-  try{
-    await Sync.ping(); await Sync.listRequests("");
-    DB.cfgDraft=c; DB.sync=c; save();           /* つながったらそのまま保存する */
-    $("#cfgState").textContent="つながりました（保存しました）";
-  }
-  catch(e){ $("#cfgState").textContent=(e&&e.message)||"つながりませんでした"; if(window.Sync) Sync.configure(keep) }
-});
-function staffUrl(){
-  var base=(location.hostname==="localhost")? location.origin+"/" : STAFF_APP;
-  if(DB.sync&&DB.sync.url&&DB.sync.anon){
-    try{ return base+"?c="+encodeURIComponent(btoa(JSON.stringify({u:DB.sync.url,a:DB.sync.anon,c:DB.sync.code||""}))) }catch(e){}
-  }
-  return base;
-}
-async function copyText(t,msg){
-  try{ await navigator.clipboard.writeText(t); toast(msg||"コピーしました"); return }catch(e){}
-  try{ prompt("コピーしてください",t) }catch(e){ toast("コピーできませんでした") }
-}
-$("#copyStaffUrl").addEventListener("click",function(){ copyText(staffUrl()) });
-$("#copyAnn").addEventListener("click",function(){
-  var nm=new Date(view.getFullYear(),view.getMonth()+1,1);
-  copyText("【"+(nm.getMonth()+1)+"月のシフト希望】\nこちらから入力して送ってください。\n"+staffUrl()+"\n\n締切：今月20日まで");
-});
-$("#copyRemind").addEventListener("click",function(){
-  var M=mon(ym());
-  var yet=DB.staff.filter(function(s){ return !M.req[s.id] }).map(function(s){ return s.name });
-  if(!yet.length){ toast("全員そろっています"); return }
-  copyText(yet.join("さん、")+"さん\n"+(view.getMonth()+1)+"月のシフト希望がまだ届いていません。\nこちらからお願いします。\n"+staffUrl(),
-    yet.length+"人ぶんの催促文をコピーしました");
-});
-$("#backup").addEventListener("click",function(){
-  download("シフト_バックアップ_"+new Date().toISOString().slice(0,10)+".json",JSON.stringify(DB,null,1),"application/json");
-  toast("バックアップを保存しました");
-});
-$("#restoreBtn").addEventListener("click",function(){ $("#restoreFile").click() });
-$("#restoreFile").addEventListener("change",function(){
-  var f=this.files&&this.files[0]; if(!f) return;
-  var r=new FileReader();
-  r.onload=function(){
-    try{
-      var d=JSON.parse(r.result);
-      if(!d||!Array.isArray(d.staff)) throw new Error("形式が違います");
-      if(!confirm("今のデータを、読み込んだ内容で置き換えます。よろしいですか？")) return;
-      DB=d; if(!DB.months) DB.months={};
-      if(DB.needDow&&!DB.closedDow){ DB.closedDow=DB.needDow.map(function(v){return v===0});
-        var nz=DB.needDow.filter(function(v){return v>0}); DB.need=nz.length?nz[0]:2; delete DB.needDow }
-      if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
-      if(typeof DB.need!=="number") DB.need=2;
-      if(!Array.isArray(DB.hidden)) DB.hidden=[];
-      save(); if(DB.sync&&window.Sync) Sync.configure(DB.sync);
-      fillCfg(); renderAll(); renderStaff(); renderSyncUI(); toast("読み込みました");
-    }catch(e){ toast("読み込めませんでした") }
-  };
-  r.readAsText(f); this.value="";
-});
-$("#wipe").addEventListener("click",function(){
-  if(!confirm("スタッフも希望もシフトも、全部消します。取り消せません。よろしいですか？")) return;
-  DB={staff:[],need:2,closedDow:[false,false,false,false,false,false,false],months:{},sync:null,cfgDraft:null,hidden:[]}; save();
-  if(window.Sync) Sync.configure(null);
-  fillCfg(); renderAll(); renderStaff(); renderSyncUI(); toast("消しました");
-});
+/* 設定（つなぎ先・スタッフ・配るもの・データ）は
+   ホーム → 設定 に移した。ここからは触らない。 */
 
 /* ================= 共通 ================= */
 $("#prevM").addEventListener("click",function(){ view.setMonth(view.getMonth()-1); rememberMonth(); renderAll() });
@@ -1117,21 +883,18 @@ $("#nextM").addEventListener("click",function(){ view.setMonth(view.getMonth()+1
 document.querySelector(".tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
   curTab=b.dataset.v;
-  ["req","cal","fix","cfg"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  ["req","cal","fix"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
-  $("#monthbar").hidden=(b.dataset.v==="cfg");
-  if(b.dataset.v==="cfg"){
-    fillCfg(); renderStaff(); renderSyncUI();
-  }
   if(b.dataset.v==="req") pull(true);
   renderStat(); renderReq();
-  if(b.dataset.v!=="cfg") requestAnimationFrame(fitAll);
+  requestAnimationFrame(fitAll);
   window.scrollTo({top:0});
 });
-/* ほかの画面から #cfg のように指定して開けるようにする（設定への案内用） */
+/* ほかの画面から #cal のように指定して開けるようにする */
 (function(){
   var h=String(location.hash||"").replace("#","");
-  if(["req","cal","fix","cfg"].indexOf(h)<0) return;
+  if(h==="cfg"){ location.replace("../settings/#conn"); return }   /* 設定は引っ越した */
+  if(["req","cal","fix"].indexOf(h)<0) return;
   var t=document.querySelector('.tab[data-v="'+h+'"]');
   if(t) setTimeout(function(){ t.click() },0);
 })();
@@ -1142,7 +905,7 @@ function toast(m){
   clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3200);
 }
 function renderAll(){ renderCal(); renderReq(); renderOut(); renderPub(); }
-fillCfg(); renderAll(); renderSyncUI();
+renderAll();
 if(syncOn()) pull(true);
 /* 新しい版が出ていたら、アプリに戻ってきたときに自動で入れ替える。
    ホーム画面のアプリは、閉じずに切り替えて戻るとページが読み直されず、

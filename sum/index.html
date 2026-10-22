@@ -189,7 +189,7 @@ async function load(quiet){
     if(!r.connected){
       rows=[]; $("#body").hidden=true; $("#noneCard").hidden=false;
       $("#noneMsg").innerHTML='まだ置き場所につないでいません。<br>'+
-        '<a href="../shift/#cfg">シフト管理 → ④設定</a>でつないでください。';
+        '<a href="../settings/#conn">設定 → 置き場所</a>でつないでください。';
       $("#log").textContent="";
       busy=false; return;
     }

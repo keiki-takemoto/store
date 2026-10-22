@@ -262,7 +262,7 @@ function hhmm(){ var d=new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+
 function today(){ var d=new Date();
   return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2) }
 
-/* つなぎ先と名簿は シフト管理 → ④設定、商品とお客様の種類は 設定 のものを借りている */
+/* つなぎ先・名簿・商品・お客様の種類は、どれも 設定 の画面のものを借りている */
 var K_SHIFT="shiftadmin.v1", K_ITEM="storeitems.v1", K_GUEST="storeguests.v1", K_REG="storereg.v1";
 function shiftDb(){ try{ return JSON.parse(localStorage.getItem(K_SHIFT))||{} }catch(e){ return {} } }
 function cfg(){ var v=shiftDb(); return v.sync||null }

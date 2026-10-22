@@ -448,7 +448,7 @@ function renderSync(){
   var s=Books.status();
   if(!s.on){
     $("#syncState").innerHTML="いまは<b>この端末だけ</b>に入っています。ほかの端末と同じにするには、"+
-      '<a href="../shift/#cfg">シフト管理 → ③設定</a>でつないでください。';
+      '<a href="../settings/#conn">設定 → 置き場所</a>でつないでください。';
     $("#syncNow").hidden=true; return;
   }
   $("#syncNow").hidden=false; $("#syncState").textContent=s.text;

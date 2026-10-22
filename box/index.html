@@ -103,7 +103,7 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 
-/* つなぎ先はシフト管理の⑤設定で入れたものを、そのまま借りている */
+/* つなぎ先は 設定 → 置き場所 で入れたものを、そのまま借りている */
 var K_SHIFT="shiftadmin.v1";
 function cfg(){
   try{ var v=JSON.parse(localStorage.getItem(K_SHIFT)); return (v&&v.sync)||null }catch(e){ return null }
@@ -178,7 +178,7 @@ function render(){
   if(!syncOn()){
     $("#filters").hidden=true;
     $("#list").innerHTML='<div class="empty">まだ置き場所につないでいません。<br>'+
-      '<a href="../shift/#cfg">シフト管理 → ⑤設定</a>でつないでください。</div>';
+      '<a href="../settings/#conn">設定 → 置き場所</a>でつないでください。</div>';
     return;
   }
   if(!items.length){
@@ -301,7 +301,7 @@ async function renderPush(){
   }
   if(!syncOn()){
     setPush("ng","まだ置き場所につないでいません","",
-      '<a href="../shift/#cfg">シフト管理 → ④設定</a>でつないでください。');
+      '<a href="../settings/#conn">設定 → 置き場所</a>でつないでください。');
     return;
   }
   var reg=null;
