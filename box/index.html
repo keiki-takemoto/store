@@ -43,7 +43,7 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 <a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
 
 <main>
-  <div class="card">
+  <div class="card" id="pushCard" hidden>
     <div class="card-h"><h2>通知</h2></div>
     <div class="sec">
       <div id="pushState" class="off">—</div>
@@ -141,7 +141,13 @@ $("#list").addEventListener("click",async function(e){
   }
 });
 
-/* ---------- スマホへの通知 ---------- */
+/* ---------- スマホへの通知（いまは止めてある） ---------- */
+/* ホーム画面に追加したPWAでは、iPhoneに通知が届くところまで持っていけなかった。
+   いったん画面から隠してある。仕組みは消していないので、
+   App Store にアプリとして出すときに PUSH_UI を true に戻せば、また画面が出る。
+   サーバー側は server/notify/index.ts と、server/supabase.sql の store_push。 */
+var PUSH_UI=false;
+
 /* 公開してよいほうのかぎ。秘密のかぎは Supabase の Edge Function にだけ置く。 */
 var VAPID_PUBLIC="BI4XfIE1XB9Di8C1KYEBtcPLcSDC0MfQzy9UhuBa8v5aExgzlwyvKE26w6Onf67A8sNHNBVpyOQeO_n5AJ3vt2c";
 function b64ToBytes(b64){
@@ -165,6 +171,8 @@ function setPush(cls,txt,btn,note){
   $("#pushNote").innerHTML=note||"";
 }
 async function renderPush(){
+  if(!PUSH_UI){ var card=$("#pushCard"); if(card) card.hidden=true; return }
+  $("#pushCard").hidden=false;
   if(!pushSupported()){
     setPush("ng","この端末では通知を出せません","",
       "通知はiPhoneなら iOS 16.4 以降で使えます。パソコンのブラウザでも出せます。");
