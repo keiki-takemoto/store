@@ -53,7 +53,8 @@ pre.code{background:var(--surface-2);border:1px solid var(--line);border-radius:
       <h2>下のSQLを貼って実行する</h2>
       <p>左メニューの <span class="pick">SQL Editor</span> → <span class="pick">New query</span> に、下のSQLを全部貼って
         <span class="pick">Run</span>（⌘+Enter）。「Success. No rows returned」と出れば完了です。</p>
-      <div class="row" style="margin-bottom:8px"><button class="btn sm" id="copyCode">SQLをコピー</button></div>
+      <div class="row" style="margin-bottom:8px"><button class="btn sm" id="copyCode">SQLをコピー</button>
+        <span class="lbl" id="codeState"></span></div>
       <pre class="code" id="code">-- シフト管理の置き場所（Supabase）
 -- Supabaseの SQL Editor に貼って Run するだけ。何度流しても大丈夫。
 --
@@ -835,6 +836,23 @@ grant execute on function meta_put(text, text, jsonb) to anon, authenticated;</p
   </div>
 </main>
 <script>
+/* このページは端末に貯めてある（オフラインでも開けるように）。
+   そのままだと、アプリを直したあとも古いSQLを配ってしまうことがあるので、
+   開くたびに大もとのファイルを取り直して、新しければ入れ替える。 */
+(function(){
+  var pre=document.getElementById("code"), st=document.getElementById("codeState");
+  fetch("../server/supabase.sql?x="+Date.now(),{cache:"no-store"}).then(function(r){
+    if(!r.ok) throw 0; return r.text();
+  }).then(function(t){
+    t=t.replace(/\n+$/,"");
+    if(!/create table/.test(t)) throw 0;
+    var same=(pre.textContent.replace(/\n+$/,"")===t);
+    if(!same) pre.textContent=t;
+    st.textContent=same?"最新です":"新しい内容に入れ替えました";
+  }).catch(function(){
+    st.textContent="（つながらないので、この端末にある内容を使います）";
+  });
+})();
 document.getElementById("copyCode").addEventListener("click",async function(){
   try{ await navigator.clipboard.writeText(document.getElementById("code").textContent); this.textContent="コピーしました" }
   catch(e){ this.textContent="コピーできません。手で選んでください" }
