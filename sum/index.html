@@ -72,10 +72,36 @@ th{font-size:11.5px;color:var(--ink-3);font-weight:600;letter-spacing:.04em;whit
 td.n,th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
 td.d{font-family:var(--mono);white-space:nowrap}
 td.d small{color:var(--ink-3);margin-left:4px}
-td.d.sun,td.d.sun small{color:var(--sun)}
-td.d.sat,td.d.sat small{color:var(--sat)}
-tr.zero td{color:var(--ink-3)}
 tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
+
+/* 売上集計（枠つきの表）。日を押すとその日の中身が開く */
+table.grid{border:1px solid var(--line);table-layout:fixed}
+table.grid th,table.grid td{border:1px solid var(--line);padding:11px 9px}
+table.grid thead th{background:var(--surface-2);color:var(--ink);font-size:13px;font-weight:700;
+  text-align:center;line-height:1.35}
+table.grid thead th small{display:block;font-size:10.5px;color:var(--ink-3);font-weight:500;
+  font-family:var(--mono)}
+table.grid tbody tr:nth-child(4n+3){background:var(--surface-2)}   /* 1行が2つのtrなので4つおき */
+table.grid tbody tr.open{background:var(--accent-2)}
+table.grid td.day{font-size:14px;font-weight:700;white-space:normal;line-height:1.35}
+table.grid td.day .sun{color:var(--sun)} table.grid td.day .sat{color:var(--sat)}
+table.grid td.v{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;
+  font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.grid td.go{width:28px;text-align:center;color:var(--ink-3);padding:0 2px;
+  font-family:var(--mono);font-size:15px}
+table.grid tr.can{cursor:pointer}
+table.grid td.inner{padding:0;background:var(--surface)}
+table.grid tfoot td{background:var(--surface-2);font-weight:800}
+.daybox{padding:12px 13px 14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px}
+.chips span{font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:999px;padding:5px 11px}
+.chips span b{font-family:var(--mono);color:var(--ink);margin-left:5px}
+.daybox h4{font-size:12px;color:var(--ink-3);font-weight:600;margin:0 0 7px;letter-spacing:.04em}
+.who{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.who span{font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:8px;padding:5px 10px}
+.who span b{font-family:var(--mono);margin-left:6px}
 
 /* 内訳の棒 */
 .bars{display:flex;flex-direction:column;gap:9px}
@@ -155,14 +181,10 @@ tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
       <div class="card"><div class="sec"><div class="kpis" id="kpis"></div></div></div>
 
       <div class="card"><div class="sec">
-        <h3 id="tblTitle">日ごと</h3>
+        <h3 id="tblTitle">売上集計</h3>
         <div id="byUnit"></div>
-      </div></div>
-
-      <div class="card"><div class="sec">
-        <h3>会計の一覧<span class="lbl" style="margin-left:8px">押すと中身が開きます</span></h3>
-        <div id="list"></div>
-        <p class="note">打ち間違えた会計は、中身を開いて<b>取り消す</b>を押してください。
+        <p class="note">日にちを押すと、その日の<b>担当ごとの売上</b>と<b>会計の一覧</b>が開きます。<br>
+          打ち間違えた会計は、そこから中身を開いて<b>取り消す</b>を押してください。
           売上から外れ、在庫も戻ります（在庫を入れている商品だけ）。<br>
           金額はすべて<b>税込</b>です。<b>粗利</b>は 売上 − 仕入れ値 で出しています（人件費や経費は含みません）。</p>
       </div></div>
@@ -403,22 +425,7 @@ function render(){
     kpi((unit==="day")?"売れた日":"売れた月",used+((unit==="day")?"日":"か月"),
         used?("1"+((unit==="day")?"日":"か月")+" "+yen(amt/used)):"");
 
-  /* 日ごと／月ごとの表 */
-  $("#byUnit").innerHTML=
-    '<table><thead><tr><th>'+((unit==="day")?"日":"月")+'</th><th class="n">売上</th>'+
-    '<th class="n">客数</th><th class="n">客単価</th><th class="n">粗利</th></tr></thead><tbody>'+
-    bs.map(function(b){
-      var cls=(b.dow===0)?" sun":(b.dow===6)?" sat":"";
-      return '<tr'+(b.n?"":' class="zero"')+'>'+
-        '<td class="d'+cls+'">'+esc(b.label)+'<small>'+esc(b.sub)+'</small></td>'+
-        '<td class="n">'+(b.n?yen(b.amt):"—")+'</td>'+
-        '<td class="n">'+(b.n?b.n:"—")+'</td>'+
-        '<td class="n">'+(b.n?yen(b.amt/b.n):"—")+'</td>'+
-        '<td class="n">'+(b.n?yen(b.amt-b.cost):"—")+'</td></tr>';
-    }).join("")+
-    '</tbody><tfoot><tr><td>合計</td><td class="n">'+yen(amt)+'</td><td class="n">'+list.length+
-    '</td><td class="n">'+yen(list.length?amt/list.length:0)+'</td><td class="n">'+yen(gro)+
-    '</td></tr></tfoot></table>';
+  renderUnit(bs,amt,list.length);
 
   /* 商品ごと */
   var im={}, io=[];
@@ -479,14 +486,83 @@ function render(){
   var hTop=hours.reduce(function(m,x){ return Math.max(m,x.amt) },0);
   bars($("#byHour"),hours,hTop);
 
-  renderList();
 }
+
+/* ---------- 売上集計の表 ---------- */
+/* 売れた日だけを並べる。押すとその日の中身が下に開く。 */
+var openDay="";
+function renderUnit(bs,amt,cnt){
+  var used=bs.filter(function(b){ return b.n });
+  if(!used.length){
+    $("#byUnit").innerHTML='<div class="empty">この期間に会計はありません。</div>';
+    return;
+  }
+  var canOpen=(unit==="day");
+  if(openDay && !used.some(function(b){ return b.key===openDay })) openDay="";
+
+  $("#byUnit").innerHTML=
+    '<table class="grid"><thead><tr>'+
+      '<th style="width:27%">集計<br>期間</th>'+
+      '<th>売上<small>[a]</small></th>'+
+      '<th style="width:17%">客数<small>[c]</small></th>'+
+      '<th style="width:22%">客単価<small>(a÷c)</small></th>'+
+      (canOpen?'<th style="width:28px"></th>':"")+
+    '</tr></thead><tbody>'+
+    used.map(function(b){
+      var cls=(b.dow===0)?"sun":(b.dow===6)?"sat":"";
+      var when=(unit==="day")
+        ? '<span class="'+cls+'">'+month+"/"+esc(b.label)+"("+esc(b.sub)+")"+'</span>'
+        : esc(b.label)+"月";
+      var row='<tr class="'+(canOpen?"can ":"")+(openDay===b.key?"open":"")+'" data-day="'+esc(b.key)+'">'+
+        '<td class="day">'+when+'</td>'+
+        '<td class="v">'+yen(b.amt)+'</td>'+
+        '<td class="v">'+b.n+'</td>'+
+        '<td class="v">'+yen(b.amt/b.n)+'</td>'+
+        (canOpen?'<td class="go">'+(openDay===b.key?"⌃":"›")+'</td>':"")+
+      '</tr>';
+      /* 開いている日の中身。表の中に入れるので、列ぜんぶをまたぐ1マスにする */
+      var inner=(canOpen&&openDay===b.key)
+        ? '<tr><td class="inner" colspan="5">'+dayBox(b)+'</td></tr>'
+        : '<tr hidden><td></td></tr>';
+      return row+inner;
+    }).join("")+
+    '</tbody><tfoot><tr><td class="day">合計</td>'+
+      '<td class="v">'+yen(amt)+'</td><td class="v">'+cnt+'</td>'+
+      '<td class="v">'+yen(cnt?amt/cnt:0)+'</td>'+(canOpen?'<td class="go"></td>':"")+
+    '</tr></tfoot></table>';
+}
+/* 押した日の中身 */
+function dayBox(b){
+  var day=ok().filter(function(s){ return s.day===b.key });
+  var disc=0; day.forEach(function(s){ disc+=s.discount });
+  var st=group(day,function(s){ return s.staff },"（担当なし）");
+  return '<div class="daybox">'+
+    '<div class="chips">'+
+      '<span>粗利<b>'+yen(b.amt-b.cost)+'</b></span>'+
+      '<span>点数<b>'+b.qty+'点</b></span>'+
+      (disc?'<span>値引き<b>−'+yen(disc)+'</b></span>':"")+
+    '</div>'+
+    '<h4>担当ごと</h4>'+
+    '<div class="who">'+st.map(function(x){
+      return '<span>'+esc(x.name)+'<b>'+yen(x.amt)+'</b> <small style="color:var(--ink-3)">'+
+        x.n+'件</small></span>';
+    }).join("")+'</div>'+
+    '<h4>会計の一覧</h4>'+
+    '<div id="list">'+listHtml(rows.filter(function(s){ return s.day===b.key }))+'</div>'+
+    '</div>';
+}
+$("#byUnit").addEventListener("click",function(e){
+  if(e.target.closest("#list")) return;            /* 会計の行は下の処理にまかせる */
+  var tr=e.target.closest("tr.can"); if(!tr) return;
+  var k=tr.dataset.day;
+  openDay=(openDay===k)?"":k;
+  render();
+});
 
 /* ---------- 会計の一覧 ---------- */
 var open={};
-function renderList(){
-  var list=rows.slice(0,300);
-  $("#list").innerHTML=list.length
+function listHtml(list){
+  return list.length
     ? list.map(function(s){
         var sub=[s.staff||"—", s.guest, ((s.pay==="card")?"カード":"現金"), s.qty+"点"]
           .filter(Boolean).join("・");
@@ -507,9 +583,9 @@ function renderList(){
             : '<button class="btn sm danger" data-void="'+esc(s.id)+'">この会計を取り消す</button>')+
           '</div></div>';
       }).join("")
-    : '<div class="empty">この期間に会計はありません。</div>';
+    : '<div class="empty">この日に会計はありません。</div>';
 }
-$("#list").addEventListener("click",async function(e){
+$("#byUnit").addEventListener("click",async function(e){
   var v=e.target.closest("[data-void]");
   if(v){
     var s=rows.filter(function(x){ return x.id===v.dataset.void })[0]; if(!s) return;
@@ -522,7 +598,7 @@ $("#list").addEventListener("click",async function(e){
   var r=e.target.closest(".r"); if(!r) return;
   var id=r.dataset.id;
   if(open[id]) delete open[id]; else open[id]=1;
-  renderList();
+  render();
 });
 
 /* ---------- 共通 ---------- */
