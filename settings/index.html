@@ -42,7 +42,11 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
 .ri-sub{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12.5px;color:var(--ink-3)}
 .dot{width:12px;height:12px;border-radius:999px;display:inline-block;flex-shrink:0}
 /* 色を変えるボタン（押すと色見本が出る） */
-button.dot{width:17px;height:17px;border:1px solid var(--line-2);cursor:pointer;padding:0}
+/* 丸そのものは小さいままで、まわりに余白を足して押しやすくする */
+button.dot{width:17px;height:17px;border:1px solid var(--line-2);cursor:pointer;padding:0;
+  background-clip:content-box;box-sizing:content-box;border-width:1px;
+  outline-offset:4px;position:relative}
+button.dot::after{content:"";position:absolute;left:-9px;top:-9px;right:-9px;bottom:-9px}
 .swatches{display:flex;flex-wrap:wrap;gap:7px;padding:8px 0 4px}
 .swatches button{width:30px;height:30px;border-radius:999px;border:2px solid transparent;cursor:pointer;padding:0}
 .swatches button.on{border-color:var(--ink)}
