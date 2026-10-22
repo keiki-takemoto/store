@@ -151,6 +151,13 @@
     saleVoid: function (id) {
       return rpc("sale_void", { p_key: (CFG && CFG.key) || "", p_id: id });
     },
+    /* ちょっとした設定（お客様の種類の一覧など）。店長用キーだけ */
+    metaGet: function (k) {
+      return rpc("meta_get", { p_key: (CFG && CFG.key) || "", p_k: k });
+    },
+    metaPut: function (k, v) {
+      return rpc("meta_put", { p_key: (CFG && CFG.key) || "", p_k: k, p_v: v });
+    },
     /* スマホへの通知。登録と解除は店長用キー */
     pushPut: function (sub, label) {
       var k = (sub && sub.keys) || {};

@@ -660,6 +660,7 @@ create table if not exists store_sales (
   id         text primary key,                   -- 端末で作る。二度送っても増えない
   at         timestamptz not null default now(), -- 会計した時刻
   staff      text    not null default '',        -- 誰が売ったか
+  guest      text    not null default '',        -- お客様の種類（設定で足した言葉がそのまま入る）
   pay        text    not null default 'cash',    -- cash（現金）／card（カード）
   subtotal   integer not null default 0,         -- 値引き前
   discount   integer not null default 0,         -- 値引き
@@ -672,6 +673,9 @@ create table if not exists store_sales (
   created_at timestamptz not null default now()
 );
 create index if not exists store_sales_at on store_sales (at);
+
+-- あとから足した列。前に作ってあっても足りるようにしておく。
+alter table store_sales add column if not exists guest text not null default '';
 
 alter table store_sales enable row level security;
 -- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
@@ -686,10 +690,11 @@ begin
   if p_rows is null or jsonb_typeof(p_rows) &lt;&gt; 'array' then raise exception 'bad_input'; end if;
 
   with ins as (
-    insert into store_sales (id, at, staff, pay, subtotal, discount, total, cost, qty, lines, note)
+    insert into store_sales (id, at, staff, guest, pay, subtotal, discount, total, cost, qty, lines, note)
     select x-&gt;&gt;'id',
            coalesce(nullif(x-&gt;&gt;'at','')::timestamptz, now()),
            btrim(coalesce(x-&gt;&gt;'staff','')),
+           btrim(coalesce(x-&gt;&gt;'guest','')),
            case when x-&gt;&gt;'pay' = 'card' then 'card' else 'cash' end,
            coalesce(nullif(x-&gt;&gt;'subtotal','')::integer, 0),
            coalesce(nullif(x-&gt;&gt;'discount','')::integer, 0),
@@ -730,7 +735,7 @@ begin
   v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
   -- 日付は日本時間で見る（サーバーのUTCで切ると、夜の会計が前の日に入ってしまう）
   select coalesce(jsonb_agg(jsonb_build_object(
-           'id', s.id, 'staff', s.staff, 'pay', s.pay,
+           'id', s.id, 'staff', s.staff, 'guest', s.guest, 'pay', s.pay,
            'subtotal', s.subtotal, 'discount', s.discount, 'total', s.total,
            'cost', s.cost, 'qty', s.qty, 'lines', s.lines, 'note', s.note,
            'voided', s.voided,
@@ -765,7 +770,31 @@ end $$;
 
 grant execute on function sale_put(text, jsonb)       to anon, authenticated;
 grant execute on function sales_get(text, text, text) to anon, authenticated;
-grant execute on function sale_void(text, text)       to anon, authenticated;</pre>
+grant execute on function sale_void(text, text)       to anon, authenticated;
+
+-- 店長：ちょっとした設定を置いておく（お客様の種類の一覧など）
+-- 表は store_items のところで作った store_meta をそのまま使う。
+create or replace function meta_get(p_key text, p_k text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v jsonb;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  select store_meta.v into v from store_meta where k = p_k;
+  return jsonb_build_object('ok', true, 'v', coalesce(v, 'null'::jsonb));
+end $$;
+
+create or replace function meta_put(p_key text, p_k text, p_v jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if btrim(coalesce(p_k,'')) = '' then raise exception 'bad_input'; end if;
+  insert into store_meta (k, v, updated_at) values (p_k, coalesce(p_v,'null'::jsonb), now())
+  on conflict (k) do update set v = excluded.v, updated_at = now();
+  return jsonb_build_object('ok', true);
+end $$;
+
+grant execute on function meta_get(text, text)        to anon, authenticated;
+grant execute on function meta_put(text, text, jsonb) to anon, authenticated;</pre>
     </li>
     <li>
       <h2>URLとキーをコピーする</h2>

@@ -82,6 +82,7 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 <header class="top"><div class="top-in"><div class="tabs">
   <button class="tab" data-v="staff" aria-selected="true">スタッフ</button>
   <button class="tab" data-v="item" aria-selected="false">商品</button>
+  <button class="tab" data-v="reg" aria-selected="false">レジ</button>
 </div></div></header>
 
 <main>
@@ -157,6 +158,26 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
         <p class="note">お店の原価表（<b>794点</b>）をこの画面に入れ直します。<br>
           同じ商品があれば<b>商品No・商品名・売価・仕入れ値</b>を原価表の内容に合わせます。<b>カテゴリーと在庫の数はそのまま残ります。</b><br>
           原価表に無い商品が消えることはありません。売価と仕入れ値はどちらも<b>税込</b>です。</p>
+      </div>
+    </div>
+  </section>
+  <!-- レジ -->
+  <section class="view" id="v-reg" data-off>
+    <div class="card">
+      <div class="card-h"><h2>お客様の種類</h2><span class="hint" id="gCount"></span></div>
+      <div class="sec">
+        <div class="syncbar"><span id="gState">—</span></div>
+        <div id="gList"></div>
+        <div id="gEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
+        <div class="addbox">
+          <input type="text" id="newGuest" placeholder="例）外国のお客さま" autocomplete="off">
+          <button class="btn sm primary" id="addGuest">追加</button>
+        </div>
+        <p class="note">レジで会計するとき、ここに入れた言葉から<b>ひとつ選ぶ</b>形になります。<br>
+          どんな言葉でも構いません（例：日本人／外国のお客さま／団体／学校）。<br>
+          <b>▲▼</b>でレジに出る並び順を変えられます。<b>消す</b>と、これからの会計では選べなくなります。
+          すでに記録した会計はそのまま残ります。<br>
+          ひとつも入れないときは、レジで種類を選ぶ画面が出ません。</p>
       </div>
     </div>
   </section>
@@ -677,10 +698,62 @@ $("#impBtn").addEventListener("click",function(){
   }).then(function(){ b.disabled=false });
 });
 
+/* ---------- お客様の種類（レジで選ぶ言葉） ---------- */
+/* 置き場所の store_meta に "guests" という名前で預ける。
+   レジはこれを読んで、会計のときに選ばせる。 */
+var K_GUEST="storeguests.v1";
+var GUESTS=[];
+try{ var gv=JSON.parse(localStorage.getItem(K_GUEST)); if(Array.isArray(gv)) GUESTS=gv }catch(e){}
+function saveGuests(){ try{ localStorage.setItem(K_GUEST,JSON.stringify(GUESTS)) }catch(e){} }
+
+function renderGuests(){
+  $("#gCount").textContent=GUESTS.length?GUESTS.length+"種類":"";
+  $("#gEmpty").hidden=!!GUESTS.length;
+  $("#gList").innerHTML=GUESTS.map(function(n,i){
+    return '<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)">'+
+      '<span style="flex:1;font-weight:700">'+esc(n)+'</span>'+
+      '<button class="btn sm ghost" data-gu="'+i+'"'+(i===0?" disabled":"")+'>▲</button>'+
+      '<button class="btn sm ghost" data-gd="'+i+'"'+(i===GUESTS.length-1?" disabled":"")+'>▼</button>'+
+      '<button class="btn sm ghost" data-gx="'+i+'">消す</button></div>';
+  }).join("");
+  $("#gState").textContent = syncOn() ? "ほかの端末とも同じにしています" : "この端末だけに入っています";
+}
+function pushGuests(){
+  saveGuests(); renderGuests();
+  if(!syncOn()) return;
+  Sync.metaPut("guests",GUESTS).then(function(){
+    $("#gState").textContent="ほかの端末とも同じにしています";
+  }).catch(function(e){
+    $("#gState").textContent="送れませんでした："+((e&&e.message)||"");
+  });
+}
+$("#addGuest").addEventListener("click",function(){
+  var n=$("#newGuest").value.trim();
+  if(!n){ $("#newGuest").focus(); return }
+  if(GUESTS.indexOf(n)>=0){ toast("もう入っています"); return }
+  GUESTS.push(n); $("#newGuest").value=""; pushGuests();
+});
+$("#newGuest").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addGuest").click() });
+$("#gList").addEventListener("click",function(e){
+  var u=e.target.closest("[data-gu]"), d=e.target.closest("[data-gd]"), x=e.target.closest("[data-gx]");
+  if(u){ var i=+u.dataset.gu; GUESTS.splice(i-1,0,GUESTS.splice(i,1)[0]); pushGuests(); return }
+  if(d){ var j=+d.dataset.gd; GUESTS.splice(j+1,0,GUESTS.splice(j,1)[0]); pushGuests(); return }
+  if(x){ var k=+x.dataset.gx;
+    if(!confirm("「"+GUESTS[k]+"」を消します。よろしいですか？")) return;
+    GUESTS.splice(k,1); pushGuests(); }
+});
+function pullGuests(){
+  if(!syncOn()) return Promise.resolve();
+  return Sync.metaGet("guests").then(function(r){
+    if(Array.isArray(r&&r.v)){ GUESTS=r.v.slice(); saveGuests() }
+    renderGuests();
+  }).catch(function(){});
+}
+
 /* ---------- 共通 ---------- */
 document.querySelector(".tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
-  ["staff","item"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  ["staff","item","reg"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   window.scrollTo({top:0});
 });
@@ -695,10 +768,10 @@ document.addEventListener("visibilitychange",function(){
   if(document.visibilityState!=="visible") return;
   DB=loadShift(); IT=loadItems();
   if(window.Sync) Sync.configure(DB.sync&&DB.sync.url?DB.sync:null);
-  renderStaff(); renderItems();
-  if(syncOn()) syncNow(true);
+  renderStaff(); renderItems(); renderGuests();
+  if(syncOn()){ syncNow(true); pullGuests() }
 });
-renderStaff(); renderItems();
+renderStaff(); renderItems(); renderGuests(); pullGuests();
 
 /* まだ1点も入っていなければ、原価表を自動で入れておく */
 function autoSeed(){
