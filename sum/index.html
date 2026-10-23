@@ -56,14 +56,6 @@ h3{font-size:13px;color:var(--ink-2);margin:0 0 10px}
   margin-right:5px;vertical-align:-1px}
 .legend .ln i{height:3px;border-radius:2px;background:var(--ink-3);vertical-align:3px}
 
-/* 数字の並び */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:9px}
-.kpi{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
-.kpi .k{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
-.kpi .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:23px;font-weight:800;line-height:1.35}
-.kpi .s{font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
-.kpi.gro .v{color:var(--ok)}
-
 /* 表 */
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th,td{padding:9px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
@@ -176,8 +168,6 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
           <div class="legend"><span><i></i>売上</span><span class="ln"><i></i>客数（会計の件数）</span></div>
         </div>
       </div></div>
-
-      <div class="card"><div class="sec"><div class="kpis" id="kpis"></div></div></div>
 
       <div class="card"><div class="sec">
         <h3 id="tblTitle">売上集計</h3>
@@ -383,10 +373,6 @@ function chart(bs){
 }
 
 /* ---------- 描く ---------- */
-function kpi(k,v,s,cls){
-  return '<div class="kpi'+(cls?" "+cls:"")+'"><div class="k">'+esc(k)+'</div>'+
-    '<div class="v">'+esc(v)+'</div>'+(s?'<div class="s">'+esc(s)+'</div>':"")+'</div>';
-}
 function bars(el,list,top,fmt){
   if(!list.length){ el.innerHTML='<span class="lbl">ありません</span>'; return }
   el.innerHTML=list.map(function(g,i){
@@ -407,20 +393,11 @@ function render(){
   $("#body").hidden=false;
 
   var list=ok(), bs=buckets();
-  var amt=0, cost=0, qty=0, disc=0;
-  list.forEach(function(s){ amt+=s.total; cost+=s.cost; qty+=s.qty; disc+=s.discount });
-  var gro=amt-cost;
+  var amt=0;
+  list.forEach(function(s){ amt+=s.total });
 
   $("#chart").innerHTML=chart(bs);
   $("#gBox").hidden=!showGraph;
-
-  $("#kpis").innerHTML=
-    kpi("売上",yen(amt),list.length+"件")+
-    kpi("客単価",yen(list.length?amt/list.length:0),"1件あたり")+
-    kpi("点数",qty+"点",(list.length?(qty/list.length).toFixed(1):"0")+"点／件")+
-    kpi("粗利",yen(gro),(amt?Math.round(gro/amt*100):0)+"%","gro")+
-    kpi("仕入れ値",yen(cost),"売れたぶん")+
-    kpi("値引き",yen(disc),"合計");
 
   renderUnit(bs,amt,list.length);
 
