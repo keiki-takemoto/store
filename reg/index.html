@@ -354,6 +354,16 @@ function renderBar(){
 $("#bStaff").addEventListener("click",function(){ show("staff") });
 $("#bGuest").addEventListener("click",function(){ show("guest") });
 
+/* しばらく使っていなかったら、担当を聞き直す。
+   9:10〜13:00 と 13:00〜17:00 のように交代があるので、
+   前の人のままだと来店も会計もその人のぶんになってしまう。 */
+var ASK_AFTER=45*60*1000;
+function staleStaff(){
+  var t=Number(REG.lastAt||0);
+  return !t || (Date.now()-t)>ASK_AFTER;
+}
+function touchStaff(){ REG.lastAt=Date.now(); saveReg() }
+
 /* ---------- ① 担当 ---------- */
 function staffList(){
   var db=shiftDb(), hid=db.hidden||[];
@@ -372,7 +382,7 @@ function renderStaffOpts(){
 }
 $("#staffOpts").addEventListener("click",function(e){
   var b=e.target.closest("[data-s]"); if(!b) return;
-  REG.staff=b.dataset.s; saveReg(); renderBar();
+  REG.staff=b.dataset.s; touchStaff(); renderBar();
   show(GUESTS.length?"guest":"till");
 });
 
@@ -542,7 +552,7 @@ $("#payBtn").addEventListener("click",function(){
     subtotal:s.sub, discount:s.disc, total:s.total, cost:s.cost, qty:s.qty,
     lines:cart.map(function(l){ return {id:l.id,no:l.no,name:l.name,price:l.price,cost:l.cost,qty:l.qty} }),
     note:"", voided:false };
-  REG.sales.unshift(sale); saveReg();
+  REG.sales.unshift(sale); saveReg(); touchStaff();
   lastSale=sale;
 
   /* お釣りを先に出す。送るのはそのあと（つながらなくても会計は終わらせる） */
@@ -701,8 +711,8 @@ document.addEventListener("visibilitychange",function(){
 window.addEventListener("online",function(){ flush() });
 
 renderBar();
-/* 担当がもう決まっていれば、①はとばして②から */
-show(REG.staff ? (GUESTS.length?"guest":"till") : "staff");
+/* 担当がもう決まっていて、さっきまで使っていたなら、①はとばして②から */
+show((REG.staff&&!staleStaff()) ? (GUESTS.length?"guest":"till") : "staff");
 refresh(true);
 })();
 </script>

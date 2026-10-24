@@ -821,3 +821,53 @@ end $$;
 grant execute on function visit_put(text, jsonb)       to anon, authenticated;
 grant execute on function visit_del(text, text)        to anon, authenticated;
 grant execute on function visits_get(text, text, text) to anon, authenticated;
+
+-- ========================================================================
+-- 販売力（スタッフ用アプリのステータス）
+-- 自分が担当になっていた時間の「来店」と「会計」を、日ごとに返す。
+-- 個人用のリンク（自分だけの合言葉）でしか呼べない。ほかの人のぶんは出ない。
+-- 金額は返さない（売上の総額はスタッフに見せない）。
+-- ========================================================================
+
+create or replace function me_power(p_code text, p_from text, p_to text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_row store_staff%rowtype; v_who text; v_days jsonb;
+        v_from date; v_to date;
+begin
+  select * into v_row from store_staff
+   where tok <> '' and tok = btrim(coalesce(p_code,''));
+  if not found then
+    -- 個人用のリンクではない（昔の共通リンク）
+    return jsonb_build_object('ok', true, 'personal', false, 'days', '[]'::jsonb);
+  end if;
+  v_who := coalesce(nullif(btrim(v_row.disp),''), v_row.name);
+  v_from := case when coalesce(p_from,'') = '' then null else p_from::date end;
+  v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
+
+  with v as (
+    select to_char(at at time zone 'Asia/Tokyo','YYYY-MM-DD') as d, sum(n)::int as vis
+      from store_visits
+     where staff = v_who
+       and (v_from is null or (at at time zone 'Asia/Tokyo')::date >= v_from)
+       and (v_to   is null or (at at time zone 'Asia/Tokyo')::date <= v_to)
+     group by 1
+  ), s as (
+    select to_char(at at time zone 'Asia/Tokyo','YYYY-MM-DD') as d,
+           count(*)::int as buy, sum(qty)::int as qty
+      from store_sales
+     where staff = v_who and voided = false
+       and (v_from is null or (at at time zone 'Asia/Tokyo')::date >= v_from)
+       and (v_to   is null or (at at time zone 'Asia/Tokyo')::date <= v_to)
+     group by 1
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'day', d, 'vis', coalesce(vis,0), 'buy', coalesce(buy,0), 'qty', coalesce(qty,0)
+         ) order by d), '[]'::jsonb)
+    into v_days
+    from (select coalesce(v.d, s.d) as d, v.vis, s.buy, s.qty
+            from v full outer join s on s.d = v.d) t;
+
+  return jsonb_build_object('ok', true, 'personal', true, 'disp', v_who, 'days', v_days);
+end $$;
+
+grant execute on function me_power(text, text, text) to anon, authenticated;

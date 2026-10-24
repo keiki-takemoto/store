@@ -139,6 +139,16 @@ function saveVis(){ try{ localStorage.setItem(K_VIS,JSON.stringify(VIS)) }catch(
 var REG=loadReg(), VIS=loadVis();
 var AREAS=(window.Sync&&Sync.AREAS)||[], KINDS=(window.Sync&&Sync.KINDS)||[];
 
+/* しばらく使っていなかったら、担当を聞き直す。
+   9:10〜13:00 と 13:00〜17:00 のように交代があるので、
+   前の人のままだと来店も会計もその人のぶんになってしまう。 */
+var ASK_AFTER=45*60*1000;
+function staleStaff(){
+  var t=Number(REG.lastAt||0);
+  return !t || (Date.now()-t)>ASK_AFTER;
+}
+function touchStaff(){ REG.lastAt=Date.now(); saveReg() }
+
 /* ---------- 担当 ---------- */
 function staffList(){
   var db=shiftDb(), hid=db.hidden||[];
@@ -159,7 +169,7 @@ function renderStaff(){
 $("#bStaff").addEventListener("click",function(){ renderStaff(); $("#sheet").hidden=false });
 $("#staffOpts").addEventListener("click",function(e){
   var b=e.target.closest("[data-s]"); if(!b) return;
-  REG.staff=b.dataset.s; saveReg(); renderStaff(); $("#sheet").hidden=true; renderAll();
+  REG.staff=b.dataset.s; touchStaff(); renderStaff(); $("#sheet").hidden=true; renderAll();
 });
 $("#sheet").addEventListener("click",function(e){ if(e.target===this) this.hidden=true });
 
@@ -182,7 +192,7 @@ $("#grid").addEventListener("click",function(e){
   if(!REG.staff){ $("#bStaff").click(); return }
   VIS.rows.unshift({ id:visId(), at:new Date().toISOString(), day:today(),
     staff:REG.staff, area:b.dataset.a, kind:b.dataset.k, n:1 });
-  saveVis();
+  saveVis(); touchStaff();
   b.classList.remove("hit"); void b.offsetWidth; b.classList.add("hit");
   renderAll(); flush();
 });
@@ -289,7 +299,7 @@ document.addEventListener("visibilitychange",function(){
 window.addEventListener("online",function(){ flush() });
 
 build(); renderStaff(); renderAll(); refresh();
-if(!REG.staff) $("#sheet").hidden=false;
+if(!REG.staff||staleStaff()) $("#sheet").hidden=false;
 })();
 </script>
 <script>
