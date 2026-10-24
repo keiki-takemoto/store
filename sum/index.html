@@ -94,6 +94,22 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
   border-radius:8px;padding:5px 10px}
 .who span b{font-family:var(--mono);margin-left:6px}
 
+h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;letter-spacing:.04em}
+/* 来店と購買率の表 */
+table.conv{width:100%;border-collapse:collapse;font-size:13.5px}
+table.conv th,table.conv td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:left}
+table.conv th{font-size:11.5px;color:var(--ink-3);font-weight:600;white-space:nowrap}
+table.conv td.n,table.conv th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  text-align:right;white-space:nowrap}
+table.conv td.rate{font-family:var(--mono);text-align:right;font-weight:800;color:var(--ok);white-space:nowrap}
+table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
+.visbig{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px}
+.visbig div{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.visbig .k{font-size:11.5px;color:var(--ink-3)}
+.visbig .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:23px;font-weight:800;
+  line-height:1.35}
+.visbig .rate .v{color:var(--ok)}
+
 /* 内訳の棒 */
 .bars{display:flex;flex-direction:column;gap:9px}
 .bar .t{display:flex;align-items:baseline;gap:9px;font-size:13.5px}
@@ -190,6 +206,19 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
 
     <!-- 分析 -->
     <section class="view" id="v-ana" data-off>
+      <div class="card" id="cVisit"><div class="sec">
+        <h3>来店と購買率</h3>
+        <div id="visSum"></div>
+        <h4 class="sub">区分ごと</h4>
+        <div id="visGrid"></div>
+        <h4 class="sub">担当ごと</h4>
+        <div id="visStaff"></div>
+        <h4 class="sub">時間帯ごと</h4>
+        <div id="visHour"></div>
+        <p class="note"><b>購買率</b>は 会計の件数 ÷ 来店数。来店は<a href="../visit/">来店の画面</a>で数えたぶんです。<br>
+          担当ごとの来店数は、<b>そのとき担当になっていた人</b>のぶんとして数えます。</p>
+      </div></div>
+
       <div class="card"><div class="sec">
         <h3>担当</h3><div class="bars" id="byStaff"></div>
       </div></div>
@@ -252,7 +281,7 @@ function range(){
 }
 
 /* ---------- 受け取る ---------- */
-var rows=[], busy=false;
+var rows=[], visits=[], busy=false;
 async function load(quiet){
   if(busy) return;
   busy=true;
@@ -267,6 +296,8 @@ async function load(quiet){
       busy=false; return;
     }
     rows=r.rows||[];
+    try{ var rv=await Sync.visitsGet(r0.from,r0.to); visits=rv.items||[] }
+    catch(e){ visits=[] }                       /* 来店はまだ使っていない店もあるので、無くても進む */
     var d=new Date();
     $("#upd").textContent=d.getFullYear()+"/"+pad2(d.getMonth()+1)+"/"+pad2(d.getDate())+" "+
       pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());
@@ -448,6 +479,8 @@ function render(){
     bars($("#byDow"),dowList,dowTop,function(x){ return x.n+"日ぶんの平均" });
   }
 
+  renderVisits(list);
+
   /* 時間帯ごと */
   var hm={};
   list.forEach(function(s){
@@ -460,6 +493,84 @@ function render(){
   var hTop=hours.reduce(function(m,x){ return Math.max(m,x.amt) },0);
   bars($("#byHour"),hours,hTop);
 
+}
+
+/* ---------- 来店と購買率 ---------- */
+/* 来店は「日・時間帯・担当・区分」でまとめて届く。購入は会計の件数。 */
+function pct(buy,vis){ return vis?Math.round(buy/vis*100)+"%":"—" }
+function renderVisits(list){
+  var all=0, byA={}, byS={}, byH={};
+  visits.forEach(function(g){
+    var n=Number(g.n)||0; all+=n;
+    var ak=g.area+"-"+g.kind;
+    byA[ak]=(byA[ak]||0)+n;
+    byS[g.staff||""]=(byS[g.staff||""]||0)+n;
+    byH[g.hour]=(byH[g.hour]||0)+n;
+  });
+  $("#cVisit").hidden=!all;
+  if(!all) return;
+
+  var buy=list.length;
+  $("#visSum").innerHTML='<div class="visbig">'+
+    '<div><div class="k">来店</div><div class="v">'+all+'人</div></div>'+
+    '<div><div class="k">購入</div><div class="v">'+buy+'件</div></div>'+
+    '<div class="rate"><div class="k">購買率</div><div class="v">'+pct(buy,all)+'</div></div>'+
+    '</div>';
+
+  /* 区分ごと（紙の表と同じ並び） */
+  var A=(window.Sync&&Sync.AREAS)||[], K=(window.Sync&&Sync.KINDS)||[];
+  var h='<table class="conv"><thead><tr><th></th>'+
+    K.map(function(k){ return '<th class="n">'+esc(k.nm)+'</th>' }).join("")+
+    '<th class="n">合計</th></tr></thead><tbody>';
+  A.forEach(function(a){
+    var sum=0;
+    h+='<tr><td>'+esc(a.nm)+'</td>'+K.map(function(k){
+      var n=byA[a.k+"-"+k.k]||0; sum+=n;
+      return '<td class="n">'+(n||"—")+'</td>';
+    }).join("")+'<td class="n">'+(sum||"—")+'</td></tr>';
+  });
+  h+='</tbody><tfoot><tr><td>合計</td>'+K.map(function(k){
+    var n=0; A.forEach(function(a){ n+=byA[a.k+"-"+k.k]||0 });
+    return '<td class="n">'+(n||"—")+'</td>';
+  }).join("")+'<td class="n">'+all+'</td></tr></tfoot></table>';
+  $("#visGrid").innerHTML=h;
+
+  /* 担当ごと */
+  var sBuy={};
+  list.forEach(function(s){ var k=s.staff||""; sBuy[k]=(sBuy[k]||0)+1 });
+  var names={}; Object.keys(byS).forEach(function(k){ names[k]=1 });
+  Object.keys(sBuy).forEach(function(k){ names[k]=1 });
+  var rowsS=Object.keys(names).map(function(k){
+    return {name:k||"（担当なし）", vis:byS[k]||0, buy:sBuy[k]||0};
+  }).sort(function(a,b){
+    var ra=a.vis?a.buy/a.vis:-1, rb=b.vis?b.buy/b.vis:-1;
+    return rb-ra || b.buy-a.buy;
+  });
+  $("#visStaff").innerHTML='<table class="conv"><thead><tr><th>担当</th>'+
+    '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
+    rowsS.map(function(x){
+      return '<tr><td>'+esc(x.name)+'</td><td class="n">'+(x.vis||"—")+'</td>'+
+        '<td class="n">'+x.buy+'</td><td class="rate">'+pct(x.buy,x.vis)+'</td></tr>';
+    }).join("")+
+    '</tbody><tfoot><tr><td>合計</td><td class="n">'+all+'</td><td class="n">'+buy+
+    '</td><td class="rate">'+pct(buy,all)+'</td></tr></tfoot></table>';
+
+  /* 時間帯ごと */
+  var hBuy={};
+  list.forEach(function(s){
+    var hh=parseInt(String(s.at||"").slice(11,13),10);
+    if(!isNaN(hh)) hBuy[hh]=(hBuy[hh]||0)+1;
+  });
+  var hs={}; Object.keys(byH).forEach(function(k){ hs[k]=1 });
+  Object.keys(hBuy).forEach(function(k){ hs[k]=1 });
+  var rowsH=Object.keys(hs).map(Number).sort(function(a,b){ return a-b });
+  $("#visHour").innerHTML='<table class="conv"><thead><tr><th>時間帯</th>'+
+    '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
+    rowsH.map(function(hh){
+      var v=byH[hh]||0, b2=hBuy[hh]||0;
+      return '<tr><td>'+hh+'時台</td><td class="n">'+(v||"—")+'</td>'+
+        '<td class="n">'+b2+'</td><td class="rate">'+pct(b2,v)+'</td></tr>';
+    }).join("")+'</tbody></table>';
 }
 
 /* ---------- 売上集計の表 ---------- */

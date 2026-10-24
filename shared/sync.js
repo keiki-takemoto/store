@@ -80,9 +80,30 @@
     return { k: "", nm: "未分類", ic: "▫️" };   // 種類が付く前に届いた報告
   }
 
+  /* 来店の数えかた。紙の表と同じ並び（欧米／アジア／日本人 × 男／女／子供）。
+     言葉を変えたいときは nm だけ直す。k（west / m …）は変えないこと。 */
+  var AREAS = [
+    { k: "west", nm: "欧米" },
+    { k: "asia", nm: "アジア" },
+    { k: "jp",   nm: "日本人" }
+  ];
+  var KINDS = [
+    { k: "m",   nm: "男" },
+    { k: "f",   nm: "女" },
+    { k: "kid", nm: "子供" }
+  ];
+  function nameOf(list, k) {
+    for (var i = 0; i < list.length; i++) if (list[i].k === k) return list[i].nm;
+    return "";
+  }
+
   root.Sync = {
     CATS: CATS,
     catOf: catOf,
+    AREAS: AREAS,
+    KINDS: KINDS,
+    areaName: function (k) { return nameOf(AREAS, k) || "（区分なし）" },
+    kindName: function (k) { return nameOf(KINDS, k) || "" },
     configure: configure, config: config, isOn: isOn, messageFor: messageFor,
     ping: function () { return rpc("shift_ping", {}) },
     submitRequest: function (r) {
@@ -150,6 +171,16 @@
     },
     saleVoid: function (id) {
       return rpc("sale_void", { p_key: (CFG && CFG.key) || "", p_id: id });
+    },
+    /* 来店（紙で数えていたカウント）。店長用キーだけ */
+    visitPut: function (rows) {
+      return rpc("visit_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
+    },
+    visitDel: function (id) {
+      return rpc("visit_del", { p_key: (CFG && CFG.key) || "", p_id: id });
+    },
+    visitsGet: function (from, to) {
+      return rpc("visits_get", { p_key: (CFG && CFG.key) || "", p_from: from || null, p_to: to || null });
     },
     /* ちょっとした設定（お客様の種類の一覧など）。店長用キーだけ */
     metaGet: function (k) {

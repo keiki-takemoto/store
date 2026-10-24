@@ -739,3 +739,85 @@ end $$;
 
 grant execute on function meta_get(text, text)        to anon, authenticated;
 grant execute on function meta_put(text, text, jsonb) to anon, authenticated;
+
+-- ========================================================================
+-- 来店（紙で数えていたカウント）
+-- 欧米／アジア／日本人 × 男／女／子供 の9つ。押すたびに1行入る。
+-- 押した時刻と、そのときの担当を残すので、出勤した時間内の来店数が出せる。
+-- 購入のほうは store_sales の会計件数をそのまま使う（別に数えない）。
+-- ========================================================================
+
+create table if not exists store_visits (
+  id         text primary key,                   -- 端末で作る。二度送っても増えない
+  at         timestamptz not null default now(), -- 押した時刻
+  staff      text    not null default '',        -- そのときの担当
+  area       text    not null default '',        -- west（欧米）／asia（アジア）／jp（日本人）
+  kind       text    not null default '',        -- m（男）／f（女）／kid（子供）
+  n          integer not null default 1,
+  created_at timestamptz not null default now()
+);
+create index if not exists store_visits_at on store_visits (at);
+
+alter table store_visits enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 店長：来店を記録する（まとめて送れる。つながらなかったぶんを後から流すため）
+create or replace function visit_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_new int := 0;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
+  with ins as (
+    insert into store_visits (id, at, staff, area, kind, n)
+    select x->>'id',
+           coalesce(nullif(x->>'at','')::timestamptz, now()),
+           btrim(coalesce(x->>'staff','')),
+           btrim(coalesce(x->>'area','')),
+           btrim(coalesce(x->>'kind','')),
+           greatest(1, coalesce(nullif(x->>'n','')::integer, 1))
+      from jsonb_array_elements(p_rows) x
+     where coalesce(x->>'id','') <> ''
+    on conflict (id) do nothing
+    returning id
+  )
+  select count(*) into v_new from ins;
+  return jsonb_build_object('ok', true, 'added', v_new);
+end $$;
+
+-- 店長：押し間違えを1つ消す
+create or replace function visit_del(p_key text, p_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  delete from store_visits where id = p_id;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 店長：来店を受け取る（日・時間帯・担当・区分でまとめて返す。1件ずつ返すと量が多いため）
+create or replace function visits_get(p_key text, p_from text default null, p_to text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_items jsonb; v_from date; v_to date;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  v_from := case when coalesce(p_from,'') = '' then null else p_from::date end;
+  v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'day', t.d, 'hour', t.h, 'staff', t.st, 'area', t.a, 'kind', t.k, 'n', t.cnt
+         )), '[]'::jsonb)
+    into v_items
+    from (
+      select to_char(v.at at time zone 'Asia/Tokyo','YYYY-MM-DD') as d,
+             extract(hour from v.at at time zone 'Asia/Tokyo')::int as h,
+             v.staff as st, v.area as a, v.kind as k, sum(v.n)::int as cnt
+        from store_visits v
+       where (v_from is null or (v.at at time zone 'Asia/Tokyo')::date >= v_from)
+         and (v_to   is null or (v.at at time zone 'Asia/Tokyo')::date <= v_to)
+       group by 1,2,3,4,5
+    ) t;
+  return jsonb_build_object('ok', true, 'items', v_items);
+end $$;
+
+grant execute on function visit_put(text, jsonb)       to anon, authenticated;
+grant execute on function visit_del(text, text)        to anon, authenticated;
+grant execute on function visits_get(text, text, text) to anon, authenticated;
