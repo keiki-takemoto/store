@@ -620,6 +620,9 @@ create index if not exists store_sales_at on store_sales (at);
 
 -- あとから足した列。前に作ってあっても足りるようにしておく。
 alter table store_sales add column if not exists guest text not null default '';
+-- 会計にも来店と同じ区分を持たせる（west／asia／jp）。
+-- そろえておかないと「欧米への販売力＝欧米の購入 ÷ 欧米の来店」が出せない。
+alter table store_sales add column if not exists area text not null default '';
 
 alter table store_sales enable row level security;
 -- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
@@ -634,11 +637,12 @@ begin
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
 
   with ins as (
-    insert into store_sales (id, at, staff, guest, pay, subtotal, discount, total, cost, qty, lines, note)
+    insert into store_sales (id, at, staff, guest, area, pay, subtotal, discount, total, cost, qty, lines, note)
     select x->>'id',
            coalesce(nullif(x->>'at','')::timestamptz, now()),
            btrim(coalesce(x->>'staff','')),
            btrim(coalesce(x->>'guest','')),
+           btrim(coalesce(x->>'area','')),
            case when x->>'pay' = 'card' then 'card' else 'cash' end,
            coalesce(nullif(x->>'subtotal','')::integer, 0),
            coalesce(nullif(x->>'discount','')::integer, 0),
@@ -679,7 +683,7 @@ begin
   v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
   -- 日付は日本時間で見る（サーバーのUTCで切ると、夜の会計が前の日に入ってしまう）
   select coalesce(jsonb_agg(jsonb_build_object(
-           'id', s.id, 'staff', s.staff, 'guest', s.guest, 'pay', s.pay,
+           'id', s.id, 'staff', s.staff, 'guest', s.guest, 'area', s.area, 'pay', s.pay,
            'subtotal', s.subtotal, 'discount', s.discount, 'total', s.total,
            'cost', s.cost, 'qty', s.qty, 'lines', s.lines, 'note', s.note,
            'voided', s.voided,
@@ -871,3 +875,77 @@ begin
 end $$;
 
 grant execute on function me_power(text, text, text) to anon, authenticated;
+
+-- ========================================================================
+-- ランキング（スタッフ用アプリのステータス）
+-- 全員ぶんの「来店・お買い上げ・点数・高単価の点数」を、区分ごとに返す。
+-- 個人用のリンクでしか呼べない。金額はいっさい返さない（売上はスタッフに見せない）。
+-- 順位のつけ方はアプリ側で決める（あとから変えやすいように）。
+-- ========================================================================
+
+create or replace function power_board(p_code text, p_from text, p_to text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_row store_staff%rowtype; v_me text; v_hi int; v_rows jsonb;
+        v_from date; v_to date;
+begin
+  select * into v_row from store_staff
+   where tok <> '' and tok = btrim(coalesce(p_code,''));
+  if not found then
+    return jsonb_build_object('ok', true, 'personal', false, 'rows', '[]'::jsonb);
+  end if;
+  v_me := coalesce(nullif(btrim(v_row.disp),''), v_row.name);
+
+  -- 高単価のライン（1点いくら以上を「高単価」と数えるか）。店長が設定で決める。
+  select coalesce(nullif(v->>'hiprice','')::int, 3000) into v_hi from store_meta where k = 'reg';
+  if v_hi is null then v_hi := 3000; end if;
+
+  v_from := case when coalesce(p_from,'') = '' then null else p_from::date end;
+  v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
+
+  with vis as (
+    select staff, area, sum(n)::int as n
+      from store_visits
+     where (v_from is null or (at at time zone 'Asia/Tokyo')::date >= v_from)
+       and (v_to   is null or (at at time zone 'Asia/Tokyo')::date <= v_to)
+     group by 1,2
+  ), sal as (
+    select staff, area, count(*)::int as buy, coalesce(sum(qty),0)::int as qty
+      from store_sales
+     where voided = false
+       and (v_from is null or (at at time zone 'Asia/Tokyo')::date >= v_from)
+       and (v_to   is null or (at at time zone 'Asia/Tokyo')::date <= v_to)
+     group by 1,2
+  ), hi as (
+    select s.staff, sum(coalesce(nullif(l->>'qty','')::int, 0))::int as hiqty
+      from store_sales s, jsonb_array_elements(s.lines) l
+     where s.voided = false
+       and (v_from is null or (s.at at time zone 'Asia/Tokyo')::date >= v_from)
+       and (v_to   is null or (s.at at time zone 'Asia/Tokyo')::date <= v_to)
+       and coalesce(nullif(l->>'price','')::int, 0) >= v_hi
+     group by 1
+  ), who as (
+    select staff from vis union select staff from sal
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'name', w.staff,
+           'vis',   coalesce((select sum(n)   from vis v where v.staff = w.staff), 0),
+           'buy',   coalesce((select sum(buy) from sal a where a.staff = w.staff), 0),
+           'qty',   coalesce((select sum(qty) from sal a where a.staff = w.staff), 0),
+           'hiqty', coalesce((select hiqty from hi h where h.staff = w.staff), 0),
+           'visA', jsonb_build_object(
+             'west', coalesce((select n from vis v where v.staff=w.staff and v.area='west'), 0),
+             'asia', coalesce((select n from vis v where v.staff=w.staff and v.area='asia'), 0),
+             'jp',   coalesce((select n from vis v where v.staff=w.staff and v.area='jp'),   0)),
+           'buyA', jsonb_build_object(
+             'west', coalesce((select buy from sal a where a.staff=w.staff and a.area='west'), 0),
+             'asia', coalesce((select buy from sal a where a.staff=w.staff and a.area='asia'), 0),
+             'jp',   coalesce((select buy from sal a where a.staff=w.staff and a.area='jp'),   0))
+         ) order by w.staff), '[]'::jsonb)
+    into v_rows
+    from who w
+   where coalesce(w.staff,'') <> '';
+
+  return jsonb_build_object('ok', true, 'personal', true, 'me', v_me, 'hi', v_hi, 'rows', v_rows);
+end $$;
+
+grant execute on function power_board(text, text, text) to anon, authenticated;

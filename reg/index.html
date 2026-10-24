@@ -206,11 +206,12 @@ body{display:flex;flex-direction:column}
     <div class="sub" id="staffSub"></div>
   </div>
 
-  <!-- ② お客様の種類を選ぶ -->
+  <!-- ② お客様の区分を選ぶ -->
   <div class="pane pick" id="p-guest">
-    <h2>お客様の種類を選んでください</h2>
+    <h2>お客様はどちらですか</h2>
     <div class="opts" id="guestOpts"></div>
-    <div class="sub">種類を足したり消したりするのは <a href="../settings/">設定 → レジ</a> から。</div>
+    <div class="sub">来店を数えるときと同じ区分です。ここで選ぶと、
+      <b>区分ごとの販売力</b>が出せるようになります。</div>
   </div>
 
   <!-- ③④ 打ち込み -->
@@ -298,7 +299,7 @@ function today(){ var d=new Date();
   return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2) }
 
 /* つなぎ先・名簿・商品・お客様の種類は、どれも 設定 の画面のものを借りている */
-var K_SHIFT="shiftadmin.v1", K_ITEM="storeitems.v1", K_GUEST="storeguests.v1", K_REG="storereg.v1";
+var K_SHIFT="shiftadmin.v1", K_ITEM="storeitems.v1", K_REG="storereg.v1";
 function shiftDb(){ try{ return JSON.parse(localStorage.getItem(K_SHIFT))||{} }catch(e){ return {} } }
 function cfg(){ var v=shiftDb(); return v.sync||null }
 function syncOn(){ var c=cfg(); return !!(window.Sync&&c&&c.url&&c.anon&&c.key) }
@@ -310,10 +311,6 @@ function loadItems(){
   return v;
 }
 function saveItems(){ try{ localStorage.setItem(K_ITEM,JSON.stringify(IT)) }catch(e){} }
-function loadGuests(){
-  try{ var v=JSON.parse(localStorage.getItem(K_GUEST)); return Array.isArray(v)?v:[] }catch(e){ return [] }
-}
-function saveGuests(){ try{ localStorage.setItem(K_GUEST,JSON.stringify(GUESTS)) }catch(e){} }
 function loadReg(){
   var v=null; try{ v=JSON.parse(localStorage.getItem(K_REG)) }catch(e){}
   if(!v||typeof v!=="object") v={};
@@ -322,7 +319,9 @@ function loadReg(){
 }
 function saveReg(){ try{ localStorage.setItem(K_REG,JSON.stringify(REG)) }catch(e){} }
 
-var IT=loadItems(), GUESTS=loadGuests(), REG=loadReg();
+var IT=loadItems(), REG=loadReg();
+/* お客様の区分。来店を数える画面と同じ3つ（欧米／アジア／日本人） */
+var AREAS=(window.Sync&&Sync.AREAS)||[];
 function live(){ return IT.items.filter(function(x){ return !x.del }) }
 
 /* ---------- 画面の切り替え ---------- */
@@ -343,8 +342,8 @@ var cart=[], guest="", pay="cash", lastSale=null;
 
 function renderBar(){
   $("#bStaffV").textContent=REG.staff||"選ぶ";
-  $("#bGuest").hidden=!GUESTS.length;
-  $("#bGuestV").textContent=guest||"選ぶ";
+  $("#bGuest").hidden=!AREAS.length;
+  $("#bGuestV").textContent=guestName()||"選ぶ";
   var list=todaySales(), sum=0;
   list.forEach(function(x){ sum+=x.total });
   $("#tSum").textContent=yen(sum);
@@ -383,15 +382,17 @@ function renderStaffOpts(){
 $("#staffOpts").addEventListener("click",function(e){
   var b=e.target.closest("[data-s]"); if(!b) return;
   REG.staff=b.dataset.s; touchStaff(); renderBar();
-  show(GUESTS.length?"guest":"till");
+  show(AREAS.length?"guest":"till");
 });
 
-/* ---------- ② お客様の種類 ---------- */
+/* ---------- ② お客様の区分 ---------- */
 function renderGuestOpts(){
-  $("#guestOpts").innerHTML=GUESTS.map(function(n){
-    return '<button type="button" data-g="'+esc(n)+'" aria-pressed="'+(guest===n)+'">'+esc(n)+'</button>';
+  $("#guestOpts").innerHTML=AREAS.map(function(a){
+    return '<button type="button" data-g="'+esc(a.k)+'" aria-pressed="'+(guest===a.k)+'">'+
+      esc(a.nm)+'</button>';
   }).join("");
 }
+function guestName(){ return guest?((window.Sync&&Sync.areaName(guest))||""):"" }
 $("#guestOpts").addEventListener("click",function(e){
   var b=e.target.closest("[data-g]"); if(!b) return;
   guest=b.dataset.g; renderBar(); show("till");
@@ -500,7 +501,7 @@ $("#goPay").addEventListener("click",function(){ if(cart.length) show("pay") });
 function renderPay(){
   var s=sums();
   $("#payTot").textContent=yen(s.total);
-  $("#payWho").textContent=[REG.staff,guest].filter(Boolean).join("　/　")+"　"+s.qty+"点";
+  $("#payWho").textContent=[REG.staff,guestName()].filter(Boolean).join("　/　")+"　"+s.qty+"点";
   renderQuick(s.total);
   renderChange();
 }
@@ -548,7 +549,8 @@ $("#payBtn").addEventListener("click",function(){
   var got=numOf($("#cashIn").value);
   if(pay==="cash"&&got&&got<s.total){ toast("預かりが足りません"); return }
 
-  var sale={ id:saleId(), at:new Date().toISOString(), day:today(), staff:REG.staff, guest:guest, pay:pay,
+  var sale={ id:saleId(), at:new Date().toISOString(), day:today(), staff:REG.staff,
+    area:guest, guest:guestName(), pay:pay,
     subtotal:s.sub, discount:s.disc, total:s.total, cost:s.cost, qty:s.qty,
     lines:cart.map(function(l){ return {id:l.id,no:l.no,name:l.name,price:l.price,cost:l.cost,qty:l.qty} }),
     note:"", voided:false };
@@ -558,7 +560,7 @@ $("#payBtn").addEventListener("click",function(){
   /* お釣りを先に出す。送るのはそのあと（つながらなくても会計は終わらせる） */
   var ch=(pay==="cash"&&got)?got-s.total:0;
   $("#dCh").textContent=(pay==="cash"&&got)?"お釣り "+yen(ch):yen(s.total);
-  $("#dSub").textContent=[(pay==="cash"?"現金":"カード"), guest, s.qty+"点", yen(s.total)]
+  $("#dSub").textContent=[(pay==="cash"?"現金":"カード"), guestName(), s.qty+"点", yen(s.total)]
     .filter(Boolean).join("　")+(s.disc?"（値引き "+yen(s.disc)+"）":"");
   show("done"); renderBar();
   flush();
@@ -571,7 +573,7 @@ $("#nextBtn").addEventListener("click",function(){
   });
   $("#cashBox").hidden=false;
   renderFound(); renderBar();
-  show(GUESTS.length?"guest":"till");
+  show(AREAS.length?"guest":"till");
 });
 $("#voidBtn").addEventListener("click",async function(){
   if(!lastSale) return;
@@ -598,7 +600,7 @@ async function flush(){
   try{
     if(wait.length){
       await Sync.salePut(wait.map(function(x){
-        return {id:x.id, at:x.at, staff:x.staff, guest:x.guest||"", pay:x.pay,
+        return {id:x.id, at:x.at, staff:x.staff, area:x.area||"", guest:x.guest||"", pay:x.pay,
                 subtotal:x.subtotal, discount:x.discount, total:x.total,
                 cost:x.cost, qty:x.qty, lines:x.lines, note:x.note||""};
       }));
@@ -632,7 +634,7 @@ async function pullToday(){
   (r.items||[]).forEach(function(s){
     var cur=mine[s.id];
     if(cur){ cur.s=1; if(s.voided) cur.voided=true; return }
-    REG.sales.unshift({id:s.id, at:s.at, day:s.day, staff:s.staff, guest:s.guest||"", pay:s.pay,
+    REG.sales.unshift({id:s.id, at:s.at, day:s.day, staff:s.staff, area:s.area||"", guest:s.guest||"", pay:s.pay,
       subtotal:s.subtotal, discount:s.discount, total:s.total, cost:s.cost, qty:s.qty,
       lines:s.lines||[], note:s.note||"", voided:!!s.voided, s:1});
   });
@@ -668,16 +670,6 @@ async function pullItems(){
   saveItems();
   if(step==="till"){ renderPad(); renderFound() }
 }
-async function pullGuests(){
-  if(!syncOn()) return;
-  var r=await Sync.metaGet("guests");
-  if(Array.isArray(r&&r.v)){
-    GUESTS=r.v.slice(); saveGuests();
-    if(guest&&GUESTS.indexOf(guest)<0) guest="";
-    renderBar();
-    if(step==="guest") renderGuestOpts();
-  }
-}
 
 /* ---------- まとめ ---------- */
 var toastEl=null,tt=null;
@@ -694,7 +686,6 @@ async function refresh(quiet){
   $("#log").textContent="受け取っています…";
   try{
     await pullItems();
-    await pullGuests();
     await pullToday();
     await flush();
     $("#log").textContent=hhmm()+" に確認";
@@ -712,7 +703,7 @@ window.addEventListener("online",function(){ flush() });
 
 renderBar();
 /* 担当がもう決まっていて、さっきまで使っていたなら、①はとばして②から */
-show((REG.staff&&!staleStaff()) ? (GUESTS.length?"guest":"till") : "staff");
+show((REG.staff&&!staleStaff()) ? (AREAS.length?"guest":"till") : "staff");
 refresh(true);
 })();
 </script>

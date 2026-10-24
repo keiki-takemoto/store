@@ -176,6 +176,10 @@
     mePower: function (from, to) {
       return rpc("me_power", { p_code: (CFG && CFG.code) || "", p_from: from || null, p_to: to || null });
     },
+    /* ランキング（スタッフ用アプリ）。自分だけの合言葉で、全員ぶんの件数だけ */
+    powerBoard: function (from, to) {
+      return rpc("power_board", { p_code: (CFG && CFG.code) || "", p_from: from || null, p_to: to || null });
+    },
     /* 来店（紙で数えていたカウント）。店長用キーだけ */
     visitPut: function (rows) {
       return rpc("visit_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });

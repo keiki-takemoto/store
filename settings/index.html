@@ -240,20 +240,24 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
   <!-- レジ -->
   <section class="view" id="v-reg" data-off>
     <div class="card">
-      <div class="card-h"><h2>お客様の種類</h2><span class="hint" id="gCount"></span></div>
+      <div class="card-h"><h2>お客様の区分</h2></div>
       <div class="sec">
-        <div class="syncbar"><span id="gState">—</span></div>
-        <div id="gList"></div>
-        <div id="gEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
-        <div class="addbox">
-          <input type="text" id="newGuest" placeholder="例）外国のお客さま" autocomplete="off">
-          <button class="btn sm primary" id="addGuest">追加</button>
+        <p class="note" style="margin-top:0">レジの会計と「来店」のカウントは、<b>同じ3つの区分</b>を使います。</p>
+        <div class="row" style="margin:10px 0 0" id="areaList"></div>
+        <p class="note">紙で数えていた表と同じ並びなので、
+          <b>区分ごとの販売力</b>（欧米の購入 ÷ 欧米の来店）が出せます。<br>
+          この3つは固定です。変えると、これまでに数えたぶんと比べられなくなります。</p>
+      </div>
+      <div class="sec">
+        <h3>高単価のライン</h3>
+        <div class="row">
+          <span class="fg">1点 <input type="number" id="hiPrice" class="num" min="0" step="100"
+            inputmode="numeric" placeholder="3000"> 円以上</span>
+          <button class="btn sm primary" id="hiSave">保存</button>
+          <span class="lbl" id="hiState"></span>
         </div>
-        <p class="note">レジで会計するとき、ここに入れた言葉から<b>ひとつ選ぶ</b>形になります。<br>
-          どんな言葉でも構いません（例：日本人／外国のお客さま／団体／学校）。<br>
-          <b>▲▼</b>でレジに出る並び順を変えられます。<b>消す</b>と、これからの会計では選べなくなります。
-          すでに記録した会計はそのまま残ります。<br>
-          ひとつも入れないときは、レジで種類を選ぶ画面が出ません。</p>
+        <p class="note">この値段以上の商品が売れた数を、<b>高単価販売数</b>として数えます。<br>
+          スタッフ用アプリのランキングに出ます。空のままなら 3,000円 で数えます。</p>
       </div>
     </div>
   </section>
@@ -924,54 +928,42 @@ $("#wipe").addEventListener("click",function(){
   fillCfg(); renderStaff(); renderSyncUI(); renderAnn(); toast("消しました");
 });
 
-/* ---------- お客様の種類（レジで選ぶ言葉） ---------- */
-/* 置き場所の store_meta に "guests" という名前で預ける。
-   レジはこれを読んで、会計のときに選ばせる。 */
-var K_GUEST="storeguests.v1";
-var GUESTS=[];
-try{ var gv=JSON.parse(localStorage.getItem(K_GUEST)); if(Array.isArray(gv)) GUESTS=gv }catch(e){}
-function saveGuests(){ try{ localStorage.setItem(K_GUEST,JSON.stringify(GUESTS)) }catch(e){} }
+/* ---------- レジの決めごと ---------- */
+/* お客様の区分は、来店を数える画面と同じ3つ（shared/sync.js にある）。
+   高単価のラインだけ、店長が決められるようにして store_meta の "reg" に預ける。 */
+var K_REGSET="storeregset.v1";
+var REGSET=null;
+try{ REGSET=JSON.parse(localStorage.getItem(K_REGSET)) }catch(e){}
+if(!REGSET||typeof REGSET!=="object") REGSET={};
 
 function renderGuests(){
-  $("#gCount").textContent=GUESTS.length?GUESTS.length+"種類":"";
-  $("#gEmpty").hidden=!!GUESTS.length;
-  $("#gList").innerHTML=GUESTS.map(function(n,i){
-    return '<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)">'+
-      '<span style="flex:1;font-weight:700">'+esc(n)+'</span>'+
-      '<button class="btn sm ghost" data-gu="'+i+'"'+(i===0?" disabled":"")+'>▲</button>'+
-      '<button class="btn sm ghost" data-gd="'+i+'"'+(i===GUESTS.length-1?" disabled":"")+'>▼</button>'+
-      '<button class="btn sm ghost" data-gx="'+i+'">消す</button></div>';
+  $("#areaList").innerHTML=((window.Sync&&Sync.AREAS)||[]).map(function(a){
+    return '<span class="btn sm" style="cursor:default">'+esc(a.nm)+'</span>';
   }).join("");
-  $("#gState").textContent = syncOn() ? "ほかの端末とも同じにしています" : "この端末だけに入っています";
+  $("#hiPrice").value=(typeof REGSET.hiprice==="number")?REGSET.hiprice:"";
+  $("#hiState").textContent = syncOn() ? "" : "この端末だけに入っています";
 }
-function pushGuests(){
-  saveGuests(); renderGuests();
-  if(!syncOn()) return;
-  Sync.metaPut("guests",GUESTS).then(function(){
-    $("#gState").textContent="ほかの端末とも同じにしています";
+$("#hiSave").addEventListener("click",function(){
+  var v=parseInt($("#hiPrice").value,10);
+  REGSET.hiprice=(isNaN(v)||v<0)?3000:v;
+  $("#hiPrice").value=REGSET.hiprice;
+  try{ localStorage.setItem(K_REGSET,JSON.stringify(REGSET)) }catch(e){}
+  if(!syncOn()){ $("#hiState").textContent="この端末だけに入っています"; return }
+  $("#hiState").textContent="送っています…";
+  Sync.metaPut("reg",REGSET).then(function(){
+    $("#hiState").textContent="保存しました";
+    toast("高単価のラインを "+REGSET.hiprice.toLocaleString("ja-JP")+"円 にしました");
   }).catch(function(e){
-    $("#gState").textContent="送れませんでした："+((e&&e.message)||"");
+    $("#hiState").textContent="送れませんでした："+((e&&e.message)||"");
   });
-}
-$("#addGuest").addEventListener("click",function(){
-  var n=$("#newGuest").value.trim();
-  if(!n){ $("#newGuest").focus(); return }
-  if(GUESTS.indexOf(n)>=0){ toast("もう入っています"); return }
-  GUESTS.push(n); $("#newGuest").value=""; pushGuests();
-});
-$("#newGuest").addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addGuest").click() });
-$("#gList").addEventListener("click",function(e){
-  var u=e.target.closest("[data-gu]"), d=e.target.closest("[data-gd]"), x=e.target.closest("[data-gx]");
-  if(u){ var i=+u.dataset.gu; GUESTS.splice(i-1,0,GUESTS.splice(i,1)[0]); pushGuests(); return }
-  if(d){ var j=+d.dataset.gd; GUESTS.splice(j+1,0,GUESTS.splice(j,1)[0]); pushGuests(); return }
-  if(x){ var k=+x.dataset.gx;
-    if(!confirm("「"+GUESTS[k]+"」を消します。よろしいですか？")) return;
-    GUESTS.splice(k,1); pushGuests(); }
 });
 function pullGuests(){
   if(!syncOn()) return Promise.resolve();
-  return Sync.metaGet("guests").then(function(r){
-    if(Array.isArray(r&&r.v)){ GUESTS=r.v.slice(); saveGuests() }
+  return Sync.metaGet("reg").then(function(r){
+    if(r&&r.v&&typeof r.v==="object"){
+      REGSET=r.v;
+      try{ localStorage.setItem(K_REGSET,JSON.stringify(REGSET)) }catch(e){}
+    }
     renderGuests();
   }).catch(function(){});
 }
