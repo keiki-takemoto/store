@@ -890,7 +890,7 @@ grant execute on function me_power(text, text, text) to anon, authenticated;
 
 create or replace function power_board(p_code text, p_from text, p_to text)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare v_row store_staff%rowtype; v_me text; v_hi int; v_rows jsonb;
+declare v_row store_staff%rowtype; v_me text; v_hi int; v_rows jsonb; v_cats jsonb;
         v_from date; v_to date;
 begin
   select * into v_row from store_staff
@@ -928,6 +928,17 @@ begin
        and (v_to   is null or (s.at at time zone 'Asia/Tokyo')::date <= v_to)
        and coalesce(nullif(l->>'price','')::int, 0) >= v_hi
      group by 1
+  ), cts as (
+    -- カテゴリーごとの点数。会計の中身には種類が入っていないので、商品台帳とつないで数える
+    select s.staff, coalesce(nullif(btrim(i.cat),''), 'その他') as cat,
+           sum(coalesce(nullif(l->>'qty','')::int, 0))::int as q
+      from store_sales s
+           cross join lateral jsonb_array_elements(s.lines) l
+           left join store_items i on i.id = l->>'id'
+     where s.voided = false
+       and (v_from is null or (s.at at time zone 'Asia/Tokyo')::date >= v_from)
+       and (v_to   is null or (s.at at time zone 'Asia/Tokyo')::date <= v_to)
+     group by 1,2
   ), who as (
     select staff from vis union select staff from sal
   )
@@ -944,13 +955,20 @@ begin
            'buyA', jsonb_build_object(
              'west', coalesce((select buy from sal a where a.staff=w.staff and a.area='west'), 0),
              'asia', coalesce((select buy from sal a where a.staff=w.staff and a.area='asia'), 0),
-             'jp',   coalesce((select buy from sal a where a.staff=w.staff and a.area='jp'),   0))
+             'jp',   coalesce((select buy from sal a where a.staff=w.staff and a.area='jp'),   0)),
+           'cats', coalesce((select jsonb_object_agg(c.cat, c.q) from cts c where c.staff = w.staff),
+                            '{}'::jsonb)
          ) order by w.staff), '[]'::jsonb)
     into v_rows
     from who w
    where coalesce(w.staff,'') <> '';
 
-  return jsonb_build_object('ok', true, 'personal', true, 'me', v_me, 'hi', v_hi, 'rows', v_rows);
+  -- お店で使っている商品の種類の一覧（「商品のはば」を出すのに使う）
+  select coalesce(v, '[]'::jsonb) into v_cats from store_meta where k = 'cats';
+  if v_cats is null or jsonb_typeof(v_cats) <> 'array' then v_cats := '[]'::jsonb; end if;
+
+  return jsonb_build_object('ok', true, 'personal', true, 'me', v_me, 'hi', v_hi,
+                            'allcats', v_cats, 'rows', v_rows);
 end $$;
 
 grant execute on function power_board(text, text, text) to anon, authenticated;
