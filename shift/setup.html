@@ -1005,7 +1005,31 @@ begin
   return jsonb_build_object('ok', true, 'personal', true, 'me', v_me, 'hi', v_hi, 'rows', v_rows);
 end $$;
 
-grant execute on function power_board(text, text, text) to anon, authenticated;</pre>
+grant execute on function power_board(text, text, text) to anon, authenticated;
+
+-- 店長：来店を1つ減らす（押し間違えの直し）
+-- その日・その区分の、いちばん新しい1件を消す。
+-- 「ひとつ戻す」と違って、ほかの端末で押したぶんや、あとから気づいたぶんも直せる。
+create or replace function visit_minus(p_key text, p_day text, p_area text, p_kind text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id text;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if coalesce(p_day,'') = '' then raise exception 'bad_input'; end if;
+  select id into v_id from store_visits
+   where (at at time zone 'Asia/Tokyo')::date = p_day::date
+     and area = btrim(coalesce(p_area,''))
+     and kind = btrim(coalesce(p_kind,''))
+   order by at desc
+   limit 1;
+  if v_id is null then
+    return jsonb_build_object('ok', true, 'removed', 0);   -- もう無い
+  end if;
+  delete from store_visits where id = v_id;
+  return jsonb_build_object('ok', true, 'removed', 1);
+end $$;
+
+grant execute on function visit_minus(text, text, text, text) to anon, authenticated;</pre>
     </li>
     <li>
       <h2>URLとキーをコピーする</h2>

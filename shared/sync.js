@@ -187,6 +187,9 @@
     visitDel: function (id) {
       return rpc("visit_del", { p_key: (CFG && CFG.key) || "", p_id: id });
     },
+    visitMinus: function (day, area, kind) {
+      return rpc("visit_minus", { p_key: (CFG && CFG.key) || "", p_day: day, p_area: area, p_kind: kind });
+    },
     visitsGet: function (from, to) {
       return rpc("visits_get", { p_key: (CFG && CFG.key) || "", p_from: from || null, p_to: to || null });
     },

@@ -127,6 +127,11 @@ body{display:flex;flex-direction:column}
   color:var(--ink);min-height:44px}
 .vcell:active{transform:translateY(1px)}
 .vcell.hit{animation:vpop .35s ease}
+/* 「数を直す」を押しているあいだ。押すと1つ減る */
+body[data-vmode="minus"] .vcell{border-color:var(--ng);color:var(--ng);background:var(--ng-bg)}
+body[data-vmode="minus"] .vcell:disabled{opacity:.35}
+body[data-vmode="minus"] #visMinus{border-color:var(--ng);background:var(--ng);color:#fff}
+body[data-vmode="minus"] .vfoot .lbl{color:var(--ng)}
 @keyframes vpop{0%{background:var(--accent-2)}100%{background:var(--surface)}}
 .vfoot{flex:0 0 auto;border-top:1px solid var(--line);padding:9px 11px;display:flex;align-items:center;
   gap:9px;flex-wrap:wrap}
@@ -301,7 +306,7 @@ body{display:flex;flex-direction:column}
       <div class="vgrid" id="vgrid"></div>
       <div class="vfoot">
         <span class="lbl" id="visLog"></span>
-        <button class="btn sm" id="visUndo" disabled>ひとつ戻す</button>
+        <button class="btn sm" id="visMinus" aria-pressed="false">数を直す</button>
       </div>
     </div>
   </div>
@@ -483,6 +488,7 @@ function buildVisit(){
 function visId(){ return "v"+Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
 $("#vgrid").addEventListener("click",function(e){
   var b=e.target.closest(".vcell"); if(!b) return;
+  if(document.body.dataset.vmode==="minus"){ minusOne(b.dataset.va,b.dataset.vk); return }
   if(!REG.staff){ show("staff"); return }
   VIS.rows.unshift({ id:visId(), at:new Date().toISOString(), day:today(),
     staff:REG.staff, area:b.dataset.va, kind:b.dataset.vk, n:1 });
@@ -490,31 +496,35 @@ $("#vgrid").addEventListener("click",function(e){
   b.classList.remove("hit"); void b.offsetWidth; b.classList.add("hit");
   renderVisit(); flushVis();
 });
-/* この端末で押したぶんのうち、いちばん新しいもの。
-   置き場所から受け取った行（srv）は本当のIDを持っていないので、戻す相手にしない。 */
 /* 前の版で受け取った行には srv の印が無いので、IDの形でも見分ける */
 function fromServer(x){ return !!x.srv || String(x.id||"").indexOf("srv-")===0 }
-function lastMine(){
-  /* 今日のぶんだけ。画面は今日しか出していないので、
-     前の日のものを知らないうちに消してしまわないようにする。 */
+
+/* 「数を直す」。押しているあいだ、マスを押すとその区分が1つ減る。
+   この端末で押したぶんでも、ほかの端末で押したぶんでも減らせる。 */
+$("#visMinus").addEventListener("click",function(){
+  var on=document.body.dataset.vmode!=="minus";
+  document.body.dataset.vmode=on?"minus":"";
+  this.setAttribute("aria-pressed",String(on));
+  this.textContent=on?"やめる":"数を直す";
+  renderVisit();
+});
+function minusOne(area,kind){
   var d=today();
-  var mine=VIS.rows.filter(function(x){ return x.day===d && !fromServer(x) });
-  if(!mine.length) return null;
-  return mine.reduce(function(a,b){ return (b.at>a.at)?b:a });
-}
-$("#visUndo").addEventListener("click",async function(){
-  var last=lastMine();
-  if(!last){ toast("この端末で押したぶんがありません"); return }
-  VIS.rows=VIS.rows.filter(function(x){ return x!==last });
-  /* 送りずみなら、置き場所からも消す。消すまでは数え直しても戻らないよう控えておく */
-  if(last.s){
-    VIS.del=(VIS.del||[]);
-    VIS.del.push({ id:last.id, key:visKey(last) });
+  var same=VIS.rows.filter(function(x){ return x.day===d&&x.area===area&&x.kind===kind });
+  if(!same.length){ toast("これ以上は減らせません"); return }
+  /* まだ送っていないものがあれば、それを消すのがいちばん確実 */
+  var wait=same.filter(function(x){ return !x.s });
+  var tgt=wait.length ? wait.reduce(function(a,b){ return (b.at>a.at)?b:a })
+                      : same.reduce(function(a,b){ return (b.at>a.at)?b:a });
+  VIS.rows=VIS.rows.filter(function(x){ return x!==tgt });
+  if(tgt.s){
+    /* 置き場所からも減らす。消すまでは、数え直しても戻らないよう控えておく */
+    VIS.minus=(VIS.minus||[]);
+    VIS.minus.push({ day:d, area:area, kind:kind });
   }
   saveVis(); renderVisit();
-  if(syncOn()&&last.s) flushVis();
-  toast("ひとつ戻しました");
-});
+  if(syncOn()) flushVis();
+}
 function visToday(){ var d=today(); return VIS.rows.filter(function(x){ return x.day===d }) }
 /* 置き場所は「日・時間帯・担当・区分」でまとめて返してくる。手元のぶんと突き合わせる目印。 */
 function visKey(x){
@@ -530,17 +540,22 @@ function renderVisit(){
   });
   document.querySelectorAll("[data-vn]").forEach(function(el){ el.textContent=by[el.dataset.vn]||0 });
   $("#visN").textContent=all?all+"人":"";
-  $("#visUndo").disabled=!lastMine();
+  /* 0のマスは減らせないので、直すあいだは押せなくしておく */
+  var minus=(document.body.dataset.vmode==="minus");
+  document.querySelectorAll(".vcell").forEach(function(c){
+    c.disabled=minus && !by[c.dataset.va+"-"+c.dataset.vk];
+  });
   var wait=VIS.rows.filter(function(x){ return !x.s }).length;
-  $("#visLog").textContent=wait?("送っていない "+wait+"件"):"";
+  $("#visLog").textContent = minus ? "マスを押すと1つ減ります"
+    : (wait?("送っていない "+wait+"件"):"");
   $("#mVis").textContent=all||"";
 }
 var visBusy=false;
 async function flushVis(){
   if(!syncOn()||visBusy) return;
   var wait=VIS.rows.filter(function(x){ return !x.s });
-  var del=VIS.del||[];
-  if(!wait.length&&!del.length) return;
+  var del=VIS.del||[], ms=VIS.minus||[];
+  if(!wait.length&&!del.length&&!ms.length) return;
   visBusy=true;
   try{
     if(wait.length){
@@ -554,7 +569,12 @@ async function flushVis(){
     for(var i=0;i<del.length;i++){
       try{ await Sync.visitDel(del[i].id) }catch(e){ left.push(del[i]) }
     }
-    VIS.del=left; saveVis();
+    VIS.del=left;
+    var mleft=[], ms=VIS.minus||[];
+    for(var j=0;j<ms.length;j++){
+      try{ await Sync.visitMinus(ms[j].day,ms[j].area,ms[j].kind) }catch(e){ mleft.push(ms[j]) }
+    }
+    VIS.minus=mleft; saveVis();
   }catch(e){}
   visBusy=false;
   renderVisit();
@@ -571,11 +591,19 @@ async function pullVisit(){
   mine.forEach(function(x){ if(x.s){ var k=visKey(x); have[k]=(have[k]||0)+1 } });
   /* まだ消せていない取り消しも、置き場所の数にはまだ入っているので引いておく */
   (VIS.del||[]).forEach(function(x){ have[x.key]=(have[x.key]||0)+1 });
+  /* 「数を直す」で減らしたぶんも、送れるまでは置き場所に残っている */
+  var pend={};
+  (VIS.minus||[]).forEach(function(x){
+    if(x.day!==d) return;
+    var k=x.area+"|"+x.kind; pend[k]=(pend[k]||0)+1;
+  });
 
   var out=[];
   (r.items||[]).forEach(function(g){
     var k=g.day+"|"+g.hour+"|"+(g.staff||"")+"|"+(g.area||"")+"|"+(g.kind||"");
     var n=(g.n||0)-(have[k]||0);
+    var pk=(g.area||"")+"|"+(g.kind||"");
+    if(pend[pk]>0){ var cut=Math.min(pend[pk],n); n-=cut; pend[pk]-=cut }
     for(var i=0;i<n;i++){
       out.push({ id:"srv-"+k+"-"+i, at:g.day+"T"+("0"+g.hour).slice(-2)+":00:00",
         day:g.day, hour:g.hour, staff:g.staff, area:g.area, kind:g.kind, n:1, s:1, srv:1 });
