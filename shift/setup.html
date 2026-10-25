@@ -839,6 +839,11 @@ begin
            greatest(1, coalesce(nullif(x-&gt;&gt;'n','')::integer, 1))
       from jsonb_array_elements(p_rows) x
      where coalesce(x-&gt;&gt;'id','') &lt;&gt; ''
+       -- 締めた日ぶんは受け取らない（その日の数は確定している）
+       and not exists (
+         select 1 from store_day_close c
+          where c.day = (coalesce(nullif(x-&gt;&gt;'at','')::timestamptz, now())
+                         at time zone 'Asia/Tokyo')::date)
     on conflict (id) do nothing
     returning id
   )
@@ -1016,6 +1021,9 @@ declare v_id text;
 begin
   if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
   if coalesce(p_day,'') = '' then raise exception 'bad_input'; end if;
+  if exists (select 1 from store_day_close c where c.day = p_day::date) then
+    raise exception 'closed';          -- 締めた日は直せない（締めを戻してから）
+  end if;
   select id into v_id from store_visits
    where (at at time zone 'Asia/Tokyo')::date = p_day::date
      and area = btrim(coalesce(p_area,''))
@@ -1029,7 +1037,74 @@ begin
   return jsonb_build_object('ok', true, 'removed', 1);
 end $$;
 
-grant execute on function visit_minus(text, text, text, text) to anon, authenticated;</pre>
+grant execute on function visit_minus(text, text, text, text) to anon, authenticated;
+
+-- ========================================================================
+-- 来店の締め（18時でその日の数を確定する）
+-- 締めた日は、もう足したり減らしたりできない。
+-- 締めたときの人数も残すので、あとから見ても「その日の数」が動かない。
+-- ========================================================================
+
+create table if not exists store_day_close (
+  day       date primary key,
+  visits    integer not null default 0,
+  closed_at timestamptz not null default now()
+);
+
+alter table store_day_close enable row level security;
+-- ポリシーは作らない ＝ 表への直接の読み書きは全部拒否される。
+
+-- 1日ぶんを締める（中で使う。人数を数えて記録する）
+create or replace function day_close_one(p_day date)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_n int;
+begin
+  select coalesce(sum(n),0)::int into v_n from store_visits
+   where (at at time zone 'Asia/Tokyo')::date = p_day;
+  insert into store_day_close (day, visits, closed_at) values (p_day, v_n, now())
+  on conflict (day) do nothing;      -- 一度締めた日は、締め直さない
+end $$;
+
+-- 店長：締めるべき日を締める
+--   ・今日より前で、まだ締めていない日（来店のある日）は、まとめて締める
+--   ・p_close_today が true なら、今日も締める（18時を過ぎたら呼ぶ）
+create or replace function day_close(p_key text, p_today text, p_close_today boolean default false)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_today date; v_d date; v_closed boolean; v_n int;
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  v_today := coalesce(nullif(p_today,'')::date, (now() at time zone 'Asia/Tokyo')::date);
+
+  for v_d in
+    select distinct (at at time zone 'Asia/Tokyo')::date as d
+      from store_visits
+     where (at at time zone 'Asia/Tokyo')::date &lt; v_today
+  loop
+    if not exists (select 1 from store_day_close c where c.day = v_d) then
+      perform day_close_one(v_d);
+    end if;
+  end loop;
+
+  if coalesce(p_close_today,false) then
+    perform day_close_one(v_today);
+  end if;
+
+  select exists (select 1 from store_day_close c where c.day = v_today) into v_closed;
+  select visits into v_n from store_day_close where day = v_today;
+  return jsonb_build_object('ok', true, 'closed', v_closed, 'visits', coalesce(v_n,0));
+end $$;
+
+-- 店長：締めを戻す（あとから直したいときだけ）
+create or replace function day_open(p_key text, p_day text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  delete from store_day_close where day = p_day::date;
+  return jsonb_build_object('ok', true);
+end $$;
+
+grant execute on function day_close(text, text, boolean) to anon, authenticated;
+grant execute on function day_open(text, text)           to anon, authenticated;</pre>
     </li>
     <li>
       <h2>URLとキーをコピーする</h2>

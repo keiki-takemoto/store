@@ -133,6 +133,11 @@ body[data-vmode="minus"] .vcell:disabled{opacity:.35}
 body[data-vmode="minus"] #visMinus{border-color:var(--ng);background:var(--ng);color:#fff}
 body[data-vmode="minus"] .vfoot .lbl{color:var(--ng)}
 @keyframes vpop{0%{background:var(--accent-2)}100%{background:var(--surface)}}
+/* 締めたあとの帯 */
+.vfix{flex:0 0 auto;margin:9px 11px 0;background:var(--ok-bg);color:var(--ok);border-radius:10px;
+  padding:9px 12px;font-size:12.5px;font-weight:700;line-height:1.6}
+.vfix b{font-family:var(--mono);font-size:15px}
+body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
 .vfoot{flex:0 0 auto;border-top:1px solid var(--line);padding:9px 11px;display:flex;align-items:center;
   gap:9px;flex-wrap:wrap}
 .vfoot .lbl{flex:1;min-width:0}
@@ -303,9 +308,11 @@ body[data-vmode="minus"] .vfoot .lbl{color:var(--ng)}
 
     <div class="col visit" id="colVisit">
       <h3>来店<span class="n" id="visN"></span></h3>
+      <div class="vfix" id="visFix" hidden></div>
       <div class="vgrid" id="vgrid"></div>
       <div class="vfoot">
         <span class="lbl" id="visLog"></span>
+        <button class="btn sm ghost" id="visReopen" hidden>締めを戻す</button>
         <button class="btn sm" id="visMinus" aria-pressed="false">数を直す</button>
       </div>
     </div>
@@ -488,6 +495,7 @@ function buildVisit(){
 function visId(){ return "v"+Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
 $("#vgrid").addEventListener("click",function(e){
   var b=e.target.closest(".vcell"); if(!b) return;
+  if(isFixed()){ toast("今日の来店はもう確定しています"); return }
   if(document.body.dataset.vmode==="minus"){ minusOne(b.dataset.va,b.dataset.vk); return }
   if(!REG.staff){ show("staff"); return }
   VIS.rows.unshift({ id:visId(), at:new Date().toISOString(), day:today(),
@@ -496,6 +504,54 @@ $("#vgrid").addEventListener("click",function(e){
   b.classList.remove("hit"); void b.offsetWidth; b.classList.add("hit");
   renderVisit(); flushVis();
 });
+/* 18時になったら、その日の来店をそこで締めて確定する。
+   締めたあとは足すことも減らすこともできない（置き場所の側でも止めてある）。 */
+var CLOSE_HOUR=18;
+function pastClose(){ return new Date().getHours()>=CLOSE_HOUR }
+function isFixed(){ return !!(VIS.fix&&VIS.fix.day===today()) }
+function renderFix(){
+  var on=isFixed();
+  document.body.dataset.vfix=on?"1":"";
+  $("#visFix").hidden=!on;
+  if(on){
+    $("#visFix").innerHTML="今日の来店は<b>"+(VIS.fix.n||0)+"人</b>で確定しました（"+CLOSE_HOUR+"時締め）";
+  }
+  $("#visMinus").hidden=on;
+  $("#visReopen").hidden=!on;
+  if(on&&document.body.dataset.vmode==="minus"){
+    document.body.dataset.vmode="";
+    $("#visMinus").setAttribute("aria-pressed","false");
+    $("#visMinus").textContent="数を直す";
+  }
+}
+/* 締めるべきものを締める。過去の締め忘れもここでまとめて締まる。 */
+var closing=false;
+async function closeDue(){
+  if(!syncOn()||closing) return;
+  closing=true;
+  try{
+    var r=await Sync.dayClose(today(),pastClose());
+    VIS.fix=r.closed?{day:today(),n:r.visits||0}:null;
+    saveVis(); renderFix(); renderVisit();
+  }catch(e){}
+  closing=false;
+}
+$("#visReopen").addEventListener("click",async function(){
+  if(!confirm("今日の締めを戻します。よろしいですか？\n（また"+CLOSE_HOUR+"時になるか、開き直すと締まります）")) return;
+  var b=this; b.disabled=true;
+  try{
+    await Sync.dayOpen(today());
+    VIS.fix=null; saveVis(); renderFix(); renderVisit();
+    toast("締めを戻しました");
+  }catch(e){ toast((e&&e.message)||"戻せませんでした") }
+  b.disabled=false;
+});
+/* 開けっぱなしでも18時で締まるように、1分おきに見る */
+setInterval(function(){
+  if(isFixed()||!pastClose()) return;
+  closeDue();
+},60000);
+
 /* 前の版で受け取った行には srv の印が無いので、IDの形でも見分ける */
 function fromServer(x){ return !!x.srv || String(x.id||"").indexOf("srv-")===0 }
 
@@ -509,6 +565,7 @@ $("#visMinus").addEventListener("click",function(){
   renderVisit();
 });
 function minusOne(area,kind){
+  if(isFixed()){ toast("今日の来店はもう確定しています"); return }
   var d=today();
   var same=VIS.rows.filter(function(x){ return x.day===d&&x.area===area&&x.kind===kind });
   if(!same.length){ toast("これ以上は減らせません"); return }
@@ -919,6 +976,7 @@ async function refresh(quiet){
     await pullVisit();
     await flush();
     await flushVis();
+    await closeDue();
     $("#log").textContent=hhmm()+" に確認";
   }catch(e){
     $("#log").textContent="受け取れませんでした："+((e&&e.message)||"");
@@ -950,7 +1008,7 @@ function openFor(m){
   if(m==="visit"){ show("till"); return }
   show((!guest&&AREAS.length)?"guest":"till");
 }
-buildVisit(); renderVisit();
+buildVisit(); renderVisit(); renderFix();
 renderBar();
 /* 担当がもう決まっていて、さっきまで使っていたなら、①はとばす */
 openFor(document.body.dataset.mode);

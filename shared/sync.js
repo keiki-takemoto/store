@@ -26,6 +26,7 @@
     if (code === "bad_key") return "管理用キーが違います";
     if (code === "bad_input") return "送る内容に不足があります";
     if (code === "already_replied") return "店長がもう返事を書いています";
+    if (code === "closed") return "その日の来店はもう確定しています";
     if (code === "no_function") return "SQLがまだ流されていないようです（はじめの設定をご確認ください）";
     if (code === "bad_anon") return "anonキーかURLが違います";
     if (code === "offline") return "つながりませんでした";
@@ -58,6 +59,7 @@
       if (/bad_key/.test(m)) throw err("bad_key", messageFor("bad_key"));
       if (/bad_input/.test(m)) throw err("bad_input", messageFor("bad_input"));
       if (/already_replied/.test(m)) throw err("already_replied", messageFor("already_replied"));
+      if (/\bclosed\b/.test(m)) throw err("closed", messageFor("closed"));
       throw err("error", m || "うまくいきませんでした");
     }
     if (!data || data.ok !== true) throw err("bad_response", "返事を読み取れませんでした");
@@ -186,6 +188,14 @@
     },
     visitDel: function (id) {
       return rpc("visit_del", { p_key: (CFG && CFG.key) || "", p_id: id });
+    },
+    /* 来店の締め。18時を過ぎたら、その日の数を確定する */
+    dayClose: function (today, closeToday) {
+      return rpc("day_close", { p_key: (CFG && CFG.key) || "", p_today: today,
+        p_close_today: !!closeToday });
+    },
+    dayOpen: function (day) {
+      return rpc("day_open", { p_key: (CFG && CFG.key) || "", p_day: day });
     },
     visitMinus: function (day, area, kind) {
       return rpc("visit_minus", { p_key: (CFG && CFG.key) || "", p_day: day, p_area: area, p_kind: kind });
