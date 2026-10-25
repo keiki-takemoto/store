@@ -23,6 +23,13 @@ body{display:flex;flex-direction:column}
   border-radius:999px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
   line-height:1.4;white-space:nowrap;min-height:34px}
 .bar .who button .k{opacity:.75;font-weight:500;margin-right:5px}
+/* レジ／来店の切り替え。狭い画面だけ出る */
+.mode{display:none;gap:4px;background:rgba(255,255,255,.18);border-radius:999px;padding:3px}
+.mode button{border:none;background:transparent;color:#fff;border-radius:999px;padding:6px 13px;
+  font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;min-height:30px}
+.mode button[aria-pressed="true"]{background:#fff;color:#2BA55F}
+.mode button span{font-family:var(--mono);opacity:.75;margin-left:5px;font-size:11.5px}
+.mode button[aria-pressed="true"] span{opacity:.6}
 .bar .sum{margin-left:auto;text-align:right;line-height:1.3;white-space:nowrap}
 .bar .sum b{display:block;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17px}
 .bar .sum span{font-size:11px;opacity:.85}
@@ -106,6 +113,29 @@ body{display:flex;flex-direction:column}
 .found button .p{float:right;font-family:var(--mono);font-weight:700}
 .col.right{position:relative}
 
+/* 来店の9つ */
+.col.visit{flex:0 0 230px;display:none}
+.vgrid{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:52px repeat(3,1fr);
+  grid-template-rows:26px repeat(3,1fr);gap:6px;padding:9px 11px}
+.vgrid .h{display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  color:var(--ink-3)}
+.vgrid .rh{display:flex;align-items:center;justify-content:flex-end;padding-right:3px;
+  font-size:12.5px;font-weight:800;color:var(--ink-2);text-align:right;line-height:1.2}
+.vcell{border:1px solid var(--line-2);background:var(--surface);border-radius:11px;cursor:pointer;
+  font-family:inherit;display:flex;align-items:center;justify-content:center;padding:2px;
+  font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:21px;font-weight:800;
+  color:var(--ink);min-height:44px}
+.vcell:active{transform:translateY(1px)}
+.vcell.hit{animation:vpop .35s ease}
+@keyframes vpop{0%{background:var(--accent-2)}100%{background:var(--surface)}}
+.vfoot{flex:0 0 auto;border-top:1px solid var(--line);padding:9px 11px;display:flex;align-items:center;
+  gap:9px;flex-wrap:wrap}
+.vfoot .lbl{flex:1;min-width:0}
+/* 広い画面なら、切り替えずに3列ならべる */
+@media (min-width:1080px) and (orientation:landscape){
+  .col.visit{display:flex}
+}
+
 /* 支払い画面 */
 .pay{flex-direction:column;align-items:center;justify-content:center;gap:14px;width:100%;overflow-y:auto}
 .paybox{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
@@ -141,6 +171,19 @@ body{display:flex;flex-direction:column}
 
 .msg{font-size:13px;color:var(--warn);text-align:center;line-height:1.8;padding:0 14px}
 .log{flex:0 0 auto;font-size:11px;color:var(--ink-3);text-align:right;padding:0 13px 5px}
+
+/* 狭い画面では、上の帯で レジ／来店 を切り替える */
+@media (max-width:1079px), (orientation:portrait){
+  .mode{display:flex}
+  body[data-mode="visit"] .col.left,
+  body[data-mode="visit"] .col.right{display:none}
+  body[data-mode="visit"] .col.visit{display:flex;flex:1 1 auto}
+  body[data-mode="visit"] .till{padding-bottom:0}
+  body[data-mode="visit"] .foot{display:none}
+  /* 狭い画面では画面いっぱいに広げて、押しやすい大きさにする */
+  body[data-mode="visit"] .vgrid{min-height:340px}
+  body[data-mode="visit"] .vcell{font-size:24px}
+}
 
 /* ---- 携帯や縦画面 ---- */
 /* iPadの横画面は1枚に収めるが、ほかでは高さが足りないので
@@ -189,7 +232,10 @@ body{display:flex;flex-direction:column}
 
 <div class="bar">
   <a class="home" href="../">← ホーム</a>
-  <a class="home" href="../visit/" style="opacity:.85">🚶 来店</a>
+  <div class="mode" id="mode">
+    <button type="button" data-m="till" aria-pressed="true">レジ<span id="mCart"></span></button>
+    <button type="button" data-m="visit" aria-pressed="false">来店<span id="mVis"></span></button>
+  </div>
   <div class="who">
     <button type="button" id="bStaff"><span class="k">担当</span><span id="bStaffV">—</span></button>
     <button type="button" id="bGuest" hidden><span class="k">お客様</span><span id="bGuestV">—</span></button>
@@ -248,6 +294,15 @@ body{display:flex;flex-direction:column}
         <input type="text" id="q" placeholder="番号が分からないとき　名前で探す" autocomplete="off">
       </div>
       <div class="found" id="found" hidden></div>
+    </div>
+
+    <div class="col visit" id="colVisit">
+      <h3>来店<span class="n" id="visN"></span></h3>
+      <div class="vgrid" id="vgrid"></div>
+      <div class="vfoot">
+        <span class="lbl" id="visLog"></span>
+        <button class="btn sm" id="visUndo" disabled>ひとつ戻す</button>
+      </div>
     </div>
   </div>
 
@@ -382,7 +437,7 @@ function renderStaffOpts(){
 $("#staffOpts").addEventListener("click",function(e){
   var b=e.target.closest("[data-s]"); if(!b) return;
   REG.staff=b.dataset.s; touchStaff(); renderBar();
-  show(AREAS.length?"guest":"till");
+  openFor(document.body.dataset.mode);
 });
 
 /* ---------- ② お客様の区分 ---------- */
@@ -395,7 +450,114 @@ function renderGuestOpts(){
 function guestName(){ return guest?((window.Sync&&Sync.areaName(guest))||""):"" }
 $("#guestOpts").addEventListener("click",function(e){
   var b=e.target.closest("[data-g]"); if(!b) return;
-  guest=b.dataset.g; renderBar(); show("till");
+  guest=b.dataset.g; renderBar();
+  if(wantPay){ wantPay=false; show("pay"); return }
+  show("till");
+});
+
+/* ---------- 来店を数える ---------- */
+/* レジと同じ画面に置いてある。広い画面では右端に出しっぱなし、
+   狭い画面では上の帯で切り替える。どちらでも、かごの中身は消えない。 */
+var K_VIS="storevisit.v1";
+function loadVis(){
+  var v=null; try{ v=JSON.parse(localStorage.getItem(K_VIS)) }catch(e){}
+  if(!v||typeof v!=="object") v={};
+  if(!Array.isArray(v.rows)) v.rows=[];
+  return v;
+}
+function saveVis(){ try{ localStorage.setItem(K_VIS,JSON.stringify(VIS)) }catch(e){} }
+var VIS=loadVis();
+var KINDS=(window.Sync&&Sync.KINDS)||[];
+
+function buildVisit(){
+  var h='<div class="h"></div>'+KINDS.map(function(k){ return '<div class="h">'+esc(k.nm)+'</div>' }).join("");
+  AREAS.forEach(function(a){
+    h+='<div class="rh">'+esc(a.nm)+'</div>';
+    KINDS.forEach(function(k){
+      h+='<button type="button" class="vcell" data-va="'+esc(a.k)+'" data-vk="'+esc(k.k)+'" '+
+         'title="'+esc(a.nm+" "+k.nm)+'"><span data-vn="'+esc(a.k+"-"+k.k)+'">0</span></button>';
+    });
+  });
+  $("#vgrid").innerHTML=h;
+}
+function visId(){ return "v"+Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
+$("#vgrid").addEventListener("click",function(e){
+  var b=e.target.closest(".vcell"); if(!b) return;
+  if(!REG.staff){ show("staff"); return }
+  VIS.rows.unshift({ id:visId(), at:new Date().toISOString(), day:today(),
+    staff:REG.staff, area:b.dataset.va, kind:b.dataset.vk, n:1 });
+  saveVis(); touchStaff();
+  b.classList.remove("hit"); void b.offsetWidth; b.classList.add("hit");
+  renderVisit(); flushVis();
+});
+$("#visUndo").addEventListener("click",async function(){
+  var last=VIS.rows[0]; if(!last) return;
+  VIS.rows.shift(); saveVis(); renderVisit();
+  if(syncOn()&&last.s){
+    try{ await Sync.visitDel(last.id) }
+    catch(e){ VIS.del=(VIS.del||[]); VIS.del.push(last.id); saveVis() }
+  }
+  toast("ひとつ戻しました");
+});
+function visToday(){ var d=today(); return VIS.rows.filter(function(x){ return x.day===d }) }
+function renderVisit(){
+  var by={}, all=0;
+  visToday().forEach(function(x){
+    var k=x.area+"-"+x.kind;
+    by[k]=(by[k]||0)+(x.n||1); all+=(x.n||1);
+  });
+  document.querySelectorAll("[data-vn]").forEach(function(el){ el.textContent=by[el.dataset.vn]||0 });
+  $("#visN").textContent=all?all+"人":"";
+  $("#visUndo").disabled=!VIS.rows.length;
+  var wait=VIS.rows.filter(function(x){ return !x.s }).length;
+  $("#visLog").textContent=wait?("送っていない "+wait+"件"):"";
+  $("#mVis").textContent=all||"";
+}
+var visBusy=false;
+async function flushVis(){
+  if(!syncOn()||visBusy) return;
+  var wait=VIS.rows.filter(function(x){ return !x.s });
+  var del=VIS.del||[];
+  if(!wait.length&&!del.length) return;
+  visBusy=true;
+  try{
+    if(wait.length){
+      await Sync.visitPut(wait.map(function(x){
+        return {id:x.id, at:x.at, staff:x.staff, area:x.area, kind:x.kind, n:x.n};
+      }));
+      wait.forEach(function(x){ x.s=1 });
+      saveVis();
+    }
+    for(var i=0;i<del.length;i++){ try{ await Sync.visitDel(del[i]) }catch(e){} }
+    VIS.del=[]; saveVis();
+  }catch(e){}
+  visBusy=false;
+  renderVisit();
+}
+/* ほかの端末で押したぶんも今日の数に入れる */
+async function pullVisit(){
+  if(!syncOn()) return;
+  var d=today();
+  var r=await Sync.visitsGet(d,d);
+  var wait=VIS.rows.filter(function(x){ return !x.s });
+  var out=[];
+  (r.items||[]).forEach(function(g){
+    for(var i=0;i<g.n;i++){
+      out.push({ id:"srv-"+g.day+"-"+g.hour+"-"+g.staff+"-"+g.area+"-"+g.kind+"-"+i,
+        at:g.day+"T"+("0"+g.hour).slice(-2)+":00:00", day:g.day, staff:g.staff,
+        area:g.area, kind:g.kind, n:1, s:1 });
+    }
+  });
+  VIS.rows=wait.concat(out).concat(VIS.rows.filter(function(x){ return x.day!==d }));
+  saveVis(); renderVisit();
+}
+
+/* レジ／来店の切り替え（狭い画面だけ） */
+$("#mode").addEventListener("click",function(e){
+  var b=e.target.closest("[data-m]"); if(!b) return;
+  setMode(b.dataset.m);
+  if(step!=="till"&&step!=="pay"&&step!=="done") openFor(b.dataset.m);
+  window.scrollTo({top:0});
 });
 
 /* ---------- ③ 商品番号を打つ ---------- */
@@ -470,6 +632,7 @@ function sums(){
 function renderCart(){
   var n=cart.reduce(function(s,l){ return s+l.qty },0);
   $("#cartN").textContent=n?n+"点":"";
+  $("#mCart").textContent=n||"";
   $("#cart").innerHTML=cart.length
     ? cart.map(function(l){
         return '<div class="ln">'+
@@ -495,7 +658,12 @@ $("#cart").addEventListener("click",function(e){
   if(l.qty<=0) cart=cart.filter(function(x){ return x.id!==id });
   renderCart();
 });
-$("#goPay").addEventListener("click",function(){ if(cart.length) show("pay") });
+var wantPay=false;
+$("#goPay").addEventListener("click",function(){
+  if(!cart.length) return;
+  if(!guest&&AREAS.length){ wantPay=true; show("guest"); return }   /* 区分がまだなら先に聞く */
+  show("pay");
+});
 
 /* ---------- ⑤ 支払い方法 ---------- */
 function renderPay(){
@@ -573,7 +741,7 @@ $("#nextBtn").addEventListener("click",function(){
   });
   $("#cashBox").hidden=false;
   renderFound(); renderBar();
-  show(AREAS.length?"guest":"till");
+  openFor(document.body.dataset.mode);
 });
 $("#voidBtn").addEventListener("click",async function(){
   if(!lastSale) return;
@@ -687,7 +855,9 @@ async function refresh(quiet){
   try{
     await pullItems();
     await pullToday();
+    await pullVisit();
     await flush();
+    await flushVis();
     $("#log").textContent=hhmm()+" に確認";
   }catch(e){
     $("#log").textContent="受け取れませんでした："+((e&&e.message)||"");
@@ -699,11 +869,30 @@ document.addEventListener("visibilitychange",function(){
   if(window.Sync) Sync.configure(cfg());
   refresh(true);
 });
-window.addEventListener("online",function(){ flush() });
+window.addEventListener("online",function(){ flush(); flushVis() });
 
+/* ホームの「来店」から来たときは、来店の側を開く */
+function setMode(m){
+  document.body.dataset.mode=m;
+  $("#mode").querySelectorAll("[data-m]").forEach(function(x){
+    x.setAttribute("aria-pressed",String(x.dataset.m===m));
+  });
+}
+setMode(location.hash==="#visit"?"visit":"till");
+window.addEventListener("hashchange",function(){
+  setMode(location.hash==="#visit"?"visit":"till");
+  openFor(document.body.dataset.mode);
+});
+/* 来店を数えるだけなら区分は要らない。担当だけ決まっていればよい。 */
+function openFor(m){
+  if(!REG.staff||staleStaff()){ show("staff"); return }
+  if(m==="visit"){ show("till"); return }
+  show((!guest&&AREAS.length)?"guest":"till");
+}
+buildVisit(); renderVisit();
 renderBar();
-/* 担当がもう決まっていて、さっきまで使っていたなら、①はとばして②から */
-show((REG.staff&&!staleStaff()) ? (AREAS.length?"guest":"till") : "staff");
+/* 担当がもう決まっていて、さっきまで使っていたなら、①はとばす */
+openFor(document.body.dataset.mode);
 refresh(true);
 })();
 </script>
