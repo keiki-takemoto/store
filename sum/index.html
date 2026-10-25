@@ -143,6 +143,65 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
 .det .ln .q{font-family:var(--mono);color:var(--ink-3)}
 .det .ln .a{margin-left:auto;font-family:var(--mono)}
 .det .act{margin-top:8px}
+
+/* ---- スタッフ ---- */
+.stfsum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stfsum>div{flex:1;min-width:88px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:11px;padding:10px 12px}
+.stfsum .k{font-size:11.5px;color:var(--ink-3)}
+.stfsum .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:21px;font-weight:800;
+  line-height:1.3;color:var(--ink)}
+.stf{border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;background:var(--surface)}
+.stf+.stf{margin-top:10px}
+.stf[aria-expanded="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sh{display:flex;align-items:center;gap:9px}
+.sh .rk{width:25px;height:25px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);
+  font-family:var(--mono);font-size:12px;font-weight:800;display:flex;align-items:center;
+  justify-content:center;flex:0 0 auto}
+.sh .rk.t1{background:#C9A227;color:#fff}
+.sh .rk.t2{background:#9AA0A6;color:#fff}
+.sh .rk.t3{background:#B07A4A;color:#fff}
+.sh .nm{flex:1;min-width:0;font-size:15px;font-weight:800;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh .sc{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--ok)}
+.sh .sc small{font-size:11px;color:var(--ink-3);font-weight:700}
+.sh .dl{font-family:var(--mono);font-size:11px;font-weight:800;border-radius:999px;padding:2px 7px;
+  background:var(--surface-2);color:var(--ink-3)}
+.sh .dl.up{background:var(--ok-bg);color:var(--ok)}
+.sh .dl.dn{background:var(--ng-bg);color:var(--ng)}
+.sb{margin-top:7px;font-size:12.5px;color:var(--ink-2);font-family:var(--mono);
+  font-variant-numeric:tabular-nums}
+.sbars{display:flex;gap:7px;margin-top:10px}
+.sbars>div{flex:1;min-width:0}
+.sbars .bn{font-size:10px;color:var(--ink-3);font-weight:700;text-align:center;margin-bottom:3px}
+.sbars .bb{height:6px;border-radius:999px;background:var(--surface-3)}
+.sbars .bb i{display:block;height:100%;border-radius:999px;background:var(--accent);min-width:2px}
+.sbars .bb i.hi{background:var(--ok)}
+.sbars .bv{font-family:var(--mono);font-size:10.5px;font-weight:800;text-align:center;margin-top:3px;
+  color:var(--ink-2)}
+.sdet{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.radar{width:100%;height:auto;display:block;max-width:300px;margin:0 auto}
+.radar .g{fill:none;stroke:var(--line-2);stroke-width:1;opacity:.75}
+.radar .g.o{stroke:var(--ink-3);opacity:.6}
+.radar .area{fill:var(--ok);fill-opacity:.2;stroke:var(--ok);stroke-width:2;stroke-linejoin:round}
+.radar .dot{fill:var(--ok)}
+.radar text.ax{font-size:11px;font-weight:700;fill:var(--ink);font-family:var(--ui)}
+.sax{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.sax th,.sax td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.sax th{font-size:10.5px;color:var(--ink-3);font-weight:600}
+.sax td.n,.sax th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.sax td.s{font-family:var(--mono);text-align:right;font-weight:800}
+.sax td.s.up{color:var(--ok)} .sax td.s.dn{color:var(--ink-3)}
+.scat{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.scat span{font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:999px;padding:4px 9px;font-weight:600;color:var(--ink-2)}
+.scat span b{font-family:var(--mono);color:var(--ink)}
+.stip{margin-top:11px;background:var(--warn-bg);border-radius:10px;padding:10px 12px;
+  font-size:12.5px;line-height:1.7;color:var(--ink)}
+.stip b{color:var(--warn)}
+.sgood{margin-top:9px;background:var(--ok-bg);border-radius:10px;padding:10px 12px;
+  font-size:12.5px;line-height:1.7;color:var(--ink)}
+.sgood b{color:var(--ok)}
 </style>
 </head>
 <body>
@@ -151,6 +210,7 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
   <button class="tab" data-v="day" aria-selected="true">日別売上</button>
   <button class="tab" data-v="item" aria-selected="false">商品別売上</button>
   <button class="tab" data-v="ana" aria-selected="false">分析</button>
+  <button class="tab" data-v="stf" aria-selected="false">スタッフ</button>
 </div></div></header>
 
 <main>
@@ -237,10 +297,23 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
         <p class="note">会計した時刻でまとめています。</p>
       </div></div>
     </section>
+
+    <section class="view" id="v-stf" data-off>
+      <div class="card"><div class="sec">
+        <h3 id="stfH">この月のみんな</h3>
+        <div class="stfsum" id="stfSum"></div>
+        <p class="note" id="stfNote"></p>
+      </div></div>
+      <div class="card"><div class="sec">
+        <h3>ひとりずつ<span class="lbl" style="margin-left:8px">押すとくわしく出ます</span></h3>
+        <div id="stfList"></div>
+      </div></div>
+    </section>
   </div>
 </main>
 
 <script src="../shared/sync.js"></script>
+<script src="../shared/power.js"></script>
 <script src="../shared/sales.js"></script>
 <script>
 (function(){
@@ -421,6 +494,7 @@ function bars(el,list,top,fmt){
 }
 
 function render(){
+  renderStaff();
   $("#noneCard").hidden=true;
   $("#body").hidden=false;
 
@@ -495,6 +569,188 @@ function render(){
   bars($("#byHour"),hours,hTop);
 
 }
+
+/* ---------- スタッフ ---------- */
+/* スタッフ用アプリの「5つの力」と同じ出し方（shared/power.js）で、全員ぶんを店長が見る画面。
+   店長なので、ここだけは売上と粗利も並べて出す。 */
+var prevRows=null, prevVisits=null, prevKey="";   /* 先月ぶん。タブを開いたときに取りに行く */
+
+function hiLine(){
+  var v=null; try{ v=JSON.parse(localStorage.getItem("storeregset.v1")) }catch(e){}
+  return (v&&typeof v.hiprice==="number")?v.hiprice:3000;
+}
+/* 商品の種類は、設定の商品台帳（storeitems.v1）から引く */
+var CATOF=null;
+function catOf(id){
+  if(!CATOF){
+    CATOF={};
+    var v=null; try{ v=JSON.parse(localStorage.getItem("storeitems.v1")) }catch(e){}
+    ((v&&v.items)||[]).forEach(function(it){ CATOF[it.id]=String(it.cat||"") });
+  }
+  return CATOF[id]||"";
+}
+/* 会計と来店から、power.js に渡せる形の行を作る */
+function powerRows(sales,vis){
+  var hi=hiLine(), m={}, order=[];
+  function row(nm){
+    if(!m[nm]){
+      m[nm]={name:nm, vis:0, buy:0, qty:0, hiqty:0,
+        visA:{west:0,asia:0,jp:0}, buyA:{west:0,asia:0,jp:0}, cats:{},
+        amt:0, cost:0, disc:0};
+      order.push(nm);
+    }
+    return m[nm];
+  }
+  (vis||[]).forEach(function(g){
+    var r=row(g.staff||"（担当なし）"), k=Number(g.n)||0;
+    r.vis+=k;
+    if(r.visA[g.area]!=null) r.visA[g.area]+=k;
+  });
+  (sales||[]).filter(function(x){ return !x.voided }).forEach(function(x){
+    var r=row(x.staff||"（担当なし）");
+    r.buy++; r.qty+=Number(x.qty)||0;
+    r.amt+=Number(x.total)||0; r.cost+=Number(x.cost)||0; r.disc+=Number(x.discount)||0;
+    if(r.buyA[x.area]!=null) r.buyA[x.area]++;
+    (x.lines||[]).forEach(function(l){
+      var q=Number(l.qty)||0;
+      if((Number(l.price)||0)>=hi) r.hiqty+=q;
+      var c=catOf(l.id)||"その他";
+      r.cats[c]=(r.cats[c]||0)+q;
+    });
+  });
+  return order.map(function(k){ return m[k] });
+}
+/* 先月ぶんを取りに行く（「先月より＋◯」を出すため）。失敗しても画面は出す */
+async function pullPrev(){
+  var key=unit+"-"+year+"-"+month;
+  if(prevKey===key) return;
+  prevKey=key;
+  var from, to;
+  if(unit==="month"){
+    from=(year-1)+"-01-01"; to=(year-1)+"-12-31";
+  }else{
+    var d=new Date(year,month-2,1);
+    var y=d.getFullYear(), mo=d.getMonth()+1;
+    var last=new Date(y,mo,0).getDate();
+    from=y+"-"+pad2(mo)+"-01"; to=y+"-"+pad2(mo)+"-"+pad2(last);
+  }
+  try{
+    var r=await Sales.rows(from,to);
+    prevRows=(r&&r.rows)||[];
+  }catch(e){ prevRows=null }
+  try{ var v=await Sync.visitsGet(from,to); prevVisits=v.items||[] }
+  catch(e){ prevVisits=null }
+  renderStaff();
+}
+
+function renderStaff(){
+  var W=(unit==="month")?"年":"月";
+  $("#stfH").textContent="この"+W+"のみんな";
+  var now=powerRows(rows,visits);
+  if(!now.length){
+    $("#stfSum").innerHTML="";
+    $("#stfNote").textContent="";
+    $("#stfList").innerHTML='<div class="empty">この'+W+'はまだ記録がありません。</div>';
+    return;
+  }
+  var tV=0,tB=0,tA=0,tC=0;
+  now.forEach(function(r){ tV+=r.vis; tB+=r.buy; tA+=r.amt; tC+=r.cost });
+  $("#stfSum").innerHTML=
+    '<div><div class="k">来店</div><div class="v">'+tV+'</div></div>'+
+    '<div><div class="k">購入</div><div class="v">'+tB+'</div></div>'+
+    '<div><div class="k">購買率</div><div class="v">'+pct(tB,tV)+'</div></div>'+
+    '<div><div class="k">売上</div><div class="v">'+yen(tA)+'</div></div>';
+  $("#stfNote").innerHTML='スコアは<b>みんなの中での位置</b>です。50がまん中、100がいちばん。'+
+    'スタッフの画面に出ているものと同じ数字です。<br>'+
+    '高単価のラインは '+hiLine().toLocaleString("ja-JP")+'円（<a href="../settings/#reg">設定 → レジ</a>で変えられます）。';
+
+  var prev=(prevRows?powerRows(prevRows,prevVisits||[]):null);
+  var AX=Power.AXES;
+  /* 総合スコアの高い順に並べる */
+  var list=now.map(function(r){
+    var sc=Power.axisScores(now,r.name);
+    return {r:r, sc:sc, tot:Power.totalScore(sc)};
+  }).sort(function(a,b){
+    return (b.tot||0)-(a.tot||0) || b.r.amt-a.r.amt || a.r.name.localeCompare(b.r.name,"ja");
+  });
+
+  $("#stfList").innerHTML=list.map(function(x,i){
+    var r=x.r, sc=x.sc, pos=i+1;
+    var dl="";
+    if(prev&&x.tot!==null){
+      var has=prev.some(function(q){ return q.name===r.name });
+      if(has){
+        var pt=Power.totalScore(Power.axisScores(prev,r.name));
+        if(pt!==null){
+          var d=x.tot-pt;
+          dl='<span class="dl '+(d>0?"up":d<0?"dn":"")+'">'+
+             (d>0?"＋":d<0?"−":"±")+Math.abs(d)+'</span>';
+        }
+      }
+    }
+    var bars=AX.map(function(a){
+      var v=sc[a.k]&&sc[a.k].s;
+      return '<div><div class="bn">'+esc(a.nm)+'</div>'+
+        '<div class="bb"><i class="'+(v>=50?"hi":"")+'" style="width:'+(v==null?0:v)+'%"></i></div>'+
+        '<div class="bv">'+(v==null?"—":v)+'</div></div>';
+    }).join("");
+    return '<div class="stf" data-s="'+esc(r.name)+'" aria-expanded="false">'+
+      '<div class="sh"><span class="rk'+(pos<=3?" t"+pos:"")+'">'+pos+'</span>'+
+      '<span class="nm">'+esc(r.name)+'</span>'+dl+
+      '<span class="sc">'+(x.tot===null?"—":x.tot)+'<small> /100</small></span></div>'+
+      '<div class="sb">'+yen(r.amt)+'　粗利 '+yen(r.amt-r.cost)+'　購買率 '+pct(r.buy,r.vis)+'</div>'+
+      '<div class="sbars">'+bars+'</div>'+
+      '<div class="sdet" hidden>'+staffDet(r,sc,now)+'</div></div>';
+  }).join("");
+}
+
+/* 押したときに開く中身 */
+function staffDet(r,sc,all){
+  var AX=Power.AXES;
+  var h=Power.radarSvg(sc)+
+    '<table class="sax"><thead><tr><th>力</th><th class="n">この人</th>'+
+    '<th class="n">みんなの平均</th><th class="n">位</th><th class="n">点</th></tr></thead><tbody>'+
+    AX.map(function(a){
+      var x=sc[a.k]||{};
+      return '<tr><td>'+esc(a.nm)+'</td><td class="n">'+esc(a.tx(r))+'</td>'+
+        '<td class="n">'+(x.avg==null?"—":esc(a.av(x.avg)))+'</td>'+
+        '<td class="n">'+(x.pos==null?"—":x.pos)+'</td>'+
+        '<td class="s '+(x.s>=50?"up":"dn")+'">'+(x.s==null?"—":x.s)+'</td></tr>';
+    }).join("")+'</tbody></table>';
+
+  /* 商品の種類 */
+  var ks=Object.keys(r.cats||{}).filter(function(k){ return r.cats[k]>0 })
+    .sort(function(a,b){ return r.cats[b]-r.cats[a] });
+  if(ks.length){
+    h+='<h4 class="sub">売れた商品の種類</h4><div class="scat">'+
+      ks.map(function(k){ return '<span>'+esc(k)+' <b>'+r.cats[k]+'</b></span>' }).join("")+
+      '</div>';
+  }
+
+  /* ほめるところ／声をかけるところ */
+  var got=AX.filter(function(a){ return sc[a.k]&&sc[a.k].s!=null });
+  if(got.length){
+    got.sort(function(x,y){ return sc[y.k].s-sc[x.k].s });
+    var top=got[0], low=got[got.length-1];
+    h+='<div class="sgood">ほめるなら <b>'+esc(top.nm)+'</b>（'+esc(top.ds)+'）。'+
+       esc(top.nm)+' は '+esc(top.tx(r))+
+       (all.length>1?'、みんなの平均は '+esc(top.av(sc[top.k].avg)):"")+'。</div>';
+    if(got.length>1&&sc[low.k].s<50){
+      h+='<div class="stip">声をかけるなら <b>'+esc(low.nm)+'</b>（'+esc(low.ds)+'）。<br>'+
+         esc(low.tip)+'</div>';
+    }
+  }
+  h+='<p class="note">売上 '+yen(r.amt)+'・粗利 '+yen(r.amt-r.cost)+
+     '・値引き '+yen(r.disc)+'・客単価 '+(r.buy?yen(r.amt/r.buy):"—")+'</p>';
+  return h;
+}
+
+$("#stfList").addEventListener("click",function(e){
+  var c=e.target.closest(".stf"); if(!c) return;
+  var open=c.getAttribute("aria-expanded")==="true";
+  c.setAttribute("aria-expanded",String(!open));
+  c.querySelector(".sdet").hidden=open;
+});
 
 /* ---------- 来店と購買率 ---------- */
 /* 来店は「日・時間帯・担当・区分」でまとめて届く。購入は会計の件数。 */
@@ -690,7 +946,8 @@ $("#byUnit").addEventListener("click",async function(e){
 /* ---------- 共通 ---------- */
 $("#tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
-  ["day","item","ana"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  ["day","item","ana","stf"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  if(b.dataset.v==="stf") pullPrev();
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   window.scrollTo({top:0});
 });
