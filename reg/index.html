@@ -495,7 +495,10 @@ $("#vgrid").addEventListener("click",function(e){
 /* 前の版で受け取った行には srv の印が無いので、IDの形でも見分ける */
 function fromServer(x){ return !!x.srv || String(x.id||"").indexOf("srv-")===0 }
 function lastMine(){
-  var mine=VIS.rows.filter(function(x){ return !fromServer(x) });
+  /* 今日のぶんだけ。画面は今日しか出していないので、
+     前の日のものを知らないうちに消してしまわないようにする。 */
+  var d=today();
+  var mine=VIS.rows.filter(function(x){ return x.day===d && !fromServer(x) });
   if(!mine.length) return null;
   return mine.reduce(function(a,b){ return (b.at>a.at)?b:a });
 }
