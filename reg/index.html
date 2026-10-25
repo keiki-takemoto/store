@@ -490,16 +490,35 @@ $("#vgrid").addEventListener("click",function(e){
   b.classList.remove("hit"); void b.offsetWidth; b.classList.add("hit");
   renderVisit(); flushVis();
 });
+/* この端末で押したぶんのうち、いちばん新しいもの。
+   置き場所から受け取った行（srv）は本当のIDを持っていないので、戻す相手にしない。 */
+/* 前の版で受け取った行には srv の印が無いので、IDの形でも見分ける */
+function fromServer(x){ return !!x.srv || String(x.id||"").indexOf("srv-")===0 }
+function lastMine(){
+  var mine=VIS.rows.filter(function(x){ return !fromServer(x) });
+  if(!mine.length) return null;
+  return mine.reduce(function(a,b){ return (b.at>a.at)?b:a });
+}
 $("#visUndo").addEventListener("click",async function(){
-  var last=VIS.rows[0]; if(!last) return;
-  VIS.rows.shift(); saveVis(); renderVisit();
-  if(syncOn()&&last.s){
-    try{ await Sync.visitDel(last.id) }
-    catch(e){ VIS.del=(VIS.del||[]); VIS.del.push(last.id); saveVis() }
+  var last=lastMine();
+  if(!last){ toast("この端末で押したぶんがありません"); return }
+  VIS.rows=VIS.rows.filter(function(x){ return x!==last });
+  /* 送りずみなら、置き場所からも消す。消すまでは数え直しても戻らないよう控えておく */
+  if(last.s){
+    VIS.del=(VIS.del||[]);
+    VIS.del.push({ id:last.id, key:visKey(last) });
   }
+  saveVis(); renderVisit();
+  if(syncOn()&&last.s) flushVis();
   toast("ひとつ戻しました");
 });
 function visToday(){ var d=today(); return VIS.rows.filter(function(x){ return x.day===d }) }
+/* 置き場所は「日・時間帯・担当・区分」でまとめて返してくる。手元のぶんと突き合わせる目印。 */
+function visKey(x){
+  var h=x.hour;
+  if(h==null){ var d=new Date(x.at); h=isNaN(d)?0:d.getHours() }
+  return x.day+"|"+h+"|"+(x.staff||"")+"|"+(x.area||"")+"|"+(x.kind||"");
+}
 function renderVisit(){
   var by={}, all=0;
   visToday().forEach(function(x){
@@ -508,7 +527,7 @@ function renderVisit(){
   });
   document.querySelectorAll("[data-vn]").forEach(function(el){ el.textContent=by[el.dataset.vn]||0 });
   $("#visN").textContent=all?all+"人":"";
-  $("#visUndo").disabled=!VIS.rows.length;
+  $("#visUndo").disabled=!lastMine();
   var wait=VIS.rows.filter(function(x){ return !x.s }).length;
   $("#visLog").textContent=wait?("送っていない "+wait+"件"):"";
   $("#mVis").textContent=all||"";
@@ -528,27 +547,38 @@ async function flushVis(){
       wait.forEach(function(x){ x.s=1 });
       saveVis();
     }
-    for(var i=0;i<del.length;i++){ try{ await Sync.visitDel(del[i]) }catch(e){} }
-    VIS.del=[]; saveVis();
+    var left=[];
+    for(var i=0;i<del.length;i++){
+      try{ await Sync.visitDel(del[i].id) }catch(e){ left.push(del[i]) }
+    }
+    VIS.del=left; saveVis();
   }catch(e){}
   visBusy=false;
   renderVisit();
 }
-/* ほかの端末で押したぶんも今日の数に入れる */
+/* ほかの端末で押したぶんも今日の数に入れる。
+   自分の端末で押したぶんは、本当のIDを持ったまま残す（「ひとつ戻す」で消せるように）。
+   置き場所はまとめた数で返ってくるので、手元にあるぶんを引いた差だけ足す。 */
 async function pullVisit(){
   if(!syncOn()) return;
   var d=today();
   var r=await Sync.visitsGet(d,d);
-  var wait=VIS.rows.filter(function(x){ return !x.s });
+  var mine=VIS.rows.filter(function(x){ return x.day===d && !fromServer(x) });
+  var have={};
+  mine.forEach(function(x){ if(x.s){ var k=visKey(x); have[k]=(have[k]||0)+1 } });
+  /* まだ消せていない取り消しも、置き場所の数にはまだ入っているので引いておく */
+  (VIS.del||[]).forEach(function(x){ have[x.key]=(have[x.key]||0)+1 });
+
   var out=[];
   (r.items||[]).forEach(function(g){
-    for(var i=0;i<g.n;i++){
-      out.push({ id:"srv-"+g.day+"-"+g.hour+"-"+g.staff+"-"+g.area+"-"+g.kind+"-"+i,
-        at:g.day+"T"+("0"+g.hour).slice(-2)+":00:00", day:g.day, staff:g.staff,
-        area:g.area, kind:g.kind, n:1, s:1 });
+    var k=g.day+"|"+g.hour+"|"+(g.staff||"")+"|"+(g.area||"")+"|"+(g.kind||"");
+    var n=(g.n||0)-(have[k]||0);
+    for(var i=0;i<n;i++){
+      out.push({ id:"srv-"+k+"-"+i, at:g.day+"T"+("0"+g.hour).slice(-2)+":00:00",
+        day:g.day, hour:g.hour, staff:g.staff, area:g.area, kind:g.kind, n:1, s:1, srv:1 });
     }
   });
-  VIS.rows=wait.concat(out).concat(VIS.rows.filter(function(x){ return x.day!==d }));
+  VIS.rows=mine.concat(out).concat(VIS.rows.filter(function(x){ return x.day!==d }));
   saveVis(); renderVisit();
 }
 
