@@ -94,6 +94,12 @@
     { k: "f",   nm: "女" },
     { k: "kid", nm: "子供" }
   ];
+  /* 支払い方法。足したいときはここに1行足す（k は変えないこと） */
+  var PAYS = [
+    { k: "cash",   nm: "現金" },
+    { k: "card",   nm: "カード" },
+    { k: "paypay", nm: "PayPay" }
+  ];
   function nameOf(list, k) {
     for (var i = 0; i < list.length; i++) if (list[i].k === k) return list[i].nm;
     return "";
@@ -104,6 +110,8 @@
     catOf: catOf,
     AREAS: AREAS,
     KINDS: KINDS,
+    PAYS: PAYS,
+    payName: function (k) { return nameOf(PAYS, k) || "現金" },
     areaName: function (k) { return nameOf(AREAS, k) || "（区分なし）" },
     kindName: function (k) { return nameOf(KINDS, k) || "" },
     configure: configure, config: config, isOn: isOn, messageFor: messageFor,

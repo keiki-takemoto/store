@@ -605,7 +605,7 @@ create table if not exists store_sales (
   at         timestamptz not null default now(), -- 会計した時刻
   staff      text    not null default '',        -- 誰が売ったか
   guest      text    not null default '',        -- お客様の種類（設定で足した言葉がそのまま入る）
-  pay        text    not null default 'cash',    -- cash（現金）／card（カード）
+  pay        text    not null default 'cash',    -- cash（現金）／card（カード）／paypay（PayPay）
   subtotal   integer not null default 0,         -- 値引き前
   discount   integer not null default 0,         -- 値引き
   total      integer not null default 0,         -- 受け取った額（subtotal - discount）
@@ -643,7 +643,7 @@ begin
            btrim(coalesce(x->>'staff','')),
            btrim(coalesce(x->>'guest','')),
            btrim(coalesce(x->>'area','')),
-           case when x->>'pay' = 'card' then 'card' else 'cash' end,
+           case when x->>'pay' in ('card','paypay') then x->>'pay' else 'cash' end,
            coalesce(nullif(x->>'subtotal','')::integer, 0),
            coalesce(nullif(x->>'discount','')::integer, 0),
            coalesce(nullif(x->>'total','')::integer, 0),

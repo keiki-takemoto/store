@@ -250,6 +250,7 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return
 function yen(n){ return "¥"+Math.round(Number(n)||0).toLocaleString("ja-JP") }
 function pad2(n){ return ("0"+n).slice(-2) }
 var DOW=["日","月","火","水","木","金","土"];
+function payName(k){ return (window.Sync&&Sync.payName(k))||"現金" }
 
 /* ---------- 集計対象 ---------- */
 var now=new Date();
@@ -461,7 +462,7 @@ function render(){
   var g=group(list,function(s){ return s.guest },"（選んでいない）");
   $("#cGuest").hidden=(g.length===1&&g[0].name==="（選んでいない）");
   bars($("#byGuest"),g,amt);
-  bars($("#byPay"),group(list,function(s){ return (s.pay==="card")?"カード":"現金" },"現金"),amt);
+  bars($("#byPay"),group(list,function(s){ return payName(s.pay) },"現金"),amt);
 
   /* 曜日ごと。日数が違うと比べられないので、1日あたりの平均にする */
   if(unit!=="day"){
@@ -649,7 +650,7 @@ var open={};
 function listHtml(list){
   return list.length
     ? list.map(function(s){
-        var sub=[s.staff||"—", s.guest, ((s.pay==="card")?"カード":"現金"), s.qty+"点"]
+        var sub=[s.staff||"—", s.guest, payName(s.pay), s.qty+"点"]
           .filter(Boolean).join("・");
         var head='<div class="r'+(s.voided?" void":"")+(open[s.id]?" open":"")+'" data-id="'+esc(s.id)+'">'+
           '<span class="t">'+esc(s.at||"")+'</span>'+

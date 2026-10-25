@@ -155,7 +155,7 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
 .paybox .amt .v{font-family:var(--mono);font-size:46px;font-weight:800;line-height:1.15}
 .pays{display:flex;gap:10px}
 .pays button{flex:1;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:12px;
-  padding:17px 0;font-size:18px;font-weight:700;cursor:pointer;font-family:inherit}
+  padding:17px 0;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
 .pays button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
 .fr{display:flex;align-items:center;gap:10px;margin-top:13px;font-size:14px;color:var(--ink-2)}
 .fr input{margin-left:auto;width:150px;font-size:19px;text-align:right;font-family:var(--mono);color:var(--ink);
@@ -225,9 +225,13 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
   .log{padding-bottom:10px}
 }
 @media (max-width:420px){
-  .bar{gap:7px;padding-left:11px;padding-right:11px}
+  /* 帯に入りきらないので、折り返して2段にする */
+  .bar{gap:7px;row-gap:6px;padding-left:11px;padding-right:11px;flex-wrap:wrap}
   .bar .who button{padding:6px 10px;font-size:12px;min-height:32px}
-  .bar .sum b{font-size:15px}
+  .bar .sum{line-height:1.2}
+  .bar .sum b{font-size:15px;display:inline;margin-right:7px}
+  .bar .sum span{font-size:11px}
+  .pays button{font-size:15.5px;padding:15px 0}
   .pick .opts button{padding:16px 22px;font-size:18px;min-width:132px}
   .paybox{padding:15px 14px}
   .paybox .amt .v{font-size:38px}
@@ -322,10 +326,7 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
   <div class="pane pay" id="p-pay">
     <div class="paybox">
       <div class="amt"><div class="k" id="payWho">—</div><div class="v" id="payTot">¥0</div></div>
-      <div class="pays">
-        <button type="button" data-pay="cash" aria-pressed="true">現金</button>
-        <button type="button" data-pay="card" aria-pressed="false">カード</button>
-      </div>
+      <div class="pays" id="pays"></div>
       <div class="fr">値引き<input type="text" inputmode="numeric" id="disc" placeholder="0"></div>
       <div id="cashBox">
         <div class="fr">預かり<input type="text" inputmode="numeric" id="cashIn" placeholder="0"></div>
@@ -784,20 +785,27 @@ $("#goPay").addEventListener("click",function(){
 });
 
 /* ---------- ⑤ 支払い方法 ---------- */
+var PAYS=(window.Sync&&Sync.PAYS)||[{k:"cash",nm:"現金"}];
+function payName(k){ return (window.Sync&&Sync.payName(k))||"現金" }
+function renderPays(){
+  $("#pays").innerHTML=PAYS.map(function(p){
+    return '<button type="button" data-pay="'+esc(p.k)+'" aria-pressed="'+(pay===p.k)+'">'+
+      esc(p.nm)+'</button>';
+  }).join("");
+}
 function renderPay(){
+  renderPays();
   var s=sums();
   $("#payTot").textContent=yen(s.total);
   $("#payWho").textContent=[REG.staff,guestName()].filter(Boolean).join("　/　")+"　"+s.qty+"点";
   renderQuick(s.total);
   renderChange();
 }
-$(".pays").addEventListener("click",function(e){
+$("#pays").addEventListener("click",function(e){
   var b=e.target.closest("[data-pay]"); if(!b) return;
   pay=b.dataset.pay;
-  $(".pays").querySelectorAll("[data-pay]").forEach(function(x){
-    x.setAttribute("aria-pressed",String(x.dataset.pay===pay));
-  });
-  $("#cashBox").hidden=(pay!=="cash");
+  renderPays();
+  $("#cashBox").hidden=(pay!=="cash");   /* お釣りが要るのは現金だけ */
   renderChange();
 });
 $("#disc").addEventListener("input",function(){ renderPay() });
@@ -846,7 +854,7 @@ $("#payBtn").addEventListener("click",function(){
   /* お釣りを先に出す。送るのはそのあと（つながらなくても会計は終わらせる） */
   var ch=(pay==="cash"&&got)?got-s.total:0;
   $("#dCh").textContent=(pay==="cash"&&got)?"お釣り "+yen(ch):yen(s.total);
-  $("#dSub").textContent=[(pay==="cash"?"現金":"カード"), guestName(), s.qty+"点", yen(s.total)]
+  $("#dSub").textContent=[payName(pay), guestName(), s.qty+"点", yen(s.total)]
     .filter(Boolean).join("　")+(s.disc?"（値引き "+yen(s.disc)+"）":"");
   show("done"); renderBar();
   flush();
@@ -854,9 +862,7 @@ $("#payBtn").addEventListener("click",function(){
 $("#nextBtn").addEventListener("click",function(){
   cart=[]; buf=""; guest=""; lastSale=null; pay="cash";
   $("#disc").value=""; $("#cashIn").value=""; $("#q").value="";
-  $(".pays").querySelectorAll("[data-pay]").forEach(function(x){
-    x.setAttribute("aria-pressed",String(x.dataset.pay==="cash"));
-  });
+  renderPays();
   $("#cashBox").hidden=false;
   renderFound(); renderBar();
   openFor(document.body.dataset.mode);
@@ -1008,7 +1014,7 @@ function openFor(m){
   if(m==="visit"){ show("till"); return }
   show((!guest&&AREAS.length)?"guest":"till");
 }
-buildVisit(); renderVisit(); renderFix();
+buildVisit(); renderVisit(); renderFix(); renderPays();
 renderBar();
 /* 担当がもう決まっていて、さっきまで使っていたなら、①はとばす */
 openFor(document.body.dataset.mode);
