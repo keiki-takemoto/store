@@ -95,6 +95,13 @@
     { k: "kid", nm: "子供" }
   ];
   /* 支払い方法。足したいときはここに1行足す（k は変えないこと） */
+  /* 仕入先の頼み方 */
+  var HOWS = [{ k: "mail", nm: "メール" }, { k: "web", nm: "ホームページ" }];
+  function howName(k) {
+    for (var i = 0; i < HOWS.length; i++) { if (HOWS[i].k === k) return HOWS[i].nm }
+    return "メール";
+  }
+
   var PAYS = [
     { k: "cash",   nm: "現金" },
     { k: "card",   nm: "カード" },
@@ -111,6 +118,8 @@
     AREAS: AREAS,
     KINDS: KINDS,
     PAYS: PAYS,
+    HOWS: HOWS,
+    howName: howName,
     payName: function (k) { return nameOf(PAYS, k) || "現金" },
     areaName: function (k) { return nameOf(AREAS, k) || "（区分なし）" },
     kindName: function (k) { return nameOf(KINDS, k) || "" },
@@ -137,6 +146,26 @@
     },
     itemsPut: function (items, cats) {
       return rpc("store_items_put", { p_key: (CFG && CFG.key) || "", p_items: items || [], p_cats: cats || null });
+    },
+    /* 仕入先と発注（店長用キーだけ）。仕入れ値が入るのでスタッフからは触れない */
+    vendorsGet: function (since) {
+      return rpc("vendors_get", { p_key: (CFG && CFG.key) || "", p_since: since || null });
+    },
+    vendorPut: function (rows) {
+      return rpc("vendor_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
+    },
+    orderPut: function (rows) {
+      return rpc("order_put", { p_key: (CFG && CFG.key) || "", p_rows: rows || [] });
+    },
+    /* 期間を渡さないと「出したまま届いていないもの」だけが返る */
+    ordersGet: function (from, to) {
+      return rpc("orders_get", { p_key: (CFG && CFG.key) || "", p_from: from || null, p_to: to || null });
+    },
+    orderRecv: function (id, lines) {
+      return rpc("order_recv", { p_key: (CFG && CFG.key) || "", p_id: id, p_lines: lines || null });
+    },
+    orderVoid: function (id) {
+      return rpc("order_void", { p_key: (CFG && CFG.key) || "", p_id: id });
     },
     /* 帳簿（変動費・固定費・人件費）。これも店長用キーだけ */
     booksGet: function (since) {

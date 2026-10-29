@@ -70,6 +70,23 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .catTag{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border-radius:7px;padding:2px 8px}
 .rate{font-family:var(--mono);color:var(--ink-2)}
 .low{color:var(--warn);font-weight:700}
+/* 仕入先 */
+.ven{border:1px solid var(--line);border-radius:12px;padding:12px}
+.ven+.ven{margin-top:10px}
+.ven .vh{display:flex;align-items:center;gap:8px}
+.ven .vh input.vn{flex:1;min-width:0;font-size:15px;font-weight:700;border:1px solid var(--line);
+  border-radius:9px;padding:8px 10px;font-family:inherit;background:var(--surface);color:var(--ink)}
+.ven .vrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px}
+.ven .vrow label{font-size:12px;color:var(--ink-3);font-weight:600;flex:0 0 auto}
+.ven .vrow input[type=text],.ven .vrow input[type=email],.ven .vrow textarea{
+  flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;
+  font-family:inherit;font-size:13.5px;background:var(--surface);color:var(--ink)}
+.ven .vrow textarea{min-height:92px;line-height:1.7;resize:vertical;width:100%}
+.ven .hows{display:flex;gap:6px;background:var(--surface-2);border-radius:9px;padding:3px}
+.ven .hows button{border:none;background:transparent;border-radius:7px;padding:7px 12px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:700;color:var(--ink-2)}
+.ven .hows button[aria-pressed="true"]{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+.ven .cnt{font-size:11.5px;color:var(--ink-3);font-weight:600}
 .rowitem.lowstock{background:var(--warn-bg);border-radius:9px;padding-left:9px;padding-right:9px}
 /* 登録したばかりのものは、794点の中で迷子にならないよう上に出して目印を付ける */
 .rowitem.just{outline:2px solid var(--accent);outline-offset:2px;border-radius:9px}
@@ -97,6 +114,7 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 <header class="top"><div class="top-in"><div class="tabs">
   <button class="tab" data-v="staff" aria-selected="true">スタッフ</button>
   <button class="tab" data-v="item" aria-selected="false">商品</button>
+  <button class="tab" data-v="ven" aria-selected="false">仕入先</button>
   <button class="tab" data-v="reg" aria-selected="false">レジ</button>
   <button class="tab" data-v="conn" aria-selected="false">置き場所</button>
 </div></div></header>
@@ -155,13 +173,16 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
           </div>
           <div class="nf-row">
             <span class="fg">店舗にある数 <input type="number" id="nStock" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
-            <span class="fg">在庫アラーム <input type="number" id="nAlert" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
+            <span class="fg">足りない数 <input type="number" id="nAlert" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
+            <span class="fg">いつもの数 <input type="number" id="nPar" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
           </div>
           <div class="nf-row end"><button class="btn primary" id="addItem">保存</button></div>
         </div>
         <p class="note">商品名だけ入れれば登録できます。ほかは空のままでも構いません。<br>
           <b>原価率</b>は売価と仕入れ値から自動で出します（仕入れ値 ÷ 売価）。<br>
-          <b>店舗にある数</b>が<b>在庫アラーム</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
+          <b>店舗にある数</b>が<b>足りない数</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
+          そのとき<a href="../order/">発注</a>の画面に出て、<b>いつもの数</b>まで戻る分を注文します。
+          <b>1箱の数</b>を入れておくと、箱の単位に切り上げます。<br>
           <b>カテゴリー</b>は「＋ 新しいカテゴリー…」からその場で作れます。上の「表示」で絞り込めます。<br>
           登録したあとは、一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
       </div>
@@ -238,6 +259,20 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
   </section>
 
   <!-- レジ -->
+  <!-- 仕入先 -->
+  <section class="view" id="v-ven" data-off>
+    <div class="card">
+      <div class="card-h"><h2>仕入先</h2>
+        <button class="btn sm primary" id="venAdd">ふやす</button></div>
+      <div class="sec">
+        <p class="note" style="margin-top:0">発注の画面は、ここで決めた<b>頼み方</b>で分かれます。<br>
+          <b>メール</b>なら文面を作ってメールアプリが開きます。
+          <b>ホームページ</b>ならそのページを開いて、注文する中身を横に出します。</p>
+        <div id="venList"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="view" id="v-reg" data-off>
     <div class="card">
       <div class="card-h"><h2>お客様の区分</h2></div>
@@ -497,6 +532,13 @@ function rateText(it){
   if(p===null||c===null||p<=0) return "—";
   return (Math.round(c/p*1000)/10)+"%";
 }
+/* 商品の行に出す「仕入先」のえらぶところ */
+function venOpts(cur){
+  var list=liveVen();
+  return '<option value="">—</option>'+list.map(function(v){
+    return '<option value="'+esc(v.id)+'"'+(v.id===cur?" selected":"")+'>'+esc(v.name||"（名前なし）")+'</option>';
+  }).join("");
+}
 function fld(it,f,label,unit,step){
   return '<span class="fg">'+label+
     ' <input type="number" class="num" data-f="'+f+'" data-id="'+esc(it.id)+'" min="0" step="'+(step||10)+'" '+
@@ -543,8 +585,14 @@ function renderItems(){
       '<div class="ri-sub"><span class="fg">カテゴリー <select data-cat="'+esc(it.id)+'">'+catOpts(it.cat||"",true)+'</select></span>'+
         '<span class="fg rate">原価率 '+rateText(it)+'</span></div>'+
       '<div class="ri-sub">'+fld(it,"price","売価","円")+fld(it,"cost","仕入れ","円")+'</div>'+
-      '<div class="ri-sub">'+fld(it,"stock","店舗にある数","",1)+fld(it,"alert","在庫アラーム","",1)+
+      '<div class="ri-sub">'+fld(it,"stock","店舗にある数","",1)+fld(it,"alert","足りない数","",1)+
+        fld(it,"par","いつもの数","",1)+
         (isLow(it)?'<span class="fg low">少なくなっています</span>':'')+'</div>'+
+      '<div class="ri-sub"><span class="fg">仕入先 <select data-ven="'+esc(it.id)+'">'+
+        venOpts(it.vendor||"")+'</select></span>'+
+        '<span class="fg">先方のNo <input type="text" class="no" data-f="vno" data-id="'+esc(it.id)+
+        '" value="'+esc(it.vno||"")+'" placeholder="—"></span>'+
+        fld(it,"lot","1箱の数","",1)+'</div>'+
       '</div>';
   }).join("");
   renderSync();
@@ -573,7 +621,8 @@ $("#addItem").addEventListener("click",function(){
   if(no) it.no=no;
   var cat=$("#nCat").value;
   if(cat&&cat!==NEWCAT) it.cat=cat;
-  [["price","#nPrice"],["cost","#nCost"],["stock","#nStock"],["alert","#nAlert"]].forEach(function(pair){
+  [["price","#nPrice"],["cost","#nCost"],["stock","#nStock"],["alert","#nAlert"],
+   ["par","#nPar"]].forEach(function(pair){
     var v=parseInt($(pair[1]).value,10);
     if(!isNaN(v)&&v>=0) it[pair[0]]=v;
   });
@@ -607,10 +656,18 @@ $("#itemTbl").addEventListener("change",function(e){
     if(cs.value) it0.cat=cs.value; else delete it0.cat;
     touch(it0); saveItems(IT); queueSync(); renderItems(); return;
   }
+  var vs=e.target.closest("[data-ven]");
+  if(vs){
+    var itv=IT.items.filter(function(x){ return x.id===vs.dataset.ven })[0]; if(!itv) return;
+    if(vs.value) itv.vendor=vs.value; else delete itv.vendor;
+    touch(itv); saveItems(IT); queueSync(); renderItems(); return;
+  }
   var el=e.target.closest("[data-f]"); if(!el) return;
   var it=IT.items.filter(function(x){ return x.id===el.dataset.id })[0]; if(!it) return;
   var f=el.dataset.f;
-  if(f==="no"){ var t=el.value.trim(); if(t) it.no=t; else delete it.no }
+  if(f==="no"||f==="vno"){
+    var t=el.value.trim(); if(t) it[f]=t; else delete it[f];
+  }
   else{
     var v=parseInt(el.value,10);
     if(el.value===""||isNaN(v)||v<0){ delete it[f]; el.value="" } else { it[f]=v }
@@ -635,6 +692,89 @@ $("#itemTbl").addEventListener("click",function(e){
     if(syncOn()){ it2.del=1; it2.d=1 }           /* ほかの端末にも消したことを伝える */
     else IT.items=IT.items.filter(function(x){ return x.id!==it2.id });
     saveItems(IT); queueSync(); renderItems(); toast(it2.name+" を削除しました");
+  }
+});
+
+/* ---------- 仕入先 ---------- */
+/* 発注の頼み方（メール／ホームページ）と、メールのひな形をここで決める。
+   商品の「仕入先」でこの一覧から選ぶ。 */
+var K_VEN="storevendors.v1";
+var VEN=(function(){
+  var v=null; try{ v=JSON.parse(localStorage.getItem(K_VEN)) }catch(e){}
+  if(!v||typeof v!=="object") v={};
+  if(!Array.isArray(v.list)) v.list=[];
+  return v;
+})();
+function saveVen(){ try{ localStorage.setItem(K_VEN,JSON.stringify(VEN)) }catch(e){ toast("保存できませんでした") } }
+function liveVen(){ return VEN.list.filter(function(x){ return !x.del }) }
+function venById(id){ return VEN.list.filter(function(x){ return x.id===id })[0]||null }
+function venName(id){ var v=venById(id); return v?(v.name||"（名前なし）"):"" }
+function venId(){ return "v"+Date.now().toString(36)+Math.random().toString(36).slice(2,6) }
+var BODY0="いつもお世話になっております。\n下記のとおり発注いたします。\n\n{明細}\n\nよろしくお願いいたします。";
+
+function renderVen(){
+  var list=liveVen();
+  if(!list.length){
+    $("#venList").innerHTML='<div class="note">まだありません。右上の「ふやす」で足してください。</div>';
+    return;
+  }
+  var cnt={};
+  IT.items.forEach(function(it){ if(!it.del&&it.vendor) cnt[it.vendor]=(cnt[it.vendor]||0)+1 });
+  $("#venList").innerHTML=list.map(function(v){
+    var mail=(v.how!=="web");
+    return '<div class="ven" data-v="'+esc(v.id)+'">'+
+      '<div class="vh"><input class="vn" type="text" data-vf="name" value="'+esc(v.name||"")+
+        '" placeholder="仕入先の名前">'+
+        '<button class="btn sm ghost" data-vdel="'+esc(v.id)+'">削除</button></div>'+
+      '<div class="vrow"><div class="hows">'+
+        ((window.Sync&&Sync.HOWS)||[]).map(function(h){
+          return '<button type="button" data-vhow="'+esc(h.k)+'" aria-pressed="'+
+            String((v.how||"mail")===h.k)+'">'+esc(h.nm)+'</button>';
+        }).join("")+'</div>'+
+        '<span class="cnt">'+(cnt[v.id]||0)+'点</span></div>'+
+      (mail
+        ? '<div class="vrow"><label>宛先</label>'+
+          '<input type="email" data-vf="mail" value="'+esc(v.mail||"")+'" placeholder="chuumon@example.co.jp"></div>'+
+          '<div class="vrow"><label>件名</label>'+
+          '<input type="text" data-vf="subject" value="'+esc(v.subject||"")+'" placeholder="発注のお願い（ZIPANG）"></div>'+
+          '<div class="vrow"><label style="width:100%">本文のひな形</label>'+
+          '<textarea data-vf="body" placeholder="'+esc(BODY0)+'">'+esc(v.body||"")+'</textarea></div>'+
+          '<p class="note" style="margin:7px 0 0">本文の <b>{明細}</b> のところに、'+
+          '注文する商品の一覧が入ります。空のままなら決まった文で作ります。</p>'
+        : '<div class="vrow"><label>注文するページ</label>'+
+          '<input type="text" data-vf="url" value="'+esc(v.url||"")+'" placeholder="https://..."></div>'+
+          '<p class="note" style="margin:7px 0 0">発注のときに、このページを開くボタンが出ます。'+
+          '注文する中身は横に出したまま打ち込めます。</p>')+
+      '<div class="vrow"><label>メモ</label>'+
+      '<input type="text" data-vf="note" value="'+esc(v.note||"")+'" placeholder="（自由に）"></div>'+
+      '</div>';
+  }).join("");
+}
+$("#venAdd").addEventListener("click",function(){
+  VEN.list.push({id:venId(), name:"", how:"mail", d:1});
+  saveVen(); queueSync(); renderVen();
+});
+$("#venList").addEventListener("input",function(e){
+  var el=e.target.closest("[data-vf]"); if(!el) return;
+  var box=el.closest(".ven"); if(!box) return;
+  var v=venById(box.dataset.v); if(!v) return;
+  v[el.dataset.vf]=el.value;
+  v.d=1; saveVen(); queueSync();
+});
+$("#venList").addEventListener("click",function(e){
+  var hb=e.target.closest("[data-vhow]");
+  if(hb){
+    var box=hb.closest(".ven"), v=venById(box.dataset.v); if(!v) return;
+    v.how=hb.dataset.vhow; v.d=1; saveVen(); queueSync(); renderVen(); return;
+  }
+  var db=e.target.closest("[data-vdel]");
+  if(db){
+    var v2=venById(db.dataset.vdel); if(!v2) return;
+    var used=IT.items.filter(function(x){ return !x.del&&x.vendor===v2.id }).length;
+    if(!confirm((v2.name||"この仕入先")+" を消しますか？"+
+      (used?"\n"+used+"点の商品から、仕入先が外れます。":""))) return;
+    IT.items.forEach(function(x){ if(x.vendor===v2.id){ delete x.vendor; touch(x) } });
+    v2.del=1; v2.d=1; saveVen(); saveItems(IT); queueSync(); renderVen(); renderItems();
   }
 });
 
@@ -665,6 +805,8 @@ function pushDirty(){
   var pay=dirty.map(function(x){
     return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
       price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:numOf(x.alert),
+      vendor:String(x.vendor||""), vno:String(x.vno||""),
+      par:numOf(x.par), lot:numOf(x.lot),
       deleted:!!x.del};
   });
   return putChunks(pay,cats).then(function(){
@@ -673,6 +815,41 @@ function pushDirty(){
     IT.items=IT.items.filter(function(x){ return !x.del });   /* 消したことは伝えたので手元から外す */
     saveItems(IT);
     return dirty.length;
+  });
+}
+/* 仕入先も商品と同じやり方で、送って受け取る */
+function pushVen(){
+  var dirty=VEN.list.filter(function(x){ return x.d });
+  if(!dirty.length) return Promise.resolve(0);
+  var pay=dirty.map(function(v){
+    return {id:v.id, name:String(v.name||""), how:(v.how==="web"?"web":"mail"),
+      url:String(v.url||""), mail:String(v.mail||""), subject:String(v.subject||""),
+      body:String(v.body||""), note:String(v.note||""), deleted:!!v.del};
+  });
+  return Sync.vendorPut(pay).then(function(){
+    dirty.forEach(function(x){ delete x.d });
+    VEN.list=VEN.list.filter(function(x){ return !x.del });
+    saveVen();
+    return dirty.length;
+  });
+}
+function pullVen(){
+  return Sync.vendorsGet(VEN.pulledAt||null).then(function(r){
+    var byId={}; VEN.list.forEach(function(x){ byId[x.id]=x });
+    (r.items||[]).forEach(function(sr){
+      var cur=byId[sr.id];
+      if(cur&&cur.d) return;                    /* この端末で直したものは残す */
+      if(sr.deleted){ if(cur) cur.del=1; return }
+      var v=cur||{id:sr.id};
+      ["name","how","url","mail","subject","body","note"].forEach(function(f){
+        v[f]=String(sr[f]||"");
+      });
+      if(v.how!=="web") v.how="mail";
+      if(!cur){ VEN.list.push(v); byId[sr.id]=v }
+    });
+    VEN.list=VEN.list.filter(function(x){ return !(x.del&&!x.d) });
+    if(r.now) VEN.pulledAt=r.now;
+    saveVen();
   });
 }
 function pullItems(){
@@ -687,7 +864,9 @@ function pullItems(){
       it.name=String(sr.name||"");
       if(sr.no) it.no=String(sr.no); else delete it.no;
       if(sr.cat) it.cat=String(sr.cat); else delete it.cat;
-      ["price","cost","stock","alert"].forEach(function(f){
+      if(sr.vendor) it.vendor=String(sr.vendor); else delete it.vendor;
+      if(sr.vno) it.vno=String(sr.vno); else delete it.vno;
+      ["price","cost","stock","alert","par","lot"].forEach(function(f){
         if(typeof sr[f]==="number") it[f]=sr[f]; else delete it[f];
       });
       if(!cur){ IT.items.push(it); byId[sr.id]=it }
@@ -709,7 +888,8 @@ function renderSync(){
     b.hidden=true; return;
   }
   b.hidden=false;
-  var w=IT.items.filter(function(x){ return x.d }).length;
+  var w=IT.items.filter(function(x){ return x.d }).length+
+        VEN.list.filter(function(x){ return x.d }).length;
   st.textContent = syncBusy ? "合わせています…"
     : (w ? ("まだ送っていないもの "+w+"点"+(syncErr?"／"+syncErr:"（まもなく送ります）"))
          : (syncErr||syncMsg||"ほかの端末と同じにしています"));
@@ -718,9 +898,9 @@ function syncNow(quiet){
   if(!syncOn()||syncBusy) return Promise.resolve();
   clearTimeout(syncT);
   syncBusy=true; renderSync();
-  return pushDirty().then(pullItems).then(function(){
+  return pushDirty().then(pushVen).then(pullItems).then(pullVen).then(function(){
     syncBusy=false; syncErr=""; syncMsg="ほかの端末と同じです（"+hhmm()+" に確認）";
-    renderItems();
+    renderItems(); renderVen();
   }).catch(function(e){
     syncBusy=false;
     syncErr=(e&&e.message)||"つながりませんでした";
@@ -971,8 +1151,9 @@ function pullGuests(){
 /* ---------- 共通 ---------- */
 document.querySelector(".tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
-  ["staff","item","reg","conn"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  ["staff","item","ven","reg","conn"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   if(b.dataset.v==="conn"){ fillCfg(); renderSyncUI(); renderAnn() }
+  if(b.dataset.v==="ven") renderVen();
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   window.scrollTo({top:0});
 });
@@ -987,16 +1168,18 @@ document.addEventListener("visibilitychange",function(){
   if(document.visibilityState!=="visible") return;
   DB=loadShift(); IT=loadItems();
   if(window.Sync) Sync.configure(DB.sync&&DB.sync.url?DB.sync:null);
-  renderStaff(); renderItems(); renderGuests();
+  VEN=(function(){ var v=null; try{ v=JSON.parse(localStorage.getItem(K_VEN)) }catch(e){}
+    if(!v||typeof v!=="object") v={}; if(!Array.isArray(v.list)) v.list=[]; return v })();
+  renderStaff(); renderItems(); renderVen(); renderGuests();
   if(syncOn()){ syncNow(true); pullGuests() }
 });
-renderStaff(); renderItems(); renderGuests(); pullGuests();
+renderStaff(); renderItems(); renderVen(); renderGuests(); pullGuests();
 fillCfg(); renderSyncUI(); renderAnn();
 
 /* ほかの画面から #conn のように指定して開けるようにする（案内用） */
 (function(){
   var h=String(location.hash||"").replace("#","");
-  if(["staff","item","reg","conn"].indexOf(h)<0) return;
+  if(["staff","item","ven","reg","conn"].indexOf(h)<0) return;
   var t=document.querySelector('.tab[data-v="'+h+'"]');
   if(t) setTimeout(function(){ t.click() },0);
 })();

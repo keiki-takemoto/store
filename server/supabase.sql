@@ -4,10 +4,43 @@
 -- 考え方：表そのものは誰にも触らせない（RLSを有効にしてポリシーを作らない）。
 -- 下の関数だけが表に触れて、関数の中で合言葉を確かめる。
 -- だから、アプリに埋め込む anon キーが人目に触れても、合言葉が無ければ何もできない。
+--
+-- ★ 合言葉そのものは、このファイルには書きません。
+--   このファイルは手順ページとしてインターネットに公開しているので、
+--   ここに書くと誰でも読めてしまうためです。
+--   本当の値は store_secret という表に入れます。入れ方はこのファイルの
+--   いちばん下、「合言葉を入れる」のところを見てください。
+--   合言葉を入れるまでは、どの関数も何も返しません（それで正しい動きです）。
 
--- この2つはこの店だけのもの。変えるときは下の2行を書き換えて、もう一度 Run。
---   スタッフ用 : iq9kbjfflg
---   店長用     : eu5gh80n32faz4m2hv0zgwui
+-- ========================================================================
+-- 合言葉のしまい場所
+--   admin … 店長用のキー（売上・仕入れ値・お給料・発注）
+--   staff … スタッフ用の共通の合言葉（シフト・報告）
+-- この表も RLS を有効にしてポリシーを作らないので、外からは読めません。
+-- 読めるのは下の admin_ok / code_ok の中だけです。
+-- ========================================================================
+create table if not exists store_secret (
+  k          text primary key,
+  v          text not null default '',
+  updated_at timestamptz not null default now()
+);
+alter table store_secret enable row level security;
+
+create or replace function secret_of(p_k text)
+returns text language sql stable security definer set search_path = public as $$
+  select v from store_secret where k = p_k;
+$$;
+
+-- 店長用のキーが合っているか
+create or replace function admin_ok(p_key text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(secret_of('admin'),'') <> ''
+     and btrim(coalesce(p_key,'')) = secret_of('admin');
+$$;
+
+-- この2つはアプリからは呼べないようにする（中の関数からだけ呼ぶ）
+revoke all on function secret_of(text) from public;
+revoke all on function admin_ok(text)  from public;
 
 create table if not exists shift_requests (
   month       text not null,
@@ -39,7 +72,7 @@ create or replace function shift_submit_request(p_code text, p_name text, p_mont
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_name text := btrim(coalesce(p_name,''));
 begin
-  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
   if v_name = '' or p_month !~ '^[0-9]{4}-[0-9]{2}$' then raise exception 'bad_input'; end if;
   insert into shift_requests (month, name, days, note, updated_at)
   values (p_month, v_name, coalesce(p_days,'{}'::jsonb), coalesce(p_note,''), now())
@@ -54,7 +87,7 @@ create or replace function shift_list_requests(p_key text, p_month text default 
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_items jsonb;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
            'at',    to_char(r.updated_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI:SS'),
            'month', r.month, 'name', r.name, 'days', r.days, 'note', r.note
@@ -69,7 +102,7 @@ end $$;
 create or replace function shift_publish(p_key text, p_month text, p_days jsonb, p_closed jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if p_month !~ '^[0-9]{4}-[0-9]{2}$' then raise exception 'bad_input'; end if;
   insert into shift_published (month, days, closed, published_at)
   values (p_month, coalesce(p_days,'{}'::jsonb), coalesce(p_closed,'[]'::jsonb), now())
@@ -84,7 +117,7 @@ create or replace function shift_get(p_code text, p_month text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_row shift_published%rowtype;
 begin
-  if p_code is distinct from 'iq9kbjfflg' and p_code is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_code'; end if;
+  if not code_ok(p_code) and not admin_ok(p_code) then raise exception 'bad_code'; end if;
   select * into v_row from shift_published where month = p_month;
   if not found then
     return jsonb_build_object('ok', true, 'month', p_month, 'days', null, 'closed', '[]'::jsonb, 'publishedAt', '');
@@ -120,6 +153,16 @@ create table if not exists store_items (
 );
 create index if not exists store_items_upd on store_items (updated_at);
 
+-- 発注のために足した列（あとから足したので alter で足す）
+--   vendor … どこから仕入れるか（store_vendors.id）
+--   vno    … その仕入先での商品番号（注文のときはこれを書く）
+--   par    … いつも置いておきたい数。注文の数はここまで戻すように決める
+--   lot    … 1箱の入り数。注文は箱の単位に切り上げる（1なら1個ずつ頼める）
+alter table store_items add column if not exists vendor text    not null default '';
+alter table store_items add column if not exists vno    text    not null default '';
+alter table store_items add column if not exists par    integer;
+alter table store_items add column if not exists lot    integer;
+
 -- カテゴリーの並びなど、商品以外のちょっとしたもの
 create table if not exists store_meta (
   k          text primary key,
@@ -136,11 +179,12 @@ create or replace function store_items_get(p_key text, p_since text default null
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_items jsonb; v_cats jsonb; v_since timestamptz;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   v_since := case when coalesce(p_since,'') = '' then null else p_since::timestamptz end;
   select coalesce(jsonb_agg(jsonb_build_object(
            'id', i.id, 'no', i.no, 'name', i.name, 'cat', i.cat,
            'price', i.price, 'cost', i.cost, 'stock', i.stock, 'alert', i.alert,
+           'vendor', i.vendor, 'vno', i.vno, 'par', i.par, 'lot', i.lot,
            'deleted', i.deleted,
            'upd', to_char(i.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
          ) order by i.updated_at), '[]'::jsonb)
@@ -158,13 +202,16 @@ end $$;
 create or replace function store_items_put(p_key text, p_items jsonb, p_cats jsonb default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if p_items is not null and jsonb_typeof(p_items) = 'array' then
-    insert into store_items (id, no, name, cat, price, cost, stock, alert, deleted, updated_at)
+    insert into store_items (id, no, name, cat, price, cost, stock, alert,
+                             vendor, vno, par, lot, deleted, updated_at)
     select x->>'id',
            coalesce(x->>'no',''), coalesce(x->>'name',''), coalesce(x->>'cat',''),
            nullif(x->>'price','')::integer, nullif(x->>'cost','')::integer,
            nullif(x->>'stock','')::integer, nullif(x->>'alert','')::integer,
+           coalesce(x->>'vendor',''), coalesce(x->>'vno',''),
+           nullif(x->>'par','')::integer, nullif(x->>'lot','')::integer,
            coalesce((x->>'deleted')::boolean, false), now()
       from jsonb_array_elements(p_items) x
      where coalesce(x->>'id','') <> ''
@@ -172,6 +219,8 @@ begin
       set no = excluded.no, name = excluded.name, cat = excluded.cat,
           price = excluded.price, cost = excluded.cost,
           stock = excluded.stock, alert = excluded.alert,
+          vendor = excluded.vendor, vno = excluded.vno,
+          par = excluded.par, lot = excluded.lot,
           deleted = excluded.deleted, updated_at = now();
   end if;
   if p_cats is not null and jsonb_typeof(p_cats) = 'array' then
@@ -184,6 +233,197 @@ end $$;
 
 grant execute on function store_items_get(text, text)        to anon, authenticated;
 grant execute on function store_items_put(text, jsonb, jsonb) to anon, authenticated;
+
+-- ========================================================================
+-- 発注（仕入先と、出した注文）
+-- 頼み方は2つある。
+--   web  … 仕入先のホームページで注文する。アプリは注文する中身を作るところまで。
+--   mail … メールで注文する。アプリが文面を作り、iPadのメールアプリを開く。
+-- どちらも「送った」を押したときに1件できて、「届いた」で在庫に足す。
+-- 仕入れ値が入っているので、店長用キーだけが触れる。
+-- ========================================================================
+
+create table if not exists store_vendors (
+  id         text primary key,
+  name       text    not null default '',
+  how        text    not null default 'mail',   -- 'web' か 'mail'
+  url        text    not null default '',       -- web のときの注文ページ
+  mail       text    not null default '',       -- mail のときの宛先
+  subject    text    not null default '',       -- メールの件名のひな形
+  body       text    not null default '',       -- メールの本文のひな形（{明細} に一覧が入る）
+  note       text    not null default '',
+  deleted    boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+create index if not exists store_vendors_upd on store_vendors (updated_at);
+
+-- 1回の注文を1行で持つ。中身（何をいくつ）は lines にまとめて入れる。
+--   lines … [{id, no, vno, name, qty, lot, boxes, cost}]
+--   status … 'sent'（出した）／'done'（届いた）／'void'（取り消した）
+create table if not exists store_orders (
+  id         text primary key,
+  at         timestamptz not null default now(),
+  vendor     text    not null default '',
+  vname      text    not null default '',       -- そのときの仕入先の名前（あとで変わっても残す）
+  how        text    not null default '',
+  lines      jsonb   not null default '[]'::jsonb,
+  status     text    not null default 'sent',
+  got_at     timestamptz,
+  note       text    not null default '',
+  updated_at timestamptz not null default now()
+);
+create index if not exists store_orders_at  on store_orders (at);
+create index if not exists store_orders_st  on store_orders (status);
+
+alter table store_vendors enable row level security;
+alter table store_orders  enable row level security;
+
+-- 店長：仕入先を受け取る
+create or replace function vendors_get(p_key text, p_since text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_rows jsonb; v_since timestamptz;
+begin
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
+  v_since := case when coalesce(p_since,'') = '' then null else p_since::timestamptz end;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', v.id, 'name', v.name, 'how', v.how, 'url', v.url, 'mail', v.mail,
+           'subject', v.subject, 'body', v.body, 'note', v.note, 'deleted', v.deleted,
+           'upd', to_char(v.updated_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+         ) order by v.updated_at), '[]'::jsonb)
+    into v_rows
+    from store_vendors v
+   where v_since is null or v.updated_at > v_since;
+  return jsonb_build_object('ok', true, 'items', v_rows,
+    'now', to_char((now() - interval '5 seconds') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+end $$;
+
+-- 店長：仕入先を書き込む
+create or replace function vendor_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
+  insert into store_vendors (id, name, how, url, mail, subject, body, note, deleted, updated_at)
+  select x->>'id',
+         coalesce(x->>'name',''),
+         case when x->>'how' = 'web' then 'web' else 'mail' end,
+         coalesce(x->>'url',''), coalesce(x->>'mail',''),
+         coalesce(x->>'subject',''), coalesce(x->>'body',''), coalesce(x->>'note',''),
+         coalesce((x->>'deleted')::boolean, false), now()
+    from jsonb_array_elements(p_rows) x
+   where coalesce(x->>'id','') <> ''
+  on conflict (id) do update
+    set name = excluded.name, how = excluded.how, url = excluded.url, mail = excluded.mail,
+        subject = excluded.subject, body = excluded.body, note = excluded.note,
+        deleted = excluded.deleted, updated_at = now();
+  return jsonb_build_object('ok', true,
+    'now', to_char(now() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'));
+end $$;
+
+-- 店長：注文を出した（「送った」を押したとき）。同じ id は入れ直さない
+create or replace function order_put(p_key text, p_rows jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_n int;
+begin
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
+  with ins as (
+    insert into store_orders (id, at, vendor, vname, how, lines, status, note, updated_at)
+    select x->>'id',
+           coalesce(nullif(x->>'at','')::timestamptz, now()),
+           coalesce(x->>'vendor',''), coalesce(x->>'vname',''), coalesce(x->>'how',''),
+           case when jsonb_typeof(x->'lines') = 'array' then x->'lines' else '[]'::jsonb end,
+           'sent', coalesce(x->>'note',''), now()
+      from jsonb_array_elements(p_rows) x
+     where coalesce(x->>'id','') <> ''
+    on conflict (id) do nothing
+    returning 1
+  )
+  select count(*) into v_n from ins;
+  return jsonb_build_object('ok', true, 'n', v_n);
+end $$;
+
+-- 店長：注文の一覧（期間で絞る。空なら出したまま届いていないものだけ）
+create or replace function orders_get(p_key text, p_from text default null, p_to text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_rows jsonb; v_from date; v_to date;
+begin
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
+  v_from := case when coalesce(p_from,'') = '' then null else p_from::date end;
+  v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', o.id,
+           'at', to_char(o.at at time zone 'Asia/Tokyo','YYYY-MM-DD"T"HH24:MI:SS'),
+           'vendor', o.vendor, 'vname', o.vname, 'how', o.how,
+           'lines', o.lines, 'status', o.status,
+           'got', case when o.got_at is null then null
+                  else to_char(o.got_at at time zone 'Asia/Tokyo','YYYY-MM-DD"T"HH24:MI:SS') end,
+           'note', o.note
+         ) order by o.at desc), '[]'::jsonb)
+    into v_rows
+    from store_orders o
+   where (v_from is null and v_to is null and o.status = 'sent')
+      or ((v_from is null or (o.at at time zone 'Asia/Tokyo')::date >= v_from)
+      and (v_to   is null or (o.at at time zone 'Asia/Tokyo')::date <= v_to));
+  return jsonb_build_object('ok', true, 'items', v_rows);
+end $$;
+
+-- 店長：届いた。受け取った数を在庫に足して、その注文を終わりにする
+--   p_lines … [{id, qty}] 実際に届いた数。省くと注文した数がそのまま入る
+create or replace function order_recv(p_key text, p_id text, p_lines jsonb default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_lines jsonb;
+begin
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
+  select lines into v_lines from store_orders where id = p_id and status = 'sent';
+  if v_lines is null then raise exception 'bad_input'; end if;   -- 無いか、もう終わっている
+  if p_lines is not null and jsonb_typeof(p_lines) = 'array' then
+    -- 届いた数を、注文の中身に書き戻す
+    select coalesce(jsonb_agg(
+             case when g.q is null then l
+                  else jsonb_set(l, '{qty}', to_jsonb(g.q)) end), '[]'::jsonb)
+      into v_lines
+      from jsonb_array_elements(v_lines) l
+      left join lateral (
+        select coalesce(nullif(y->>'qty','')::int, 0) as q
+          from jsonb_array_elements(p_lines) y
+         where y->>'id' = l->>'id'
+         limit 1
+      ) g on true;
+  end if;
+  -- 在庫に足す
+  update store_items i
+     set stock = coalesce(i.stock,0) + t.q, updated_at = now()
+    from (
+      select l->>'id' as id, sum(coalesce(nullif(l->>'qty','')::int, 0))::int as q
+        from jsonb_array_elements(v_lines) l
+       where coalesce(l->>'id','') <> ''
+       group by 1
+    ) t
+   where i.id = t.id and t.q > 0;
+  update store_orders
+     set lines = v_lines, status = 'done', got_at = now(), updated_at = now()
+   where id = p_id;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- 店長：注文を取り消す（まだ届いていないものだけ）
+create or replace function order_void(p_key text, p_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
+  update store_orders set status = 'void', updated_at = now()
+   where id = p_id and status = 'sent';
+  if not found then raise exception 'bad_input'; end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+grant execute on function vendors_get(text, text)        to anon, authenticated;
+grant execute on function vendor_put(text, jsonb)        to anon, authenticated;
+grant execute on function order_put(text, jsonb)         to anon, authenticated;
+grant execute on function orders_get(text, text, text)   to anon, authenticated;
+grant execute on function order_recv(text, text, jsonb)  to anon, authenticated;
+grant execute on function order_void(text, text)         to anon, authenticated;
 
 -- ========================================================================
 -- 帳簿（店舗管理の「経費」と「収支表」）
@@ -212,7 +452,7 @@ create or replace function store_books_get(p_key text, p_since text default null
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_rows jsonb; v_since timestamptz;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   v_since := case when coalesce(p_since,'') = '' then null else p_since::timestamptz end;
   select coalesce(jsonb_agg(jsonb_build_object(
            'id', b.id, 'kind', b.kind, 'day', b.day, 'data', b.data, 'deleted', b.deleted
@@ -229,7 +469,7 @@ end $$;
 create or replace function store_books_put(p_key text, p_rows jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if p_rows is not null and jsonb_typeof(p_rows) = 'array' then
     insert into store_books (id, kind, day, data, deleted, updated_at)
     select x->>'id', coalesce(x->>'kind',''), coalesce(x->>'day',''),
@@ -282,7 +522,7 @@ create or replace function report_submit(p_code text, p_id text, p_name text, p_
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_id text := btrim(coalesce(p_id,''));
 begin
-  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
   if v_id = '' or btrim(coalesce(p_body,'')) = '' then raise exception 'bad_input'; end if;
   insert into store_reports (id, name, title, body, cat, created_at)
   values (v_id, btrim(coalesce(p_name,'')), btrim(coalesce(p_title,'')), p_body,
@@ -297,7 +537,7 @@ create or replace function report_list_mine(p_code text, p_ids jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_items jsonb;
 begin
-  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
   if p_ids is null or jsonb_typeof(p_ids) <> 'array' then
     return jsonb_build_object('ok', true, 'items', '[]'::jsonb);
   end if;
@@ -319,7 +559,7 @@ create or replace function report_list(p_key text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_items jsonb;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
            'id', r.id, 'name', r.name, 'title', r.title, 'body', r.body, 'cat', r.cat,
            'at', to_char(r.created_at at time zone 'Asia/Tokyo','YYYY-MM-DD HH24:MI')
@@ -334,7 +574,7 @@ end $$;
 create or replace function report_reply(p_key text, p_id text, p_reply text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if btrim(coalesce(p_reply,'')) = '' then raise exception 'bad_input'; end if;
   update store_reports
      set reply = p_reply, replied = true, replied_at = now()
@@ -349,7 +589,7 @@ create or replace function report_cancel(p_code text, p_id text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_n int;
 begin
-  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
   delete from store_reports where id = p_id and replied = false;
   get diagnostics v_n = row_count;
   if v_n = 0 then raise exception 'already_replied'; end if;   -- 返事ずみか、もう無い
@@ -383,7 +623,7 @@ alter table store_staff enable row level security;
 create or replace function staff_put(p_key text, p_rows jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
   delete from store_staff
    where name not in (select coalesce(x->>'name','') from jsonb_array_elements(p_rows) x);
@@ -401,7 +641,7 @@ create or replace function staff_me(p_code text, p_name text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_row store_staff%rowtype;
 begin
-  if p_code is distinct from 'iq9kbjfflg' then raise exception 'bad_code'; end if;
+  if not code_ok(p_code) then raise exception 'bad_code'; end if;
   select * into v_row from store_staff where name = btrim(coalesce(p_name,''));
   if not found then return jsonb_build_object('ok', true, 'found', false); end if;
   return jsonb_build_object('ok', true, 'found', true,
@@ -424,7 +664,8 @@ create unique index if not exists store_staff_tok on store_staff (tok) where tok
 -- 合言葉として通すかどうか（みんな共通の合言葉か、誰かの個人用か）
 create or replace function code_ok(p_code text)
 returns boolean language sql stable security definer set search_path = public as $$
-  select btrim(coalesce(p_code,'')) = 'iq9kbjfflg'
+  select (coalesce(secret_of('staff'),'') <> ''
+          and btrim(coalesce(p_code,'')) = secret_of('staff'))
       or exists (select 1 from store_staff s
                   where s.tok <> '' and s.tok = btrim(coalesce(p_code,'')));
 $$;
@@ -465,7 +706,7 @@ create or replace function shift_get(p_code text, p_month text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_row shift_published%rowtype;
 begin
-  if not code_ok(p_code) and p_code is distinct from 'eu5gh80n32faz4m2hv0zgwui' then
+  if not code_ok(p_code) and not admin_ok(p_code) then
     raise exception 'bad_code';
   end if;
   select * into v_row from shift_published where month = p_month;
@@ -527,7 +768,7 @@ end $$;
 create or replace function staff_put(p_key text, p_rows jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
   delete from store_staff
    where name not in (select coalesce(x->>'name','') from jsonb_array_elements(p_rows) x);
@@ -567,7 +808,7 @@ alter table store_push enable row level security;
 create or replace function push_put(p_key text, p_endpoint text, p_p256dh text, p_auth text, p_label text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if btrim(coalesce(p_endpoint,'')) = '' then raise exception 'bad_input'; end if;
   insert into store_push (endpoint, p256dh, auth, label, created_at)
   values (p_endpoint, coalesce(p_p256dh,''), coalesce(p_auth,''), coalesce(p_label,''), now())
@@ -580,7 +821,7 @@ end $$;
 create or replace function push_del(p_key text, p_endpoint text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   delete from store_push where endpoint = p_endpoint;
   return jsonb_build_object('ok', true);
 end $$;
@@ -633,7 +874,7 @@ create or replace function sale_put(p_key text, p_rows jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_new int := 0; v_stock int := 0;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
 
   with ins as (
@@ -678,7 +919,7 @@ create or replace function sales_get(p_key text, p_from text default null, p_to 
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_items jsonb; v_from date; v_to date;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   v_from := case when coalesce(p_from,'') = '' then null else p_from::date end;
   v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
   -- 日付は日本時間で見る（サーバーのUTCで切ると、夜の会計が前の日に入ってしまう）
@@ -702,7 +943,7 @@ create or replace function sale_void(p_key text, p_id text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_lines jsonb;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   update store_sales set voided = true where id = p_id and voided = false
   returning lines into v_lines;
   if v_lines is null then raise exception 'bad_input'; end if;   -- もう無いか、取り消しずみ
@@ -726,7 +967,7 @@ create or replace function meta_get(p_key text, p_k text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v jsonb;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   select store_meta.v into v from store_meta where k = p_k;
   return jsonb_build_object('ok', true, 'v', coalesce(v, 'null'::jsonb));
 end $$;
@@ -734,7 +975,7 @@ end $$;
 create or replace function meta_put(p_key text, p_k text, p_v jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if btrim(coalesce(p_k,'')) = '' then raise exception 'bad_input'; end if;
   insert into store_meta (k, v, updated_at) values (p_k, coalesce(p_v,'null'::jsonb), now())
   on conflict (k) do update set v = excluded.v, updated_at = now();
@@ -770,7 +1011,7 @@ create or replace function visit_put(p_key text, p_rows jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_new int := 0;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'bad_input'; end if;
   with ins as (
     insert into store_visits (id, at, staff, area, kind, n)
@@ -798,7 +1039,7 @@ end $$;
 create or replace function visit_del(p_key text, p_id text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   delete from store_visits where id = p_id;
   return jsonb_build_object('ok', true);
 end $$;
@@ -808,7 +1049,7 @@ create or replace function visits_get(p_key text, p_from text default null, p_to
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_items jsonb; v_from date; v_to date;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   v_from := case when coalesce(p_from,'') = '' then null else p_from::date end;
   v_to   := case when coalesce(p_to,'')   = '' then null else p_to::date   end;
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -980,7 +1221,7 @@ create or replace function visit_minus(p_key text, p_day text, p_area text, p_ki
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_id text;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   if coalesce(p_day,'') = '' then raise exception 'bad_input'; end if;
   if exists (select 1 from store_day_close c where c.day = p_day::date) then
     raise exception 'closed';          -- 締めた日は直せない（締めを戻してから）
@@ -1033,7 +1274,7 @@ create or replace function day_close(p_key text, p_today text, p_close_today boo
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare v_today date; v_d date; v_closed boolean; v_n int;
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   v_today := coalesce(nullif(p_today,'')::date, (now() at time zone 'Asia/Tokyo')::date);
 
   for v_d in
@@ -1059,10 +1300,33 @@ end $$;
 create or replace function day_open(p_key text, p_day text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
-  if p_key is distinct from 'eu5gh80n32faz4m2hv0zgwui' then raise exception 'bad_key'; end if;
+  if not admin_ok(p_key) then raise exception 'bad_key'; end if;
   delete from store_day_close where day = p_day::date;
   return jsonb_build_object('ok', true);
 end $$;
 
 grant execute on function day_close(text, text, boolean) to anon, authenticated;
 grant execute on function day_open(text, text)           to anon, authenticated;
+
+
+-- ========================================================================
+-- ★ 合言葉を入れる（ここだけは自分の値に書き換えてから実行）
+-- ========================================================================
+-- 下の2行の『 』の中を、自分で決めた合言葉に書き換えて実行してください。
+-- 合言葉はスタッフ用アプリの手順ページ（setup.html）で作れます。
+--
+-- ここで入れた値は、この画面とSupabaseの中だけにあります。
+-- 公開しているファイルには残りません。
+--
+-- ※ 入れ忘れると、アプリから何も読み書きできません。
+-- ※ あとから変えるときも、この2行をもう一度実行するだけです。
+--    変えたら、店舗管理アプリの「設定 → 置き場所」も入れ直してください。
+
+-- insert into store_secret (k, v) values ('admin', 'ここに店長用のキー')
+--   on conflict (k) do update set v = excluded.v, updated_at = now();
+
+-- insert into store_secret (k, v) values ('staff', 'ここにスタッフ用の合言葉')
+--   on conflict (k) do update set v = excluded.v, updated_at = now();
+
+-- いま入っているか確かめる（合言葉そのものは出さず、長さだけ出します）
+--   select k, length(v) as 文字数, updated_at from store_secret order by k;
