@@ -930,7 +930,26 @@ function renderWeeks(){
       it("客単価",cnt?yen(amt/cnt):"—")+it("1日あたり",yen(per))+'</div>';
   }
 
-  var h=ws.map(function(w,i){
+  /* 月の合計をいちばん上に置く。開いてすぐ、その月ぜんぶが分かるようにする。 */
+  var tA=0,tO=0,tC=0,tN=0,tD=0;
+  var tot={n:0, vis:0, visA:{}, buyA:{}};
+  ws.forEach(function(w){
+    tA+=w.amt; tO+=w.own; tC+=w.con; tN+=w.n; tD+=w.days;
+    tot.n+=w.n; tot.vis+=w.vis;
+    AR.forEach(function(a){
+      tot.visA[a.k]=(tot.visA[a.k]||0)+(w.visA[a.k]||0);
+      tot.buyA[a.k]=(tot.buyA[a.k]||0)+(w.buyA[a.k]||0);
+    });
+  });
+  var h='<div class="wk tot"><div class="wh"><span class="wn">'+pick.m+'月の合計</span>'+
+     '<span class="wd">'+tD+'日ぶん</span></div>'+
+     '<div class="wg">'+
+       box("売上", yen(tO))+
+       box(CONSIGN, yen(tC), "con")+
+     '</div>'+
+     sub(tA,tN,tD?tA/tD:0)+vis(tot)+'</div>';
+
+  h+=ws.map(function(w,i){
     return '<div class="wk">'+
       '<div class="wh"><span class="wn">第'+(i+1)+'週</span>'+
       '<span class="wr">'+dw(w.from)+'〜'+dw(w.to)+'</span>'+
@@ -944,24 +963,6 @@ function renderWeeks(){
       '<div class="wb"><i style="width:'+(top?Math.round(w.per/top*100):0)+'%"></i></div>'+
       '</div>';
   }).join("");
-
-  var tA=0,tO=0,tC=0,tN=0,tD=0;
-  var tot={n:0, vis:0, visA:{}, buyA:{}};
-  ws.forEach(function(w){
-    tA+=w.amt; tO+=w.own; tC+=w.con; tN+=w.n; tD+=w.days;
-    tot.n+=w.n; tot.vis+=w.vis;
-    AR.forEach(function(a){
-      tot.visA[a.k]=(tot.visA[a.k]||0)+(w.visA[a.k]||0);
-      tot.buyA[a.k]=(tot.buyA[a.k]||0)+(w.buyA[a.k]||0);
-    });
-  });
-  h+='<div class="wk tot"><div class="wh"><span class="wn">'+pick.m+'月の合計</span>'+
-     '<span class="wd">'+tD+'日ぶん</span></div>'+
-     '<div class="wg">'+
-       box("売上", yen(tO))+
-       box(CONSIGN, yen(tC), "con")+
-     '</div>'+
-     sub(tA,tN,tD?tA/tD:0)+vis(tot)+'</div>';
 
   if(!hasConsign())
     h='<div class="stip">まだ<b>「'+CONSIGN+'」</b>の種類に入れた商品がありません。<br>'+
