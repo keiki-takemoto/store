@@ -69,6 +69,15 @@ h3 .lbl{margin-left:8px}
 .wk .wg .k{font-size:11px;color:var(--ink-3)}
 .wk .wg .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17.5px;
   font-weight:800;line-height:1.4}
+.wk .wg>div.con{background:var(--am-bg)}
+.wk.tot .wg>div.con{background:var(--am-bg)}
+.wk .wg>div.con .k{color:var(--am)}
+.wk .wg>div.con .v{color:var(--am)}
+.wk .wsub{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:9px;font-size:12px;
+  color:var(--ink-2);line-height:1.9}
+.wk .wsub span{white-space:nowrap}
+.wk .wsub b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);
+  font-weight:800;margin-left:3px}
 .wk .wb{height:6px;border-radius:999px;background:var(--surface-3);margin-top:10px;overflow:hidden}
 .wk .wb i{display:block;height:100%;border-radius:999px;background:var(--accent)}
 
@@ -222,8 +231,14 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
         <p class="note">週は<b>月曜から日曜まで</b>で区切っています。<br>
           月のはじめと終わりの週は、<b>その月に入っている日だけ</b>を数えています
           （何日ぶんかを右に出しています）。<br>
+          <b>歴博委託商品</b>は、<a href="../settings/#item">設定 → 商品</a>で
+          <b>種類</b>を「歴博委託商品」にした商品の売上です。
+          <b>売上</b>はそれ以外ぜんぶです。<br>
+          値引きをしたお会計は、明細の金額の割合で2つに分けています。
+          足すとかならず会計の合計と同じになります。<br>
+          <b>合計・客単価・1日あたり</b>は、売上と歴博委託商品を<b>足したもの</b>で出しています。<br>
           <b>購買数</b>は会計の件数です。打ち消した会計は入りません。<br>
-          棒の長さは<b>1日あたりの売上</b>です。日数のちがう週どうしでもくらべられます。</p>
+          棒の長さは<b>1日あたり</b>です。日数のちがう週どうしでもくらべられます。</p>
       </div></div>
     </section>
 
@@ -400,6 +415,29 @@ function monthVisits(k){
   return visits.filter(function(g){ return String(g.day).slice(0,7)===pre });
 }
 function prevOf(k){ var d=new Date(k.y,k.m-2,1); return {y:d.getFullYear(), m:d.getMonth()+1} }
+
+/* 歴博からお預かりしている商品の「種類」の名前。
+   設定 → 商品 で、その商品の種類をこの名前にすると、週次決算で分けて出る。
+   名前を変えたいときは、ここの1行だけを直す。 */
+var CONSIGN="歴博委託商品";
+
+function hasConsign(){
+  return items.some(function(it){ return String(it.cat||"")===CONSIGN });
+}
+/* 会計ひとつを、歴博委託ぶんと、それ以外に分ける。
+   値引きがあると明細の合計と会計の合計がずれるので、割合で分ける。
+   こうすると、2つを足したものが、かならず会計の合計と同じになる。 */
+function splitAmt(s){
+  var tot=Number(s.total)||0, sum=0, con=0;
+  (s.lines||[]).forEach(function(l){
+    var a=(Number(l.price)||0)*(Number(l.qty)||0);
+    sum+=a;
+    if(catOf(l.id)===CONSIGN) con+=a;
+  });
+  if(!sum||!con) return {con:0, own:tot};
+  var c=tot*con/sum;
+  return {con:c, own:tot-c};
+}
 
 /* 月の中を、月曜はじまり・日曜おわりで区切る。
    月のはじめと終わりは、その月に入っている日だけの短い週になる。 */
@@ -723,10 +761,12 @@ function renderWeeks(){
 
   var ws=weeksOf(pick);
   ws.forEach(function(w){
-    w.amt=0; w.n=0;
+    w.amt=0; w.own=0; w.con=0; w.n=0;
     list.forEach(function(s){
       var d=+String(s.day).slice(8,10);
-      if(d>=w.from&&d<=w.to){ w.amt+=Number(s.total)||0; w.n++ }
+      if(d<w.from||d>w.to) return;
+      var sp=splitAmt(s);
+      w.own+=sp.own; w.con+=sp.con; w.amt+=sp.own+sp.con; w.n++;
     });
     w.per=w.days?w.amt/w.days:0;
   });
@@ -737,7 +777,15 @@ function renderWeeks(){
     var c=(w===0)?' class="s0"':(w===6)?' class="s6"':"";
     return '<span'+c+'>'+pick.m+'/'+d+'('+DOW[w]+')</span>';
   }
-  function box(k,v){ return '<div><div class="k">'+k+'</div><div class="v">'+v+'</div></div>' }
+  function box(k,v,cls){
+    return '<div'+(cls?' class="'+cls+'"':"")+'><div class="k">'+k+'</div>'+
+      '<div class="v">'+v+'</div></div>';
+  }
+  function sub(amt,cnt,per){
+    function it(k,v){ return '<span>'+k+'<b>'+v+'</b></span>' }
+    return '<div class="wsub">'+it("合計",yen(amt))+it("購買数",cnt+"件")+
+      it("客単価",cnt?yen(amt/cnt):"—")+it("1日あたり",yen(per))+'</div>';
+  }
 
   var h=ws.map(function(w,i){
     return '<div class="wk">'+
@@ -745,25 +793,28 @@ function renderWeeks(){
       '<span class="wr">'+dw(w.from)+'〜'+dw(w.to)+'</span>'+
       '<span class="wd">'+w.days+'日ぶん</span></div>'+
       '<div class="wg">'+
-        box("売上", yen(w.amt))+
-        box("購買数", w.n+"件")+
-        box("客単価", w.n?yen(w.amt/w.n):"—")+
-        box("1日あたり", yen(w.per))+
+        box("売上", yen(w.own))+
+        box(CONSIGN, yen(w.con), "con")+
       '</div>'+
+      sub(w.amt,w.n,w.per)+
       '<div class="wb"><i style="width:'+(top?Math.round(w.per/top*100):0)+'%"></i></div>'+
       '</div>';
   }).join("");
 
-  var tA=0,tN=0,tD=0;
-  ws.forEach(function(w){ tA+=w.amt; tN+=w.n; tD+=w.days });
+  var tA=0,tO=0,tC=0,tN=0,tD=0;
+  ws.forEach(function(w){ tA+=w.amt; tO+=w.own; tC+=w.con; tN+=w.n; tD+=w.days });
   h+='<div class="wk tot"><div class="wh"><span class="wn">'+pick.m+'月の合計</span>'+
      '<span class="wd">'+tD+'日ぶん</span></div>'+
      '<div class="wg">'+
-       box("売上", yen(tA))+
-       box("購買数", tN+"件")+
-       box("客単価", tN?yen(tA/tN):"—")+
-       box("1日あたり", tD?yen(tA/tD):"—")+
-     '</div></div>';
+       box("売上", yen(tO))+
+       box(CONSIGN, yen(tC), "con")+
+     '</div>'+
+     sub(tA,tN,tD?tA/tD:0)+'</div>';
+
+  if(!hasConsign())
+    h='<div class="stip">まだ<b>「'+CONSIGN+'」</b>の種類に入れた商品がありません。<br>'+
+      '<a href="../settings/#item">設定 → 商品</a>で、お預かりしている商品の'+
+      '<b>種類</b>を <b>'+CONSIGN+'</b> にすると、ここで分けて出ます。</div>'+h;
 
   $("#weeks").innerHTML=list.length?h
     :'<div class="empty">'+pick.m+'月はまだ記録がありません。</div>'+h;
