@@ -76,6 +76,14 @@ h3 .lbl{margin-left:8px}
 .wk .wsub{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:9px;font-size:12px;
   color:var(--ink-2);line-height:1.9}
 .wk .wsub span{white-space:nowrap}
+.wk .wv{margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+.wk .wvr{display:flex;flex-wrap:wrap;gap:3px 13px;font-size:12px;color:var(--ink-2);line-height:1.9}
+.wk .wvr+.wvr{margin-top:3px}
+.wk .wvr span{white-space:nowrap}
+.wk .wvr b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);
+  font-weight:800;margin-left:3px}
+.wk .wvr .wvk{min-width:6.4em;color:var(--ink-3)}
+.wk .wvr.rate .wvk b{color:var(--ok)}
 .wk .wsub b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);
   font-weight:800;margin-left:3px}
 .wk .wb{height:6px;border-radius:999px;background:var(--surface-3);margin-top:10px;overflow:hidden}
@@ -238,6 +246,11 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
           足すとかならず会計の合計と同じになります。<br>
           <b>合計・客単価・1日あたり</b>は、売上と歴博委託商品を<b>足したもの</b>で出しています。<br>
           <b>購買数</b>は会計の件数です。打ち消した会計は入りません。<br>
+          <b>来場者</b>の横の％は<b>うちわけ</b>です（3つ合わせて100%）。
+          <b>購買率</b>の横の％は、<b>その区分の 購入÷来場</b>です。
+          来店は<a href="../visit/">来店の画面</a>で数えたぶん、
+          区分はレジでお会計のときに選んだものです。<br>
+          区分を選ばずにしたお会計は、<b>全体の購買率にだけ</b>入ります。<br>
           棒の長さは<b>1日あたり</b>です。日数のちがう週どうしでもくらべられます。</p>
       </div></div>
     </section>
@@ -756,20 +769,30 @@ function renderWhen(){
 
 /* ---------- 週次決算（月曜〜日曜） ---------- */
 function renderWeeks(){
-  var list=monthRows(pick);
+  var list=monthRows(pick), vs=monthVisits(pick);
   $("#wkH").textContent=pick.y+"年"+pick.m+"月　週ごと";
 
   var ws=weeksOf(pick);
   ws.forEach(function(w){
     w.amt=0; w.own=0; w.con=0; w.n=0;
+    w.vis=0; w.visA={}; w.buyA={};
     list.forEach(function(s){
       var d=+String(s.day).slice(8,10);
       if(d<w.from||d>w.to) return;
       var sp=splitAmt(s);
       w.own+=sp.own; w.con+=sp.con; w.amt+=sp.own+sp.con; w.n++;
+      if(s.area) w.buyA[s.area]=(w.buyA[s.area]||0)+1;
+    });
+    vs.forEach(function(g){
+      var d=+String(g.day).slice(8,10);
+      if(d<w.from||d>w.to) return;
+      var k=Number(g.n)||0;
+      w.vis+=k;
+      if(g.area) w.visA[g.area]=(w.visA[g.area]||0)+k;
     });
     w.per=w.days?w.amt/w.days:0;
   });
+  var anyVis=ws.some(function(w){ return w.vis>0 });
   var top=ws.reduce(function(m,w){ return Math.max(m,w.per) },0);
 
   function dw(d){
@@ -781,6 +804,23 @@ function renderWeeks(){
     return '<div'+(cls?' class="'+cls+'"':"")+'><div class="k">'+k+'</div>'+
       '<div class="v">'+v+'</div></div>';
   }
+  /* 来場者のうちわけ（合わせて100%）と、区分ごとの購買率（購入÷来場） */
+  var AR=(window.Sync&&Sync.AREAS)||[];
+  function vis(w){
+    if(!anyVis) return "";
+    function parts(fn){
+      return AR.map(function(a){
+        return '<span>'+esc(a.nm)+'<b>'+fn(a.k)+'</b></span>';
+      }).join("");
+    }
+    return '<div class="wv">'+
+      '<div class="wvr"><span class="wvk">来場者<b>'+w.vis+'人</b></span>'+
+        parts(function(k){ return w.vis?Math.round((w.visA[k]||0)/w.vis*100)+"%":"—" })+'</div>'+
+      '<div class="wvr rate"><span class="wvk">購買率<b>'+pct(w.n,w.vis)+'</b></span>'+
+        parts(function(k){ return pct(w.buyA[k]||0, w.visA[k]||0) })+'</div>'+
+      '</div>';
+  }
+
   function sub(amt,cnt,per){
     function it(k,v){ return '<span>'+k+'<b>'+v+'</b></span>' }
     return '<div class="wsub">'+it("合計",yen(amt))+it("購買数",cnt+"件")+
@@ -797,19 +837,28 @@ function renderWeeks(){
         box(CONSIGN, yen(w.con), "con")+
       '</div>'+
       sub(w.amt,w.n,w.per)+
+      vis(w)+
       '<div class="wb"><i style="width:'+(top?Math.round(w.per/top*100):0)+'%"></i></div>'+
       '</div>';
   }).join("");
 
   var tA=0,tO=0,tC=0,tN=0,tD=0;
-  ws.forEach(function(w){ tA+=w.amt; tO+=w.own; tC+=w.con; tN+=w.n; tD+=w.days });
+  var tot={n:0, vis:0, visA:{}, buyA:{}};
+  ws.forEach(function(w){
+    tA+=w.amt; tO+=w.own; tC+=w.con; tN+=w.n; tD+=w.days;
+    tot.n+=w.n; tot.vis+=w.vis;
+    AR.forEach(function(a){
+      tot.visA[a.k]=(tot.visA[a.k]||0)+(w.visA[a.k]||0);
+      tot.buyA[a.k]=(tot.buyA[a.k]||0)+(w.buyA[a.k]||0);
+    });
+  });
   h+='<div class="wk tot"><div class="wh"><span class="wn">'+pick.m+'月の合計</span>'+
      '<span class="wd">'+tD+'日ぶん</span></div>'+
      '<div class="wg">'+
        box("売上", yen(tO))+
        box(CONSIGN, yen(tC), "con")+
      '</div>'+
-     sub(tA,tN,tD?tA/tD:0)+'</div>';
+     sub(tA,tN,tD?tA/tD:0)+vis(tot)+'</div>';
 
   if(!hasConsign())
     h='<div class="stip">まだ<b>「'+CONSIGN+'」</b>の種類に入れた商品がありません。<br>'+
