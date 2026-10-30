@@ -22,7 +22,8 @@
   function err(code, message) { var e = new Error(message || code); e.code = code; return e }
 
   function messageFor(code) {
-    if (code === "bad_code") return "合言葉が違います";
+    /* たいていは「古いリンクを開いている」。スタッフに次にやることが分かる言い方にする */
+    if (code === "bad_code") return "このリンクはもう使えません。店長に新しいリンクをもらってください";
     if (code === "bad_key") return "管理用キーが違います";
     if (code === "bad_input") return "送る内容に不足があります";
     if (code === "already_replied") return "店長がもう返事を書いています";
