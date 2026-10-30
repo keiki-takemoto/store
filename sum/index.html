@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>集計</title>
-<meta name="description" content="レジの会計を、日別・商品別・分析の3つで見る画面。">
+<meta name="description" content="レジの会計を、日ごと・商品ごとに見る画面。">
 <meta name="theme-color" content="#2BA55F">
 <link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
 <link rel="stylesheet" href="../shared/theme.css">
@@ -39,6 +39,8 @@ h3{font-size:13px;color:var(--ink-2);margin:0 0 10px}
 .target .go{width:100%;margin-top:10px;padding:13px 0;font-size:15.5px}
 .upd{font-size:12px;color:var(--ink-3);text-align:center;padding:11px 4px 3px}
 .upd b{font-family:var(--mono);font-weight:600;color:var(--ink-2)}
+.goana{font-size:12.5px;color:var(--ink-2);text-align:center;padding:2px 4px 10px;line-height:1.8}
+.goana a{color:var(--accent);font-weight:700}
 
 /* グラフ */
 .ghead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -94,33 +96,6 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
   border-radius:8px;padding:5px 10px}
 .who span b{font-family:var(--mono);margin-left:6px}
 
-h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;letter-spacing:.04em}
-/* 来店と購買率の表 */
-table.conv{width:100%;border-collapse:collapse;font-size:13.5px}
-table.conv th,table.conv td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:left}
-table.conv th{font-size:11.5px;color:var(--ink-3);font-weight:600;white-space:nowrap}
-table.conv td.n,table.conv th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;
-  text-align:right;white-space:nowrap}
-table.conv td.rate{font-family:var(--mono);text-align:right;font-weight:800;color:var(--ok);white-space:nowrap}
-table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
-.visbig{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px}
-.visbig div{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
-.visbig .k{font-size:11.5px;color:var(--ink-3)}
-.visbig .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:23px;font-weight:800;
-  line-height:1.35}
-.visbig .rate .v{color:var(--ok)}
-
-/* 内訳の棒 */
-.bars{display:flex;flex-direction:column;gap:9px}
-.bar .t{display:flex;align-items:baseline;gap:9px;font-size:13.5px}
-.bar .t .n{font-weight:700}
-.bar .t .c{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:700}
-.bar .t .p{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);min-width:44px;text-align:right}
-.bar .g{height:8px;border-radius:999px;background:var(--surface-3);margin-top:5px;overflow:hidden}
-.bar .g i{display:block;height:100%;border-radius:999px;background:var(--accent)}
-.bar.c2 .g i{background:var(--ok)} .bar.c3 .g i{background:var(--am)}
-.bar.c4 .g i{background:var(--pm)} .bar.c5 .g i{background:var(--tm)}
-
 /* 会計の一覧 */
 .r{display:grid;grid-template-columns:150px 1fr auto;gap:2px 10px;align-items:baseline;
   padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer}
@@ -144,64 +119,6 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
 .det .ln .a{margin-left:auto;font-family:var(--mono)}
 .det .act{margin-top:8px}
 
-/* ---- スタッフ ---- */
-.stfsum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-.stfsum>div{flex:1;min-width:88px;background:var(--surface-2);border:1px solid var(--line);
-  border-radius:11px;padding:10px 12px}
-.stfsum .k{font-size:11.5px;color:var(--ink-3)}
-.stfsum .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:21px;font-weight:800;
-  line-height:1.3;color:var(--ink)}
-.stf{border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;background:var(--surface)}
-.stf+.stf{margin-top:10px}
-.stf[aria-expanded="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.sh{display:flex;align-items:center;gap:9px}
-.sh .rk{width:25px;height:25px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);
-  font-family:var(--mono);font-size:12px;font-weight:800;display:flex;align-items:center;
-  justify-content:center;flex:0 0 auto}
-.sh .rk.t1{background:#C9A227;color:#fff}
-.sh .rk.t2{background:#9AA0A6;color:#fff}
-.sh .rk.t3{background:#B07A4A;color:#fff}
-.sh .nm{flex:1;min-width:0;font-size:15px;font-weight:800;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.sh .sc{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--ok)}
-.sh .sc small{font-size:11px;color:var(--ink-3);font-weight:700}
-.sh .dl{font-family:var(--mono);font-size:11px;font-weight:800;border-radius:999px;padding:2px 7px;
-  background:var(--surface-2);color:var(--ink-3)}
-.sh .dl.up{background:var(--ok-bg);color:var(--ok)}
-.sh .dl.dn{background:var(--ng-bg);color:var(--ng)}
-.sb{margin-top:7px;font-size:12.5px;color:var(--ink-2);font-family:var(--mono);
-  font-variant-numeric:tabular-nums}
-.sbars{display:flex;gap:7px;margin-top:10px}
-.sbars>div{flex:1;min-width:0}
-.sbars .bn{font-size:10px;color:var(--ink-3);font-weight:700;text-align:center;margin-bottom:3px}
-.sbars .bb{height:6px;border-radius:999px;background:var(--surface-3)}
-.sbars .bb i{display:block;height:100%;border-radius:999px;background:var(--accent);min-width:2px}
-.sbars .bb i.hi{background:var(--ok)}
-.sbars .bv{font-family:var(--mono);font-size:10.5px;font-weight:800;text-align:center;margin-top:3px;
-  color:var(--ink-2)}
-.sdet{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-.radar{width:100%;height:auto;display:block;max-width:300px;margin:0 auto}
-.radar .g{fill:none;stroke:var(--line-2);stroke-width:1;opacity:.75}
-.radar .g.o{stroke:var(--ink-3);opacity:.6}
-.radar .area{fill:var(--ok);fill-opacity:.2;stroke:var(--ok);stroke-width:2;stroke-linejoin:round}
-.radar .dot{fill:var(--ok)}
-.radar text.ax{font-size:11px;font-weight:700;fill:var(--ink);font-family:var(--ui)}
-.sax{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
-.sax th,.sax td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
-.sax th{font-size:10.5px;color:var(--ink-3);font-weight:600}
-.sax td.n,.sax th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
-.sax td.s{font-family:var(--mono);text-align:right;font-weight:800}
-.sax td.s.up{color:var(--ok)} .sax td.s.dn{color:var(--ink-3)}
-.scat{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.scat span{font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
-  border-radius:999px;padding:4px 9px;font-weight:600;color:var(--ink-2)}
-.scat span b{font-family:var(--mono);color:var(--ink)}
-.stip{margin-top:11px;background:var(--warn-bg);border-radius:10px;padding:10px 12px;
-  font-size:12.5px;line-height:1.7;color:var(--ink)}
-.stip b{color:var(--warn)}
-.sgood{margin-top:9px;background:var(--ok-bg);border-radius:10px;padding:10px 12px;
-  font-size:12.5px;line-height:1.7;color:var(--ink)}
-.sgood b{color:var(--ok)}
 </style>
 </head>
 <body>
@@ -209,8 +126,6 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
 <header class="top"><div class="top-in"><div class="tabs" id="tabs">
   <button class="tab" data-v="day" aria-selected="true">日別売上</button>
   <button class="tab" data-v="item" aria-selected="false">商品別売上</button>
-  <button class="tab" data-v="ana" aria-selected="false">分析</button>
-  <button class="tab" data-v="stf" aria-selected="false">スタッフ</button>
 </div></div></header>
 
 <main>
@@ -227,6 +142,8 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
     <button class="btn primary go" id="go">表示する</button>
   </div>
   <div class="upd">更新日時：<b id="upd">—</b></div>
+  <p class="goana">お客さま・スタッフ・月をまたいだ移り変わりは
+    <a href="../analyze/">分析</a> に移しました。</p>
 
   <div id="noneCard" hidden><div class="card"><div class="sec">
     <div class="empty" id="noneMsg"></div>
@@ -264,56 +181,10 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
       </div></div>
     </section>
 
-    <!-- 分析 -->
-    <section class="view" id="v-ana" data-off>
-      <div class="card" id="cVisit"><div class="sec">
-        <h3>来店と購買率</h3>
-        <div id="visSum"></div>
-        <h4 class="sub">区分ごと</h4>
-        <div id="visGrid"></div>
-        <h4 class="sub">担当ごと</h4>
-        <div id="visStaff"></div>
-        <h4 class="sub">時間帯ごと</h4>
-        <div id="visHour"></div>
-        <p class="note"><b>購買率</b>は 会計の件数 ÷ 来店数。来店は<a href="../visit/">来店の画面</a>で数えたぶんです。<br>
-          担当ごとの来店数は、<b>そのとき担当になっていた人</b>のぶんとして数えます。</p>
-      </div></div>
-
-      <div class="card"><div class="sec">
-        <h3>担当</h3><div class="bars" id="byStaff"></div>
-      </div></div>
-      <div class="card" id="cGuest"><div class="sec">
-        <h3>お客様の種類</h3><div class="bars" id="byGuest"></div>
-      </div></div>
-      <div class="card"><div class="sec">
-        <h3>支払い方法</h3><div class="bars" id="byPay"></div>
-      </div></div>
-      <div class="card"><div class="sec">
-        <h3>曜日ごと<span class="lbl" style="margin-left:8px">1日あたりの平均</span></h3>
-        <div class="bars" id="byDow"></div>
-      </div></div>
-      <div class="card"><div class="sec">
-        <h3>時間帯ごと</h3><div class="bars" id="byHour"></div>
-        <p class="note">会計した時刻でまとめています。</p>
-      </div></div>
-    </section>
-
-    <section class="view" id="v-stf" data-off>
-      <div class="card"><div class="sec">
-        <h3 id="stfH">この月のみんな</h3>
-        <div class="stfsum" id="stfSum"></div>
-        <p class="note" id="stfNote"></p>
-      </div></div>
-      <div class="card"><div class="sec">
-        <h3>ひとりずつ<span class="lbl" style="margin-left:8px">押すとくわしく出ます</span></h3>
-        <div id="stfList"></div>
-      </div></div>
-    </section>
   </div>
 </main>
 
 <script src="../shared/sync.js"></script>
-<script src="../shared/power.js"></script>
 <script src="../shared/sales.js"></script>
 <script>
 (function(){
@@ -355,7 +226,7 @@ function range(){
 }
 
 /* ---------- 受け取る ---------- */
-var rows=[], visits=[], busy=false;
+var rows=[], busy=false;
 async function load(quiet){
   if(busy) return;
   busy=true;
@@ -370,8 +241,6 @@ async function load(quiet){
       busy=false; return;
     }
     rows=r.rows||[];
-    try{ var rv=await Sync.visitsGet(r0.from,r0.to); visits=rv.items||[] }
-    catch(e){ visits=[] }                       /* 来店はまだ使っていない店もあるので、無くても進む */
     var d=new Date();
     $("#upd").textContent=d.getFullYear()+"/"+pad2(d.getMonth()+1)+"/"+pad2(d.getDate())+" "+
       pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());
@@ -478,23 +347,7 @@ function chart(bs){
 }
 
 /* ---------- 描く ---------- */
-function bars(el,list,top,fmt){
-  if(!list.length){ el.innerHTML='<span class="lbl">ありません</span>'; return }
-  el.innerHTML=list.map(function(g,i){
-    var p=top?Math.round(g.amt/top*100):0;
-    return '<div class="bar c'+((i%5)+1)+'">'+
-      '<div class="t"><span class="n">'+esc(g.name)+'</span>'+
-        '<span class="p">'+p+'%</span>'+
-        '<span class="c">'+yen(g.amt)+'</span></div>'+
-      '<div class="g"><i style="width:'+p+'%"></i></div>'+
-      '<div class="t" style="margin-top:3px"><span class="p" style="min-width:0;text-align:left">'+
-        esc(fmt?fmt(g):(g.n+"件・"+g.qty+"点"))+'</span></div>'+
-      '</div>';
-  }).join("");
-}
-
 function render(){
-  renderStaff();
   $("#noneCard").hidden=true;
   $("#body").hidden=false;
 
@@ -529,305 +382,6 @@ function render(){
       }).join("")+'</tbody></table>'
     : '<span class="lbl">ありません</span>';
 
-  /* 分析 */
-  bars($("#byStaff"),group(list,function(s){ return s.staff },"（担当なし）"),amt,function(x){
-    return x.n+"件・"+x.qty+"点・1件 "+yen(x.amt/x.n);
-  });
-  var g=group(list,function(s){ return s.guest },"（選んでいない）");
-  $("#cGuest").hidden=(g.length===1&&g[0].name==="（選んでいない）");
-  bars($("#byGuest"),g,amt);
-  bars($("#byPay"),group(list,function(s){ return payName(s.pay) },"現金"),amt);
-
-  /* 曜日ごと。日数が違うと比べられないので、1日あたりの平均にする */
-  if(unit!=="day"){
-    $("#byDow").innerHTML='<span class="lbl">「日別」を選ぶと出ます</span>';
-  }else{
-    var dw={}, dn={};
-    bs.forEach(function(b){
-      if(b.dow<0||!b.n) return;
-      dw[b.dow]=(dw[b.dow]||0)+b.amt; dn[b.dow]=(dn[b.dow]||0)+1;
-    });
-    var dowList=Object.keys(dw).map(function(k){
-      return {name:DOW[k]+"曜", amt:Math.round(dw[k]/dn[k]), n:dn[k], qty:0};
-    }).sort(function(a,b){ return b.amt-a.amt });
-    var dowTop=dowList.reduce(function(m,x){ return Math.max(m,x.amt) },0);
-    bars($("#byDow"),dowList,dowTop,function(x){ return x.n+"日ぶんの平均" });
-  }
-
-  renderVisits(list);
-
-  /* 時間帯ごと */
-  var hm={};
-  list.forEach(function(s){
-    var h=parseInt(String(s.at||"").slice(11,13),10);
-    if(isNaN(h)) return;
-    if(!hm[h]) hm[h]={name:h+"時台", amt:0, n:0, qty:0, h:h};
-    hm[h].amt+=s.total; hm[h].n++; hm[h].qty+=s.qty;
-  });
-  var hours=Object.keys(hm).map(function(k){ return hm[k] }).sort(function(a,b){ return a.h-b.h });
-  var hTop=hours.reduce(function(m,x){ return Math.max(m,x.amt) },0);
-  bars($("#byHour"),hours,hTop);
-
-}
-
-/* ---------- スタッフ ---------- */
-/* スタッフ用アプリの「5つの力」と同じ出し方（shared/power.js）で、全員ぶんを店長が見る画面。
-   店長なので、ここだけは売上と粗利も並べて出す。 */
-var prevRows=null, prevVisits=null, prevKey="";   /* 先月ぶん。タブを開いたときに取りに行く */
-
-function hiLine(){
-  var v=null; try{ v=JSON.parse(localStorage.getItem("storeregset.v1")) }catch(e){}
-  return (v&&typeof v.hiprice==="number")?v.hiprice:3000;
-}
-/* 商品の種類は、設定の商品台帳（storeitems.v1）から引く */
-var CATOF=null;
-function catOf(id){
-  if(!CATOF){
-    CATOF={};
-    var v=null; try{ v=JSON.parse(localStorage.getItem("storeitems.v1")) }catch(e){}
-    ((v&&v.items)||[]).forEach(function(it){ CATOF[it.id]=String(it.cat||"") });
-  }
-  return CATOF[id]||"";
-}
-/* 会計と来店から、power.js に渡せる形の行を作る */
-function powerRows(sales,vis){
-  var hi=hiLine(), m={}, order=[];
-  function row(nm){
-    if(!m[nm]){
-      m[nm]={name:nm, vis:0, buy:0, qty:0, hiqty:0,
-        visA:{west:0,asia:0,jp:0}, buyA:{west:0,asia:0,jp:0}, cats:{},
-        amt:0, cost:0, disc:0};
-      order.push(nm);
-    }
-    return m[nm];
-  }
-  (vis||[]).forEach(function(g){
-    var r=row(g.staff||"（担当なし）"), k=Number(g.n)||0;
-    r.vis+=k;
-    if(r.visA[g.area]!=null) r.visA[g.area]+=k;
-  });
-  (sales||[]).filter(function(x){ return !x.voided }).forEach(function(x){
-    var r=row(x.staff||"（担当なし）");
-    r.buy++; r.qty+=Number(x.qty)||0;
-    r.amt+=Number(x.total)||0; r.cost+=Number(x.cost)||0; r.disc+=Number(x.discount)||0;
-    if(r.buyA[x.area]!=null) r.buyA[x.area]++;
-    (x.lines||[]).forEach(function(l){
-      var q=Number(l.qty)||0;
-      if((Number(l.price)||0)>=hi) r.hiqty+=q;
-      var c=catOf(l.id)||"その他";
-      r.cats[c]=(r.cats[c]||0)+q;
-    });
-  });
-  return order.map(function(k){ return m[k] });
-}
-/* 先月ぶんを取りに行く（「先月より＋◯」を出すため）。失敗しても画面は出す */
-async function pullPrev(){
-  var key=unit+"-"+year+"-"+month;
-  if(prevKey===key) return;
-  prevKey=key;
-  var from, to;
-  if(unit==="month"){
-    from=(year-1)+"-01-01"; to=(year-1)+"-12-31";
-  }else{
-    var d=new Date(year,month-2,1);
-    var y=d.getFullYear(), mo=d.getMonth()+1;
-    var last=new Date(y,mo,0).getDate();
-    from=y+"-"+pad2(mo)+"-01"; to=y+"-"+pad2(mo)+"-"+pad2(last);
-  }
-  try{
-    var r=await Sales.rows(from,to);
-    prevRows=(r&&r.rows)||[];
-  }catch(e){ prevRows=null }
-  try{ var v=await Sync.visitsGet(from,to); prevVisits=v.items||[] }
-  catch(e){ prevVisits=null }
-  renderStaff();
-}
-
-function renderStaff(){
-  var W=(unit==="month")?"年":"月";
-  $("#stfH").textContent="この"+W+"のみんな";
-  var now=powerRows(rows,visits);
-  if(!now.length){
-    $("#stfSum").innerHTML="";
-    $("#stfNote").textContent="";
-    $("#stfList").innerHTML='<div class="empty">この'+W+'はまだ記録がありません。</div>';
-    return;
-  }
-  var tV=0,tB=0,tA=0,tC=0;
-  now.forEach(function(r){ tV+=r.vis; tB+=r.buy; tA+=r.amt; tC+=r.cost });
-  $("#stfSum").innerHTML=
-    '<div><div class="k">来店</div><div class="v">'+tV+'</div></div>'+
-    '<div><div class="k">購入</div><div class="v">'+tB+'</div></div>'+
-    '<div><div class="k">購買率</div><div class="v">'+pct(tB,tV)+'</div></div>'+
-    '<div><div class="k">売上</div><div class="v">'+yen(tA)+'</div></div>';
-  $("#stfNote").innerHTML='スコアは<b>みんなの中での位置</b>です。50がまん中、100がいちばん。'+
-    'スタッフの画面に出ているものと同じ数字です。<br>'+
-    '高単価のラインは '+hiLine().toLocaleString("ja-JP")+'円（<a href="../settings/#reg">設定 → レジ</a>で変えられます）。';
-
-  var prev=(prevRows?powerRows(prevRows,prevVisits||[]):null);
-  var AX=Power.AXES;
-  /* 総合スコアの高い順に並べる */
-  var list=now.map(function(r){
-    var sc=Power.axisScores(now,r.name);
-    return {r:r, sc:sc, tot:Power.totalScore(sc)};
-  }).sort(function(a,b){
-    return (b.tot||0)-(a.tot||0) || b.r.amt-a.r.amt || a.r.name.localeCompare(b.r.name,"ja");
-  });
-
-  $("#stfList").innerHTML=list.map(function(x,i){
-    var r=x.r, sc=x.sc, pos=i+1;
-    var dl="";
-    if(prev&&x.tot!==null){
-      var has=prev.some(function(q){ return q.name===r.name });
-      if(has){
-        var pt=Power.totalScore(Power.axisScores(prev,r.name));
-        if(pt!==null){
-          var d=x.tot-pt;
-          dl='<span class="dl '+(d>0?"up":d<0?"dn":"")+'">'+
-             (d>0?"＋":d<0?"−":"±")+Math.abs(d)+'</span>';
-        }
-      }
-    }
-    var bars=AX.map(function(a){
-      var v=sc[a.k]&&sc[a.k].s;
-      return '<div><div class="bn">'+esc(a.nm)+'</div>'+
-        '<div class="bb"><i class="'+(v>=50?"hi":"")+'" style="width:'+(v==null?0:v)+'%"></i></div>'+
-        '<div class="bv">'+(v==null?"—":v)+'</div></div>';
-    }).join("");
-    return '<div class="stf" data-s="'+esc(r.name)+'" aria-expanded="false">'+
-      '<div class="sh"><span class="rk'+(pos<=3?" t"+pos:"")+'">'+pos+'</span>'+
-      '<span class="nm">'+esc(r.name)+'</span>'+dl+
-      '<span class="sc">'+(x.tot===null?"—":x.tot)+'<small> /100</small></span></div>'+
-      '<div class="sb">'+yen(r.amt)+'　粗利 '+yen(r.amt-r.cost)+'　購買率 '+pct(r.buy,r.vis)+'</div>'+
-      '<div class="sbars">'+bars+'</div>'+
-      '<div class="sdet" hidden>'+staffDet(r,sc,now)+'</div></div>';
-  }).join("");
-}
-
-/* 押したときに開く中身 */
-function staffDet(r,sc,all){
-  var AX=Power.AXES;
-  var h=Power.radarSvg(sc)+
-    '<table class="sax"><thead><tr><th>力</th><th class="n">この人</th>'+
-    '<th class="n">みんなの平均</th><th class="n">位</th><th class="n">点</th></tr></thead><tbody>'+
-    AX.map(function(a){
-      var x=sc[a.k]||{};
-      return '<tr><td>'+esc(a.nm)+'</td><td class="n">'+esc(a.tx(r))+'</td>'+
-        '<td class="n">'+(x.avg==null?"—":esc(a.av(x.avg)))+'</td>'+
-        '<td class="n">'+(x.pos==null?"—":x.pos)+'</td>'+
-        '<td class="s '+(x.s>=50?"up":"dn")+'">'+(x.s==null?"—":x.s)+'</td></tr>';
-    }).join("")+'</tbody></table>';
-
-  /* 商品の種類 */
-  var ks=Object.keys(r.cats||{}).filter(function(k){ return r.cats[k]>0 })
-    .sort(function(a,b){ return r.cats[b]-r.cats[a] });
-  if(ks.length){
-    h+='<h4 class="sub">売れた商品の種類</h4><div class="scat">'+
-      ks.map(function(k){ return '<span>'+esc(k)+' <b>'+r.cats[k]+'</b></span>' }).join("")+
-      '</div>';
-  }
-
-  /* ほめるところ／声をかけるところ */
-  var got=AX.filter(function(a){ return sc[a.k]&&sc[a.k].s!=null });
-  if(got.length){
-    got.sort(function(x,y){ return sc[y.k].s-sc[x.k].s });
-    var top=got[0], low=got[got.length-1];
-    h+='<div class="sgood">ほめるなら <b>'+esc(top.nm)+'</b>（'+esc(top.ds)+'）。'+
-       esc(top.nm)+' は '+esc(top.tx(r))+
-       (all.length>1?'、みんなの平均は '+esc(top.av(sc[top.k].avg)):"")+'。</div>';
-    if(got.length>1&&sc[low.k].s<50){
-      h+='<div class="stip">声をかけるなら <b>'+esc(low.nm)+'</b>（'+esc(low.ds)+'）。<br>'+
-         esc(low.tip)+'</div>';
-    }
-  }
-  h+='<p class="note">売上 '+yen(r.amt)+'・粗利 '+yen(r.amt-r.cost)+
-     '・値引き '+yen(r.disc)+'・客単価 '+(r.buy?yen(r.amt/r.buy):"—")+'</p>';
-  return h;
-}
-
-$("#stfList").addEventListener("click",function(e){
-  var c=e.target.closest(".stf"); if(!c) return;
-  var open=c.getAttribute("aria-expanded")==="true";
-  c.setAttribute("aria-expanded",String(!open));
-  c.querySelector(".sdet").hidden=open;
-});
-
-/* ---------- 来店と購買率 ---------- */
-/* 来店は「日・時間帯・担当・区分」でまとめて届く。購入は会計の件数。 */
-function pct(buy,vis){ return vis?Math.round(buy/vis*100)+"%":"—" }
-function renderVisits(list){
-  var all=0, byA={}, byS={}, byH={};
-  visits.forEach(function(g){
-    var n=Number(g.n)||0; all+=n;
-    var ak=g.area+"-"+g.kind;
-    byA[ak]=(byA[ak]||0)+n;
-    byS[g.staff||""]=(byS[g.staff||""]||0)+n;
-    byH[g.hour]=(byH[g.hour]||0)+n;
-  });
-  $("#cVisit").hidden=!all;
-  if(!all) return;
-
-  var buy=list.length;
-  $("#visSum").innerHTML='<div class="visbig">'+
-    '<div><div class="k">来店</div><div class="v">'+all+'人</div></div>'+
-    '<div><div class="k">購入</div><div class="v">'+buy+'件</div></div>'+
-    '<div class="rate"><div class="k">購買率</div><div class="v">'+pct(buy,all)+'</div></div>'+
-    '</div>';
-
-  /* 区分ごと（紙の表と同じ並び） */
-  var A=(window.Sync&&Sync.AREAS)||[], K=(window.Sync&&Sync.KINDS)||[];
-  var h='<table class="conv"><thead><tr><th></th>'+
-    K.map(function(k){ return '<th class="n">'+esc(k.nm)+'</th>' }).join("")+
-    '<th class="n">合計</th></tr></thead><tbody>';
-  A.forEach(function(a){
-    var sum=0;
-    h+='<tr><td>'+esc(a.nm)+'</td>'+K.map(function(k){
-      var n=byA[a.k+"-"+k.k]||0; sum+=n;
-      return '<td class="n">'+(n||"—")+'</td>';
-    }).join("")+'<td class="n">'+(sum||"—")+'</td></tr>';
-  });
-  h+='</tbody><tfoot><tr><td>合計</td>'+K.map(function(k){
-    var n=0; A.forEach(function(a){ n+=byA[a.k+"-"+k.k]||0 });
-    return '<td class="n">'+(n||"—")+'</td>';
-  }).join("")+'<td class="n">'+all+'</td></tr></tfoot></table>';
-  $("#visGrid").innerHTML=h;
-
-  /* 担当ごと */
-  var sBuy={};
-  list.forEach(function(s){ var k=s.staff||""; sBuy[k]=(sBuy[k]||0)+1 });
-  var names={}; Object.keys(byS).forEach(function(k){ names[k]=1 });
-  Object.keys(sBuy).forEach(function(k){ names[k]=1 });
-  var rowsS=Object.keys(names).map(function(k){
-    return {name:k||"（担当なし）", vis:byS[k]||0, buy:sBuy[k]||0};
-  }).sort(function(a,b){
-    var ra=a.vis?a.buy/a.vis:-1, rb=b.vis?b.buy/b.vis:-1;
-    return rb-ra || b.buy-a.buy;
-  });
-  $("#visStaff").innerHTML='<table class="conv"><thead><tr><th>担当</th>'+
-    '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
-    rowsS.map(function(x){
-      return '<tr><td>'+esc(x.name)+'</td><td class="n">'+(x.vis||"—")+'</td>'+
-        '<td class="n">'+x.buy+'</td><td class="rate">'+pct(x.buy,x.vis)+'</td></tr>';
-    }).join("")+
-    '</tbody><tfoot><tr><td>合計</td><td class="n">'+all+'</td><td class="n">'+buy+
-    '</td><td class="rate">'+pct(buy,all)+'</td></tr></tfoot></table>';
-
-  /* 時間帯ごと */
-  var hBuy={};
-  list.forEach(function(s){
-    var hh=parseInt(String(s.at||"").slice(11,13),10);
-    if(!isNaN(hh)) hBuy[hh]=(hBuy[hh]||0)+1;
-  });
-  var hs={}; Object.keys(byH).forEach(function(k){ hs[k]=1 });
-  Object.keys(hBuy).forEach(function(k){ hs[k]=1 });
-  var rowsH=Object.keys(hs).map(Number).sort(function(a,b){ return a-b });
-  $("#visHour").innerHTML='<table class="conv"><thead><tr><th>時間帯</th>'+
-    '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
-    rowsH.map(function(hh){
-      var v=byH[hh]||0, b2=hBuy[hh]||0;
-      return '<tr><td>'+hh+'時台</td><td class="n">'+(v||"—")+'</td>'+
-        '<td class="n">'+b2+'</td><td class="rate">'+pct(b2,v)+'</td></tr>';
-    }).join("")+'</tbody></table>';
 }
 
 /* ---------- 売上集計の表 ---------- */
@@ -946,8 +500,7 @@ $("#byUnit").addEventListener("click",async function(e){
 /* ---------- 共通 ---------- */
 $("#tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
-  ["day","item","ana","stf"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
-  if(b.dataset.v==="stf") pullPrev();
+  ["day","item"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   window.scrollTo({top:0});
 });

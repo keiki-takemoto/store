@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>分析</title>
-<meta name="description" content="月をまたいで、お店が良くなっているかを見る画面。">
+<meta name="description" content="月ごとの移り変わり・商品の動き・お客さま・時間帯・スタッフを見る画面。">
 <meta name="theme-color" content="#2BA55F">
 <link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
 <link rel="stylesheet" href="../shared/theme.css">
@@ -98,18 +98,104 @@ tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
 .bar .t .p{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);min-width:44px;text-align:right}
 .bar .g{height:8px;border-radius:999px;background:var(--surface-3);margin-top:5px;overflow:hidden}
 .bar .g i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+
+/* 月を選ぶバー（お客さま・スタッフのタブだけに出す） */
+.monbar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:8px 10px;box-shadow:var(--shadow)}
+.monbar button{border:none;background:var(--surface-2);color:var(--ink-2);width:40px;height:40px;
+  border-radius:10px;font-size:19px;cursor:pointer;font-family:inherit;line-height:1}
+.monbar button:disabled{opacity:.3;cursor:not-allowed}
+.monbar .mon{flex:1;text-align:center;font-size:15.5px;font-weight:800}
+.monhint{font-size:11.5px;color:var(--ink-3);text-align:center;padding:7px 0 0;letter-spacing:.06em}
+
+/* 来店と購買率 */
+h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;letter-spacing:.04em}
+table.conv{width:100%;border-collapse:collapse;font-size:13.5px}
+table.conv th,table.conv td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:left}
+table.conv th{font-size:11.5px;color:var(--ink-3);font-weight:600;white-space:nowrap}
+table.conv td.n,table.conv th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  text-align:right;white-space:nowrap}
+table.conv td.rate{font-family:var(--mono);text-align:right;font-weight:800;color:var(--ok);white-space:nowrap}
+table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
+.visbig{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px}
+.visbig>div{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.visbig .k{font-size:11.5px;color:var(--ink-3)}
+.visbig .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:23px;font-weight:800;
+  line-height:1.35}
+.visbig .rate .v{color:var(--ok)}
+
+/* ---- スタッフ ---- */
+.stfsum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.stfsum>div{flex:1;min-width:88px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:11px;padding:10px 12px}
+.stfsum .k{font-size:11.5px;color:var(--ink-3)}
+.stfsum .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:21px;font-weight:800;
+  line-height:1.3;color:var(--ink)}
+.stf{border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;background:var(--surface)}
+.stf+.stf{margin-top:10px}
+.stf[aria-expanded="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sh{display:flex;align-items:center;gap:9px}
+.sh .rk{width:25px;height:25px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);
+  font-family:var(--mono);font-size:12px;font-weight:800;display:flex;align-items:center;
+  justify-content:center;flex:0 0 auto}
+.sh .rk.t1{background:#C9A227;color:#fff}
+.sh .rk.t2{background:#9AA0A6;color:#fff}
+.sh .rk.t3{background:#B07A4A;color:#fff}
+.sh .nm{flex:1;min-width:0;font-size:15px;font-weight:800;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh .sc{font-family:var(--mono);font-size:20px;font-weight:800;color:var(--ok)}
+.sh .sc small{font-size:11px;color:var(--ink-3);font-weight:700}
+.sh .dl{font-family:var(--mono);font-size:11px;font-weight:800;border-radius:999px;padding:2px 7px;
+  background:var(--surface-2);color:var(--ink-3)}
+.sh .dl.up{background:var(--ok-bg);color:var(--ok)}
+.sh .dl.dn{background:var(--ng-bg);color:var(--ng)}
+.sb{margin-top:7px;font-size:12.5px;color:var(--ink-2);font-family:var(--mono);
+  font-variant-numeric:tabular-nums}
+.sbars{display:flex;gap:7px;margin-top:10px}
+.sbars>div{flex:1;min-width:0}
+.sbars .bn{font-size:10px;color:var(--ink-3);font-weight:700;text-align:center;margin-bottom:3px}
+.sbars .bb{height:6px;border-radius:999px;background:var(--surface-3)}
+.sbars .bb i{display:block;height:100%;border-radius:999px;background:var(--accent);min-width:2px}
+.sbars .bb i.hi{background:var(--ok)}
+.sbars .bv{font-family:var(--mono);font-size:10.5px;font-weight:800;text-align:center;margin-top:3px;
+  color:var(--ink-2)}
+.sdet{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.radar{width:100%;height:auto;display:block;max-width:300px;margin:0 auto}
+.radar .g{fill:none;stroke:var(--line-2);stroke-width:1;opacity:.75}
+.radar .g.o{stroke:var(--ink-3);opacity:.6}
+.radar .area{fill:var(--ok);fill-opacity:.2;stroke:var(--ok);stroke-width:2;stroke-linejoin:round}
+.radar .dot{fill:var(--ok)}
+.radar text.ax{font-size:11px;font-weight:700;fill:var(--ink);font-family:var(--ui)}
+.sax{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.sax th,.sax td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.sax th{font-size:10.5px;color:var(--ink-3);font-weight:600}
+.sax td.n,.sax th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+.sax td.s{font-family:var(--mono);text-align:right;font-weight:800}
+.sax td.s.up{color:var(--ok)} .sax td.s.dn{color:var(--ink-3)}
+.scat{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.scat span{font-size:11.5px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:999px;padding:4px 9px;font-weight:600;color:var(--ink-2)}
+.scat span b{font-family:var(--mono);color:var(--ink)}
+.stip{margin-top:11px;background:var(--warn-bg);border-radius:10px;padding:10px 12px;
+  font-size:12.5px;line-height:1.7;color:var(--ink)}
+.stip b{color:var(--warn)}
+.sgood{margin-top:9px;background:var(--ok-bg);border-radius:10px;padding:10px 12px;
+  font-size:12.5px;line-height:1.7;color:var(--ink)}
+.sgood b{color:var(--ok)}
 </style>
 </head>
 <body>
 <a class="homebar" href="../">← ホーム<span>分析</span></a>
 <header class="top"><div class="top-in"><div class="tabs" id="tabs">
-  <button class="tab" data-v="trend" aria-selected="true">移り変わり</button>
-  <button class="tab" data-v="item" aria-selected="false">商品の動き</button>
-  <button class="tab" data-v="when" aria-selected="false">いつ忙しいか</button>
+  <button class="tab" data-v="trend" aria-selected="true">月ごと</button>
+  <button class="tab" data-v="item" aria-selected="false">商品</button>
+  <button class="tab" data-v="guest" aria-selected="false">お客さま</button>
+  <button class="tab" data-v="when" aria-selected="false">時間帯</button>
+  <button class="tab" data-v="staff" aria-selected="false">スタッフ</button>
 </div></div></header>
 
 <main>
-  <div class="target">
+  <div class="target" id="target">
     <h2>見る期間</h2>
     <div class="ln"><select id="span">
       <option value="6">直近6か月</option>
@@ -117,6 +203,14 @@ tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
       <option value="24">直近24か月</option>
     </select></div>
     <button class="btn primary go" id="go">表示する</button>
+  </div>
+  <div id="monWrap" hidden>
+    <div class="monbar">
+      <button type="button" id="monPrev" aria-label="前の月">‹</button>
+      <div class="mon" id="monLbl">—</div>
+      <button type="button" id="monNext" aria-label="次の月">›</button>
+    </div>
+    <div class="monhint" id="monHint"></div>
   </div>
   <div class="upd">更新日時：<b id="upd">—</b></div>
 
@@ -175,6 +269,28 @@ tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
       </div></div>
     </section>
 
+    <!-- お客さま -->
+    <section class="view" id="v-guest" data-off>
+      <div class="card" id="cVisit"><div class="sec">
+        <h3>来店と購買率</h3>
+        <div id="visSum"></div>
+        <h4 class="sub">区分ごと</h4>
+        <div id="visGrid"></div>
+        <h4 class="sub">担当ごと</h4>
+        <div id="visStaff"></div>
+        <h4 class="sub">時間帯ごと</h4>
+        <div id="visHour"></div>
+        <p class="note"><b>購買率</b>は 会計の件数 ÷ 来店数。来店は<a href="../visit/">来店の画面</a>で数えたぶんです。<br>
+          担当ごとの来店数は、<b>そのとき担当になっていた人</b>のぶんとして数えます。</p>
+      </div></div>
+      <div class="card" id="cGuest"><div class="sec">
+        <h3>お客様の種類</h3><div class="bars" id="byGuest"></div>
+      </div></div>
+      <div class="card"><div class="sec">
+        <h3>支払い方法</h3><div class="bars" id="byPay"></div>
+      </div></div>
+    </section>
+
     <!-- いつ忙しいか -->
     <section class="view" id="v-when" data-off>
       <div class="card"><div class="sec">
@@ -199,11 +315,28 @@ tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
         <div class="bars" id="byHour"></div>
       </div></div>
     </section>
+
+    <!-- スタッフ -->
+    <section class="view" id="v-staff" data-off>
+      <div class="card"><div class="sec">
+        <h3 id="stfH">この月のみんな</h3>
+        <div class="stfsum" id="stfSum"></div>
+        <p class="note" id="stfNote"></p>
+      </div></div>
+      <div class="card"><div class="sec">
+        <h3>ひとりずつ<span class="lbl">押すとくわしく出ます</span></h3>
+        <div id="stfList"></div>
+      </div></div>
+      <div class="card"><div class="sec">
+        <h3>担当ごとの売上</h3><div class="bars" id="byStaff"></div>
+      </div></div>
+    </section>
   </div>
 </main>
 
 <script src="../shared/sync.js"></script>
 <script src="../shared/sales.js"></script>
+<script src="../shared/power.js"></script>
 <script>
 (function(){
 "use strict";
@@ -213,6 +346,7 @@ function yen(n){ return "¥"+Math.round(Number(n)||0).toLocaleString("ja-JP") }
 function pad2(n){ return ("0"+n).slice(-2) }
 function pct(a,b){ return b?Math.round(a/b*100)+"%" : "—" }
 var DOW=["日","月","火","水","木","金","土"];
+function payName(k){ return (window.Sync&&Sync.payName(k))||"現金" }
 
 /* 置き場所は設定の画面と同じものを借りる（仕入れ値を見るので店長用キーが要る） */
 var K_SHIFT="shiftadmin.v1", K_ITEM="storeitems.v1";
@@ -251,6 +385,47 @@ function range(){
   return {from:a.y+"-"+pad2(a.m)+"-01", to:b.y+"-"+pad2(b.m)+"-"+pad2(last)};
 }
 
+/* ---------- 月を選ぶ（お客さま・スタッフのタブ） ---------- */
+/* いちど受け取った期間の中から切り出すだけ。月を送っても取り直しはしない。 */
+var pick=null;
+function pickIdx(){
+  var ks=monthKeys();
+  if(pick) for(var i=0;i<ks.length;i++) if(ks[i].y===pick.y&&ks[i].m===pick.m) return i;
+  return ks.length-1;
+}
+function syncMon(){
+  var ks=monthKeys(), i=pickIdx();
+  pick={y:ks[i].y, m:ks[i].m};
+  $("#monLbl").textContent=pick.y+"年"+pick.m+"月";
+  $("#monPrev").disabled=(i<=0);
+  $("#monNext").disabled=(i>=ks.length-1);
+  $("#monHint").textContent="直近"+span+"か月から選べます";
+}
+function stepMon(d){
+  var ks=monthKeys(), i=pickIdx()+d;
+  if(i<0||i>=ks.length) return;
+  pick={y:ks[i].y, m:ks[i].m};
+  syncMon(); renderGuest(); renderStaff();
+}
+$("#monPrev").addEventListener("click",function(){ stepMon(-1) });
+$("#monNext").addEventListener("click",function(){ stepMon(1) });
+
+function monthPre(k){ return k.y+"-"+pad2(k.m) }
+function monthRows(k){
+  var pre=monthPre(k);
+  return ok().filter(function(s){ return String(s.day).slice(0,7)===pre });
+}
+function monthVisits(k){
+  var pre=monthPre(k);
+  return visits.filter(function(g){ return String(g.day).slice(0,7)===pre });
+}
+function prevOf(k){ var d=new Date(k.y,k.m-2,1); return {y:d.getFullYear(), m:d.getMonth()+1} }
+function inRange(k){
+  var ks=monthKeys();
+  for(var i=0;i<ks.length;i++) if(ks[i].y===k.y&&ks[i].m===k.m) return true;
+  return false;
+}
+
 /* ---------- 受け取る ---------- */
 var rows=[], visits=[], items=[], busy=false;
 async function load(quiet){
@@ -273,6 +448,7 @@ async function load(quiet){
     catch(e){ visits=[] }
     try{ items=await pullItems() }
     catch(e){ items=localItems() }
+    CATOF=null;
     var d=new Date();
     $("#upd").textContent=d.getFullYear()+"/"+pad2(d.getMonth()+1)+"/"+pad2(d.getDate())+" "+
       pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());
@@ -286,6 +462,15 @@ async function load(quiet){
   $("#go").disabled=false;
 }
 /* 商品リストは見るだけ。発注や設定の画面が持っているものを書きかえない。 */
+var CATOF=null;
+function catOf(id){
+  if(!CATOF){ CATOF={}; items.forEach(function(it){ CATOF[it.id]=String(it.cat||"") }) }
+  return CATOF[id]||"";
+}
+function hiLine(){
+  var v=null; try{ v=JSON.parse(localStorage.getItem("storeregset.v1")) }catch(e){}
+  return (v&&typeof v.hiprice==="number")?v.hiprice:3000;
+}
 function localItems(){
   var v=null; try{ v=JSON.parse(localStorage.getItem(K_ITEM)) }catch(e){}
   return (((v||{}).items)||[]).filter(function(x){ return !x.del });
@@ -305,6 +490,15 @@ async function pullItems(){
 
 /* ---------- まとめる ---------- */
 function ok(){ return rows.filter(function(s){ return !s.voided }) }
+function group(list,keyOf,fallback){
+  var m={}, order=[];
+  list.forEach(function(s){
+    var k=keyOf(s); if(k==null||k==="") k=fallback;
+    if(!m[k]){ m[k]={name:k, amt:0, n:0, qty:0}; order.push(k) }
+    m[k].amt+=s.total; m[k].n++; m[k].qty+=s.qty;
+  });
+  return order.map(function(k){ return m[k] }).sort(function(a,b){ return b.amt-a.amt });
+}
 
 /* 月ごとの数。いちばん後ろの月は途中までのことがある。 */
 function months(){
@@ -537,9 +731,12 @@ function bars(el,list,top,fmt){
 function render(){
   $("#noneCard").hidden=true;
   $("#body").hidden=false;
+  syncMon();
   renderTrend();
   renderItems();
+  renderGuest();
   renderWhen();
+  renderStaff();
 }
 
 function dl(a,b){
@@ -778,14 +975,255 @@ function renderWhen(){
   bars($("#byHour"),hl,hTop,function(x){ return "会計 "+x.n+"件" });
 }
 
+/* ---------- お客さま（来店と購買率・種類・支払い方法） ---------- */
+/* 来店は「日・時間帯・担当・区分」でまとめて届く。購入は会計の件数。
+   ここは選んだ1か月ぶんだけを出す。 */
+function renderGuest(){
+  var list=monthRows(pick), vs=monthVisits(pick);
+  var amt=0; list.forEach(function(s){ amt+=s.total });
+
+  var all=0, byA={}, byS={}, byH={};
+  vs.forEach(function(g){
+    var k=Number(g.n)||0; all+=k;
+    byA[g.area+"-"+g.kind]=(byA[g.area+"-"+g.kind]||0)+k;
+    byS[g.staff||""]=(byS[g.staff||""]||0)+k;
+    byH[g.hour]=(byH[g.hour]||0)+k;
+  });
+  $("#cVisit").hidden=!all;
+
+  if(all){
+    var buy=list.length;
+    $("#visSum").innerHTML='<div class="visbig">'+
+      '<div><div class="k">来店</div><div class="v">'+all+'人</div></div>'+
+      '<div><div class="k">購入</div><div class="v">'+buy+'件</div></div>'+
+      '<div class="rate"><div class="k">購買率</div><div class="v">'+pct(buy,all)+'</div></div>'+
+      '</div>';
+
+    /* 区分ごと（紙の表と同じ並び） */
+    var A=(window.Sync&&Sync.AREAS)||[], K=(window.Sync&&Sync.KINDS)||[];
+    var h='<table class="conv"><thead><tr><th></th>'+
+      K.map(function(k){ return '<th class="n">'+esc(k.nm)+'</th>' }).join("")+
+      '<th class="n">合計</th></tr></thead><tbody>';
+    A.forEach(function(a){
+      var sum=0;
+      h+='<tr><td>'+esc(a.nm)+'</td>'+K.map(function(k){
+        var v=byA[a.k+"-"+k.k]||0; sum+=v;
+        return '<td class="n">'+(v||"—")+'</td>';
+      }).join("")+'<td class="n">'+(sum||"—")+'</td></tr>';
+    });
+    h+='</tbody><tfoot><tr><td>合計</td>'+K.map(function(k){
+      var v=0; A.forEach(function(a){ v+=byA[a.k+"-"+k.k]||0 });
+      return '<td class="n">'+(v||"—")+'</td>';
+    }).join("")+'<td class="n">'+all+'</td></tr></tfoot></table>';
+    $("#visGrid").innerHTML=h;
+
+    /* 担当ごと */
+    var sBuy={};
+    list.forEach(function(s){ var k=s.staff||""; sBuy[k]=(sBuy[k]||0)+1 });
+    var names={};
+    Object.keys(byS).forEach(function(k){ names[k]=1 });
+    Object.keys(sBuy).forEach(function(k){ names[k]=1 });
+    var rowsS=Object.keys(names).map(function(k){
+      return {name:k||"（担当なし）", vis:byS[k]||0, buy:sBuy[k]||0};
+    }).sort(function(a,b){
+      var ra=a.vis?a.buy/a.vis:-1, rb=b.vis?b.buy/b.vis:-1;
+      return rb-ra || b.buy-a.buy;
+    });
+    $("#visStaff").innerHTML='<table class="conv"><thead><tr><th>担当</th>'+
+      '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
+      rowsS.map(function(x){
+        return '<tr><td>'+esc(x.name)+'</td><td class="n">'+(x.vis||"—")+'</td>'+
+          '<td class="n">'+x.buy+'</td><td class="rate">'+pct(x.buy,x.vis)+'</td></tr>';
+      }).join("")+
+      '</tbody><tfoot><tr><td>合計</td><td class="n">'+all+'</td><td class="n">'+buy+
+      '</td><td class="rate">'+pct(buy,all)+'</td></tr></tfoot></table>';
+
+    /* 時間帯ごと */
+    var hBuy={};
+    list.forEach(function(s){
+      var hh=parseInt(String(s.at||"").slice(11,13),10);
+      if(!isNaN(hh)) hBuy[hh]=(hBuy[hh]||0)+1;
+    });
+    var hs={};
+    Object.keys(byH).forEach(function(k){ hs[k]=1 });
+    Object.keys(hBuy).forEach(function(k){ hs[k]=1 });
+    $("#visHour").innerHTML='<table class="conv"><thead><tr><th>時間帯</th>'+
+      '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
+      Object.keys(hs).map(Number).sort(function(a,b){ return a-b }).map(function(hh){
+        var v=byH[hh]||0, b2=hBuy[hh]||0;
+        return '<tr><td>'+hh+'時台</td><td class="n">'+(v||"—")+'</td>'+
+          '<td class="n">'+b2+'</td><td class="rate">'+pct(b2,v)+'</td></tr>';
+      }).join("")+'</tbody></table>';
+  }
+
+  var g=group(list,function(s){ return s.guest },"（選んでいない）");
+  $("#cGuest").hidden=(!g.length||(g.length===1&&g[0].name==="（選んでいない）"));
+  bars($("#byGuest"),g,amt,function(x){ return x.n+"件・"+x.qty+"点" });
+  bars($("#byPay"),group(list,function(s){ return payName(s.pay) },"現金"),amt,
+    function(x){ return x.n+"件" });
+}
+
+/* ---------- スタッフ（5つの力） ---------- */
+/* スタッフ用アプリと同じ出し方（shared/power.js）で、全員ぶんを店長が見るところ。
+   店長なので、ここだけは売上と粗利も並べて出す。
+   先月ぶんは、もう受け取ってある中から切り出すので、取り直しはしない。 */
+function powerRows(sales,vis){
+  var hi=hiLine(), m={}, order=[];
+  function row(nm){
+    if(!m[nm]){
+      m[nm]={name:nm, vis:0, buy:0, qty:0, hiqty:0,
+        visA:{west:0,asia:0,jp:0}, buyA:{west:0,asia:0,jp:0}, cats:{},
+        amt:0, cost:0, disc:0};
+      order.push(nm);
+    }
+    return m[nm];
+  }
+  (vis||[]).forEach(function(g){
+    var r=row(g.staff||"（担当なし）"), k=Number(g.n)||0;
+    r.vis+=k;
+    if(r.visA[g.area]!=null) r.visA[g.area]+=k;
+  });
+  (sales||[]).forEach(function(x){
+    var r=row(x.staff||"（担当なし）");
+    r.buy++; r.qty+=Number(x.qty)||0;
+    r.amt+=Number(x.total)||0; r.cost+=Number(x.cost)||0; r.disc+=Number(x.discount)||0;
+    if(r.buyA[x.area]!=null) r.buyA[x.area]++;
+    (x.lines||[]).forEach(function(l){
+      var q=Number(l.qty)||0;
+      if((Number(l.price)||0)>=hi) r.hiqty+=q;
+      var c=catOf(l.id)||"その他";
+      r.cats[c]=(r.cats[c]||0)+q;
+    });
+  });
+  return order.map(function(k){ return m[k] });
+}
+
+function renderStaff(){
+  var list=monthRows(pick), vs=monthVisits(pick);
+  var amt=0; list.forEach(function(s){ amt+=s.total });
+  bars($("#byStaff"),group(list,function(s){ return s.staff },"（担当なし）"),amt,function(x){
+    return x.n+"件・"+x.qty+"点・1件 "+yen(x.amt/x.n);
+  });
+
+  $("#stfH").textContent=pick.y+"年"+pick.m+"月のみんな";
+  var cur=powerRows(list,vs);
+  if(!cur.length){
+    $("#stfSum").innerHTML=""; $("#stfNote").textContent="";
+    $("#stfList").innerHTML='<div class="empty">この月はまだ記録がありません。</div>';
+    return;
+  }
+  var tV=0,tB=0,tA=0,tC=0;
+  cur.forEach(function(r){ tV+=r.vis; tB+=r.buy; tA+=r.amt; tC+=r.cost });
+  $("#stfSum").innerHTML=
+    '<div><div class="k">来店</div><div class="v">'+tV+'</div></div>'+
+    '<div><div class="k">購入</div><div class="v">'+tB+'</div></div>'+
+    '<div><div class="k">購買率</div><div class="v">'+pct(tB,tV)+'</div></div>'+
+    '<div><div class="k">売上</div><div class="v">'+yen(tA)+'</div></div>';
+
+  var pk=prevOf(pick), has=inRange(pk);
+  var prev=has?powerRows(monthRows(pk),monthVisits(pk)):null;
+  if(prev&&!prev.length) prev=null;
+  $("#stfNote").innerHTML='スコアは<b>みんなの中での位置</b>です。50がまん中、100がいちばん。'+
+    'スタッフの画面に出ているものと同じ数字です。'+
+    (prev?'丸いしるしは<b>'+pk.m+'月とくらべた増え方</b>です。':'')+'<br>'+
+    '高単価のラインは '+hiLine().toLocaleString("ja-JP")+'円（<a href="../settings/#reg">設定 → レジ</a>で変えられます）。';
+
+  var AX=Power.AXES;
+  /* 総合スコアの高い順に並べる */
+  var order=cur.map(function(r){
+    var sc=Power.axisScores(cur,r.name);
+    return {r:r, sc:sc, tot:Power.totalScore(sc)};
+  }).sort(function(a,b){
+    return (b.tot||0)-(a.tot||0) || b.r.amt-a.r.amt || a.r.name.localeCompare(b.r.name,"ja");
+  });
+
+  $("#stfList").innerHTML=order.map(function(x,i){
+    var r=x.r, sc=x.sc, pos=i+1;
+    var d1="";
+    if(prev&&x.tot!==null&&prev.some(function(q){ return q.name===r.name })){
+      var pt=Power.totalScore(Power.axisScores(prev,r.name));
+      if(pt!==null){
+        var d=x.tot-pt;
+        d1='<span class="dl '+(d>0?"up":d<0?"dn":"")+'">'+
+           (d>0?"＋":d<0?"−":"±")+Math.abs(d)+'</span>';
+      }
+    }
+    var bb=AX.map(function(a){
+      var v=sc[a.k]&&sc[a.k].s;
+      return '<div><div class="bn">'+esc(a.nm)+'</div>'+
+        '<div class="bb"><i class="'+(v>=50?"hi":"")+'" style="width:'+(v==null?0:v)+'%"></i></div>'+
+        '<div class="bv">'+(v==null?"—":v)+'</div></div>';
+    }).join("");
+    return '<div class="stf" data-s="'+esc(r.name)+'" aria-expanded="false">'+
+      '<div class="sh"><span class="rk'+(pos<=3?" t"+pos:"")+'">'+pos+'</span>'+
+      '<span class="nm">'+esc(r.name)+'</span>'+d1+
+      '<span class="sc">'+(x.tot===null?"—":x.tot)+'<small> /100</small></span></div>'+
+      '<div class="sb">'+yen(r.amt)+'　粗利 '+yen(r.amt-r.cost)+'　購買率 '+pct(r.buy,r.vis)+'</div>'+
+      '<div class="sbars">'+bb+'</div>'+
+      '<div class="sdet" hidden>'+staffDet(r,sc,cur)+'</div></div>';
+  }).join("");
+}
+
+/* 押したときに開く中身 */
+function staffDet(r,sc,all){
+  var AX=Power.AXES;
+  var h=Power.radarSvg(sc)+
+    '<table class="sax"><thead><tr><th>力</th><th class="n">この人</th>'+
+    '<th class="n">みんなの平均</th><th class="n">位</th><th class="n">点</th></tr></thead><tbody>'+
+    AX.map(function(a){
+      var x=sc[a.k]||{};
+      return '<tr><td>'+esc(a.nm)+'</td><td class="n">'+esc(a.tx(r))+'</td>'+
+        '<td class="n">'+(x.avg==null?"—":esc(a.av(x.avg)))+'</td>'+
+        '<td class="n">'+(x.pos==null?"—":x.pos)+'</td>'+
+        '<td class="s '+(x.s>=50?"up":"dn")+'">'+(x.s==null?"—":x.s)+'</td></tr>';
+    }).join("")+'</tbody></table>';
+
+  /* 商品の種類 */
+  var ks=Object.keys(r.cats||{}).filter(function(k){ return r.cats[k]>0 })
+    .sort(function(a,b){ return r.cats[b]-r.cats[a] });
+  if(ks.length){
+    h+='<h4 class="sub">売れた商品の種類</h4><div class="scat">'+
+      ks.map(function(k){ return '<span>'+esc(k)+' <b>'+r.cats[k]+'</b></span>' }).join("")+
+      '</div>';
+  }
+
+  /* ほめるところ／声をかけるところ */
+  var got=AX.filter(function(a){ return sc[a.k]&&sc[a.k].s!=null });
+  if(got.length){
+    got.sort(function(x,y){ return sc[y.k].s-sc[x.k].s });
+    var top=got[0], low=got[got.length-1];
+    h+='<div class="sgood">ほめるなら <b>'+esc(top.nm)+'</b>（'+esc(top.ds)+'）。'+
+       esc(top.nm)+' は '+esc(top.tx(r))+
+       (all.length>1?'、みんなの平均は '+esc(top.av(sc[top.k].avg)):"")+'。</div>';
+    if(got.length>1&&sc[low.k].s<50){
+      h+='<div class="stip">声をかけるなら <b>'+esc(low.nm)+'</b>（'+esc(low.ds)+'）。<br>'+
+         esc(low.tip)+'</div>';
+    }
+  }
+  h+='<p class="note">売上 '+yen(r.amt)+'・粗利 '+yen(r.amt-r.cost)+
+     '・値引き '+yen(r.disc)+'・客単価 '+(r.buy?yen(r.amt/r.buy):"—")+'</p>';
+  return h;
+}
+
+$("#stfList").addEventListener("click",function(e){
+  var c=e.target.closest(".stf"); if(!c) return;
+  var open=c.getAttribute("aria-expanded")==="true";
+  c.setAttribute("aria-expanded",String(!open));
+  c.querySelector(".sdet").hidden=open;
+});
+
 /* ---------- 共通 ---------- */
-var VIEWS=["trend","item","when"];
+var VIEWS=["trend","item","guest","when","staff"];
+var BYMON={guest:1, staff:1};      /* 月を選んで見るタブ */
 function show(v){
   if(VIEWS.indexOf(v)<0) v="trend";
   VIEWS.forEach(function(k){ $("#v-"+k).toggleAttribute("data-off",k!==v) });
   document.querySelectorAll(".tab").forEach(function(t){
     t.setAttribute("aria-selected",String(t.dataset.v===v));
   });
+  /* 日付を選ぶところが2つ並ぶと迷うので、そのタブで使うほうだけを出す */
+  $("#target").hidden=!!BYMON[v];
+  $("#monWrap").hidden=!BYMON[v];
 }
 $("#tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
