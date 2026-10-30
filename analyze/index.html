@@ -100,6 +100,25 @@ td.dn{color:var(--ng);font-weight:700}
 tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 
+/* 区分ごとに売れている商品 */
+.ahd{display:flex;align-items:baseline;gap:8px;margin:16px 0 9px}
+.ahd:first-child{margin-top:2px}
+.ahd .an{font-size:14.5px;font-weight:800}
+.ahd .as{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);margin-left:auto;
+  white-space:nowrap}
+.ai{display:flex;flex-direction:column;gap:9px}
+.ai .r{display:grid;grid-template-columns:20px 1fr auto;gap:4px 9px;align-items:baseline}
+.ai .r .no{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);text-align:right}
+.ai .r .nm{font-size:13.5px;font-weight:700;min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.ai .r .vv{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:13.5px;
+  font-weight:800;white-space:nowrap}
+.ai .r .g{grid-column:2/-1;height:6px;border-radius:999px;background:var(--surface-3);overflow:hidden}
+.ai .r .g i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+.ai .r .sb{grid-column:2/-1;font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.ai .tag{font-size:10px;font-weight:800;color:var(--am);background:var(--am-bg);
+  border-radius:999px;padding:2px 7px;margin-left:6px;font-family:var(--ui)}
+
 /* 内訳の棒 */
 .bars{display:flex;flex-direction:column;gap:9px}
 .bar .t{display:flex;align-items:baseline;gap:9px;font-size:13.5px}
@@ -257,6 +276,17 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
 
     <!-- 商品の動き -->
     <section class="view" id="v-item" data-off>
+      <div class="card"><div class="sec">
+        <div class="ghead"><h3>区分ごとに売れている商品</h3>
+          <span class="sw">金額で見る<button type="button" id="aiSw" aria-pressed="false" aria-label="金額で見る"></button></span>
+        </div>
+        <div id="aiBox"></div>
+        <p class="note">お会計のときにレジで選んだ<b>区分</b>ごとに、売れた商品を並べています。
+          区分を選ばずにしたお会計は、ここには入りません。<br>
+          <b>「この区分で特に」</b>は、お店ぜんぶでの売れ方とくらべて、
+          その区分でよく売れている商品です。仕入れや置き場所を決めるのに使ってください。</p>
+      </div></div>
+
       <div class="card"><div class="sec">
         <h3>伸びている商品</h3>
         <div class="tw" id="itUp"></div>
@@ -665,10 +695,83 @@ function render(){
   $("#body").hidden=false;
   syncMon();
   renderWeeks();
+  renderAreaItems();
   renderItems();
   renderGuest();
   renderWhen();
   renderStaff();
+}
+
+/* ---------- 区分ごとに売れている商品 ---------- */
+/* 見る期間ぜんぶぶん。1か月だと商品ごとの数が小さすぎて、順番がぶれるため。 */
+var aiAmt=false;        /* false=点数 / true=金額 */
+$("#aiSw").addEventListener("click",function(){
+  aiAmt=!aiAmt;
+  this.setAttribute("aria-pressed",String(aiAmt));
+  renderAreaItems();
+});
+function renderAreaItems(){
+  var AR=(window.Sync&&Sync.AREAS)||[];
+  var by={}, all={}, tot={}, allQty=0;
+  AR.forEach(function(a){ by[a.k]={}; tot[a.k]={qty:0, amt:0, n:0} });
+
+  ok().forEach(function(s){
+    var m=by[s.area];
+    (s.lines||[]).forEach(function(l){
+      var id=l.id||l.name, q=Number(l.qty)||0, a=(Number(l.price)||0)*q;
+      allQty+=q;
+      if(!all[id]) all[id]=0;
+      all[id]+=q;
+      if(!m) return;
+      if(!m[id]) m[id]={no:l.no||"", name:l.name||"（名前なし）", qty:0, amt:0};
+      m[id].qty+=q; m[id].amt+=a;
+      tot[s.area].qty+=q; tot[s.area].amt+=a;
+    });
+    if(m) tot[s.area].n++;
+  });
+
+  var any=AR.some(function(a){ return tot[a.k].qty>0 });
+  if(!any){
+    $("#aiBox").innerHTML='<div class="stip">区分を選んだお会計がまだありません。<br>'+
+      'レジでお会計のときに<b>お客さまの区分</b>（'+
+      AR.map(function(a){ return esc(a.nm) }).join("・")+'）を選ぶと、ここに出ます。</div>';
+    return;
+  }
+
+  var ks=monthKeys(), a0=ks[0], a1=ks[ks.length-1];
+  var h='<div class="lbl" style="display:block;margin-bottom:2px">'+
+    a0.y+'年'+a0.m+'月〜'+a1.y+'年'+a1.m+'月（直近'+span+'か月）・'+
+    (aiAmt?'金額':'売れた点数')+'の多い順</div>';
+
+  AR.forEach(function(a){
+    var m=by[a.k]||{}, t=tot[a.k];
+    h+='<div class="ahd"><span class="an">'+esc(a.nm)+'</span>'+
+       '<span class="as">'+t.n+'件・'+t.qty+'点・'+yen(t.amt)+'</span></div>';
+    var list=Object.keys(m).map(function(id){
+      var r=m[id];
+      /* その区分での売れ方が、お店ぜんぶより目立って多いか */
+      var mine=t.qty?r.qty/t.qty:0;
+      var base=allQty?(all[id]||0)/allQty:0;
+      r.sp=(r.qty>=5&&base>0&&mine>=base*1.3);
+      return r;
+    }).sort(function(x,y){
+      return aiAmt ? (y.amt-x.amt||y.qty-x.qty) : (y.qty-x.qty||y.amt-x.amt);
+    });
+    if(!list.length){ h+='<span class="lbl">まだありません</span>'; return }
+    var top=aiAmt?list[0].amt:list[0].qty;
+    h+='<div class="ai">'+list.slice(0,10).map(function(r,i){
+      var v=aiAmt?r.amt:r.qty;
+      return '<div class="r"><span class="no">'+(i+1)+'</span>'+
+        '<span class="nm">'+esc(r.name)+(r.sp?'<span class="tag">この区分で特に</span>':"")+'</span>'+
+        '<span class="vv">'+(aiAmt?yen(r.amt):r.qty+"点")+'</span>'+
+        '<span class="g"><i style="width:'+(top?Math.round(v/top*100):0)+'%"></i></span>'+
+        '<span class="sb">'+(aiAmt?(r.qty+"点"):yen(r.amt))+
+        '　この区分の '+(t.qty?Math.round(r.qty/t.qty*100):0)+'%</span>'+
+        '</div>';
+    }).join("")+'</div>';
+    if(list.length>10) h+='<div class="lbl" style="margin-top:8px">ほかに '+(list.length-10)+' 種類</div>';
+  });
+  $("#aiBox").innerHTML=h;
 }
 
 function renderItems(){
