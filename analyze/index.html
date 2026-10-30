@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>分析</title>
-<meta name="description" content="月ごとの移り変わり・商品の動き・お客さま・時間帯・スタッフを見る画面。">
+<meta name="description" content="週次決算・商品の動き・お客さま・時間帯・スタッフを見る画面。">
 <meta name="theme-color" content="#2BA55F">
 <link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
 <link rel="stylesheet" href="../shared/theme.css">
@@ -41,27 +41,6 @@ h3 .lbl{margin-left:8px}
 .upd{font-size:12px;color:var(--ink-3);text-align:center;padding:11px 4px 3px}
 .upd b{font-family:var(--mono);font-weight:600;color:var(--ink-2)}
 
-/* 気づき */
-.ins{display:flex;flex-direction:column;gap:9px}
-.ins .i{display:flex;gap:10px;font-size:13.5px;line-height:1.8;background:var(--surface-2);
-  border-radius:10px;padding:11px 13px;color:var(--ink)}
-.ins .i.up{background:var(--ok-bg)}
-.ins .i.dn{background:var(--warn-bg)}
-.ins .i .ic{flex:none;font-size:15px;line-height:1.6}
-.ins .i em{font-style:normal;font-weight:800;font-family:var(--mono)}
-.ins .i.up em{color:var(--ok)}
-.ins .i.dn em{color:var(--warn)}
-
-/* くらべる箱 */
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:9px}
-.tiles>div{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 12px}
-.tiles .k{font-size:11.5px;color:var(--ink-3)}
-.tiles .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:20px;font-weight:800;
-  line-height:1.45}
-.tiles .d{font-size:12px;font-family:var(--mono);font-weight:700;color:var(--ink-3);white-space:nowrap}
-.tiles .d.up{color:var(--ok)}
-.tiles .d.dn{color:var(--ng)}
-
 /* グラフ */
 .ghead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .ghead h3{margin:0}
@@ -74,10 +53,24 @@ h3 .lbl{margin-left:8px}
 .sw button[aria-pressed="true"]{background:var(--accent)}
 .sw button[aria-pressed="true"]::after{transform:translateX(22px)}
 .gwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-2);margin-top:8px;flex-wrap:wrap}
-.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--accent);
-  margin-right:5px;vertical-align:-1px}
-.legend .ln i{height:3px;border-radius:2px;background:var(--ink-3);vertical-align:3px}
+
+/* 週ごと */
+.wk{border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:var(--surface)}
+.wk+.wk{margin-top:10px}
+.wk.tot{background:var(--surface-2);border-color:var(--line-2)}
+.wk .wh{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
+.wk .wn{font-size:14px;font-weight:800;white-space:nowrap}
+.wk .wr{font-family:var(--mono);font-size:12.5px;color:var(--ink-2)}
+.wk .wr .s0{color:var(--sun)} .wk .wr .s6{color:var(--sat)}
+.wk .wd{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-family:var(--mono);white-space:nowrap}
+.wk .wg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.wk .wg>div{background:var(--surface-2);border-radius:9px;padding:8px 10px}
+.wk.tot .wg>div{background:var(--surface)}
+.wk .wg .k{font-size:11px;color:var(--ink-3)}
+.wk .wg .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17.5px;
+  font-weight:800;line-height:1.4}
+.wk .wb{height:6px;border-radius:999px;background:var(--surface-3);margin-top:10px;overflow:hidden}
+.wk .wb i{display:block;height:100%;border-radius:999px;background:var(--accent)}
 
 /* 表 */
 table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -107,6 +100,8 @@ tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
 .monbar button:disabled{opacity:.3;cursor:not-allowed}
 .monbar .mon{flex:1;text-align:center;font-size:15.5px;font-weight:800}
 .monhint{font-size:11.5px;color:var(--ink-3);text-align:center;padding:7px 0 0;letter-spacing:.06em}
+.monhint .lnk{background:none;border:none;color:var(--accent);font-family:inherit;font-size:11.5px;
+  font-weight:700;cursor:pointer;padding:0 0 0 9px;text-decoration:underline}
 
 /* 来店と購買率 */
 h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;letter-spacing:.04em}
@@ -187,7 +182,7 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
 <body>
 <a class="homebar" href="../">← ホーム<span>分析</span></a>
 <header class="top"><div class="top-in"><div class="tabs" id="tabs">
-  <button class="tab" data-v="trend" aria-selected="true">月ごと</button>
+  <button class="tab" data-v="week" aria-selected="true">週次決算</button>
   <button class="tab" data-v="item" aria-selected="false">商品</button>
   <button class="tab" data-v="guest" aria-selected="false">お客さま</button>
   <button class="tab" data-v="when" aria-selected="false">時間帯</button>
@@ -210,7 +205,7 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
       <div class="mon" id="monLbl">—</div>
       <button type="button" id="monNext" aria-label="次の月">›</button>
     </div>
-    <div class="monhint" id="monHint"></div>
+    <div class="monhint"><span id="monHint"></span><button type="button" class="lnk" id="spanBtn">期間を変える</button></div>
   </div>
   <div class="upd">更新日時：<b id="upd">—</b></div>
 
@@ -219,31 +214,16 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
   </div></div></div>
 
   <div id="body" hidden>
-    <!-- 移り変わり -->
-    <section class="view" id="v-trend">
+    <!-- 週次決算 -->
+    <section class="view" id="v-week">
       <div class="card"><div class="sec">
-        <h3>気づき</h3>
-        <div class="ins" id="ins"></div>
-      </div></div>
-
-      <div class="card"><div class="sec">
-        <h3>前の月とくらべて</h3>
-        <div class="tiles" id="cmp"></div>
-        <p class="note" id="cmpNote"></p>
-      </div></div>
-
-      <div class="card"><div class="sec">
-        <div class="ghead"><h3>売上と客単価</h3></div>
-        <div class="gwrap"><div id="chart"></div></div>
-        <div class="legend"><span><i></i>売上（棒・左の目もり）</span><span class="ln"><i></i>客単価（線・右の目もり）</span></div>
-      </div></div>
-
-      <div class="card"><div class="sec">
-        <h3>月ごと</h3>
-        <div class="tw" id="tbl"></div>
-        <p class="note"><b>客単価</b>は 売上 ÷ 会計の件数。<b>粗利</b>は 売上 − 仕入れ値（人件費や経費は入りません）。<br>
-          <b>前年</b>は1年前の同じ月とくらべた売上の増え方です。1年前が期間の外のときは「—」になります。<br>
-          <b>いちばん下の月は途中まで</b>のことがあります。くらべるときは上の「前の月とくらべて」をご覧ください。</p>
+        <h3 id="wkH">週ごと</h3>
+        <div id="weeks"></div>
+        <p class="note">週は<b>月曜から日曜まで</b>で区切っています。<br>
+          月のはじめと終わりの週は、<b>その月に入っている日だけ</b>を数えています
+          （何日ぶんかを右に出しています）。<br>
+          <b>購買数</b>は会計の件数です。打ち消した会計は入りません。<br>
+          棒の長さは<b>1日あたりの売上</b>です。日数のちがう週どうしでもくらべられます。</p>
       </div></div>
     </section>
 
@@ -405,7 +385,7 @@ function stepMon(d){
   var ks=monthKeys(), i=pickIdx()+d;
   if(i<0||i>=ks.length) return;
   pick={y:ks[i].y, m:ks[i].m};
-  syncMon(); renderGuest(); renderStaff();
+  syncMon(); renderWeeks(); renderGuest(); renderStaff();
 }
 $("#monPrev").addEventListener("click",function(){ stepMon(-1) });
 $("#monNext").addEventListener("click",function(){ stepMon(1) });
@@ -420,6 +400,20 @@ function monthVisits(k){
   return visits.filter(function(g){ return String(g.day).slice(0,7)===pre });
 }
 function prevOf(k){ var d=new Date(k.y,k.m-2,1); return {y:d.getFullYear(), m:d.getMonth()+1} }
+
+/* 月の中を、月曜はじまり・日曜おわりで区切る。
+   月のはじめと終わりは、その月に入っている日だけの短い週になる。 */
+function weeksOf(k){
+  var last=new Date(k.y,k.m,0).getDate(), out=[], d=1;
+  while(d<=last){
+    var w=new Date(k.y,k.m-1,d).getDay();     /* 0=日 … 6=土 */
+    var toSun=(w===0)?0:(7-w);                /* その週の日曜までの残り日数 */
+    var end=Math.min(last,d+toSun);
+    out.push({from:d, to:end, days:end-d+1});
+    d=end+1;
+  }
+  return out;
+}
 function inRange(k){
   var ks=monthKeys();
   for(var i=0;i<ks.length;i++) if(ks[i].y===k.y&&ks[i].m===k.m) return true;
@@ -500,66 +494,6 @@ function group(list,keyOf,fallback){
   return order.map(function(k){ return m[k] }).sort(function(a,b){ return b.amt-a.amt });
 }
 
-/* 月ごとの数。いちばん後ろの月は途中までのことがある。 */
-function months(){
-  var ks=monthKeys(), m={}, out=[];
-  ks.forEach(function(k){
-    out.push(m[k.key]={key:k.key, y:k.y, mo:k.m, label:k.m+"月",
-      amt:0, cost:0, n:0, qty:0, vis:0, part:false});
-  });
-  /* 今月は途中。グラフと表で「※」を出すために覚えておく */
-  var lastM=out[out.length-1];
-  var lastDay=new Date(lastM.y,lastM.mo,0).getDate();
-  lastM.part=(now.getDate()<lastDay);
-
-  ok().forEach(function(s){
-    var b=m[String(s.day).slice(0,7)]; if(!b) return;
-    b.amt+=Number(s.total)||0; b.cost+=Number(s.cost)||0;
-    b.n++; b.qty+=Number(s.qty)||0;
-  });
-  visits.forEach(function(g){
-    var b=m[String(g.day).slice(0,7)]; if(!b) return;
-    b.vis+=Number(g.n)||0;
-  });
-  return out;
-}
-
-/* 今月と前の月を、同じ日数でくらべる。
-   今月が途中なのに前の月の丸ごとと並べると、いつも「落ちた」ように見えてしまう。 */
-function compare(){
-  var ks=monthKeys();
-  if(ks.length<2) return null;
-  var cur=ks[ks.length-1], prv=ks[ks.length-2];
-  var curLast=new Date(cur.y,cur.m,0).getDate();
-  var dLimit=(now.getDate()<curLast)?now.getDate():curLast;
-  /* 月が変わったばかりだと、1日や2日ぶんをくらべることになって役に立たない。
-     そのときは、終わった月どうしをくらべる。 */
-  if(dLimit<3&&ks.length>=3){
-    cur=prv; prv=ks[ks.length-3];
-    curLast=new Date(cur.y,cur.m,0).getDate();
-    dLimit=curLast;
-  }
-  function sum(k){
-    var pre=k.y+"-"+pad2(k.m), o={amt:0,cost:0,n:0,qty:0,vis:0};
-    ok().forEach(function(s){
-      var day=String(s.day);
-      if(day.slice(0,7)!==pre) return;
-      if(+day.slice(8,10)>dLimit) return;
-      o.amt+=Number(s.total)||0; o.cost+=Number(s.cost)||0;
-      o.n++; o.qty+=Number(s.qty)||0;
-    });
-    visits.forEach(function(g){
-      var day=String(g.day);
-      if(day.slice(0,7)!==pre) return;
-      if(+day.slice(8,10)>dLimit) return;
-      o.vis+=Number(g.n)||0;
-    });
-    return o;
-  }
-  return {cur:cur, prv:prv, d:dLimit, a:sum(cur), b:sum(prv),
-    whole:(dLimit===curLast)};
-}
-
 /* 商品の動き。途中の月は入れずに、終わった月だけでくらべる。 */
 function pairSpan(){
   var ks=monthKeys().slice();
@@ -615,59 +549,6 @@ function heatData(){
 }
 
 /* ---------- 絵 ---------- */
-function niceMax(v){
-  if(v<=0) return 1;
-  var p=Math.pow(10,Math.floor(Math.log10(v))), f=v/p;
-  var s=f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10;
-  return s*p;
-}
-/* 棒＝売上、線＝客単価。外の部品を使わないので、つながっていなくても絵は出る。 */
-function chart(ms){
-  var step=(ms.length>14)?34:50, padL=54, padR=60, padT=14, padB=36, h=236;
-  var w=Math.max(padL+padR+ms.length*step, 320);
-  var maxA=niceMax(Math.max.apply(null,ms.map(function(b){ return b.amt }).concat([0])));
-  var avg=function(b){ return b.n?b.amt/b.n:0 };
-  var maxU=niceMax(Math.max.apply(null,ms.map(avg).concat([0])));
-  var gh=h-padT-padB;
-  var yA=function(v){ return padT+gh-(v/maxA)*gh };
-  var yU=function(v){ return padT+gh-(v/maxU)*gh };
-  var x=function(i){ return padL+step*i+step/2 };
-
-  var g="";
-  for(var t=0;t<=4;t++){
-    var v=maxA*t/4, y=yA(v);
-    g+='<line x1="'+padL+'" y1="'+y+'" x2="'+(w-padR)+'" y2="'+y+'" stroke="var(--line)" stroke-width="1"/>'+
-       '<text x="'+(padL-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)">'+
-       (v>=10000?Math.round(v/10000)+"万":Math.round(v))+'</text>'+
-       '<text x="'+(w-padR+6)+'" y="'+(y+4)+'" font-size="9.5" fill="var(--ink-3)">'+
-       Math.round(maxU*t/4).toLocaleString("ja-JP")+'</text>';
-  }
-  var bw=Math.min(step-12,26);
-  ms.forEach(function(b,i){
-    if(b.amt<=0) return;
-    var y1=yA(b.amt);
-    g+='<rect x="'+(x(i)-bw/2)+'" y="'+y1+'" width="'+bw+'" height="'+(padT+gh-y1)+'" rx="3" '+
-       'fill="var(--accent)" opacity="'+(b.part?.45:1)+'"><title>'+
-       esc(b.y+"年"+b.mo+"月　"+yen(b.amt)+(b.part?"（途中まで）":""))+'</title></rect>';
-  });
-  var pts=ms.map(function(b,i){ return x(i)+","+yU(avg(b)) }).join(" ");
-  g+='<polyline points="'+pts+'" fill="none" stroke="var(--ink-3)" stroke-width="1.6" '+
-     'stroke-linejoin="round" stroke-linecap="round"/>';
-  ms.forEach(function(b,i){
-    g+='<circle cx="'+x(i)+'" cy="'+yU(avg(b))+'" r="3.2" fill="var(--surface)" stroke="var(--ink-3)" '+
-       'stroke-width="1.6"><title>'+esc(b.mo+"月　客単価 "+yen(avg(b)))+'</title></circle>';
-  });
-  ms.forEach(function(b,i){
-    g+='<text x="'+x(i)+'" y="'+(h-19)+'" text-anchor="middle" font-size="11" fill="var(--ink-2)">'+
-       b.mo+'</text>';
-    if(b.mo===1||i===0)
-      g+='<text x="'+x(i)+'" y="'+(h-5)+'" text-anchor="middle" font-size="10" fill="var(--ink-3)">'+
-         b.y+'</text>';
-  });
-  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" '+
-    'aria-label="売上と客単価の移り変わり">'+g+'</svg>';
-}
-
 var heatN=false;      /* false=売上 / true=件数 */
 $("#hSw").addEventListener("click",function(){
   heatN=!heatN;
@@ -732,151 +613,11 @@ function render(){
   $("#noneCard").hidden=true;
   $("#body").hidden=false;
   syncMon();
-  renderTrend();
+  renderWeeks();
   renderItems();
   renderGuest();
   renderWhen();
   renderStaff();
-}
-
-function dl(a,b){
-  /* 増え方を「＋12%」の形で返す。前が0のときは出さない。 */
-  if(!b) return {t:"—", c:""};
-  var p=Math.round((a-b)/b*100);
-  return {t:(p>0?"＋":p<0?"−":"±")+Math.abs(p)+"%", c:(p>0?"up":p<0?"dn":"")};
-}
-
-function renderTrend(){
-  var ms=months();
-  $("#chart").innerHTML=chart(ms);
-
-  /* 前の月とくらべて */
-  var c=compare();
-  if(!c){ $("#cmp").innerHTML=""; $("#cmpNote").textContent="" }
-  else{
-    var a=c.a, b=c.b;
-    var uA=a.n?a.amt/a.n:0, uB=b.n?b.amt/b.n:0;
-    var box=[
-      {k:"売上",   v:yen(a.amt),         d:dl(a.amt,b.amt)},
-      {k:"客数",   v:a.n+"件",           d:dl(a.n,b.n)},
-      {k:"客単価", v:yen(uA),            d:dl(uA,uB)},
-      {k:"粗利",   v:yen(a.amt-a.cost),  d:dl(a.amt-a.cost,b.amt-b.cost)}
-    ];
-    if(a.vis||b.vis) box.push({k:"購買率", v:pct(a.n,a.vis), d:dl(a.vis?a.n/a.vis:0, b.vis?b.n/b.vis:0)});
-    $("#cmp").innerHTML=box.map(function(x){
-      return '<div><div class="k">'+esc(x.k)+'</div><div class="v">'+x.v+'</div>'+
-        '<div class="d '+x.d.c+'">'+x.d.t+'</div></div>';
-    }).join("");
-    $("#cmpNote").innerHTML=c.whole
-      ? '<b>'+c.cur.m+'月</b>と<b>'+c.prv.m+'月</b>の、ひと月ぶんどうしをくらべています。'
-      : '<b>'+c.cur.m+'月1〜'+c.d+'日</b>と<b>'+c.prv.m+'月1〜'+c.d+'日</b>をくらべています。'+
-        '今月は途中なので、前の月も同じ日数だけ切り取っています。';
-  }
-
-  /* 月ごとの表 */
-  var byKey={}; ms.forEach(function(x){ byKey[x.key]=x });
-  var hasVis=ms.some(function(x){ return x.vis>0 });
-  var h='<table><thead><tr><th>月</th><th class="n">売上</th><th class="n">粗利</th>'+
-    '<th class="n">客数</th><th class="n">客単価</th>'+(hasVis?'<th class="n">購買率</th>':"")+
-    '<th class="n">前年</th></tr></thead><tbody>';
-  var tA=0,tC=0,tN=0,tV=0;
-  ms.forEach(function(x){
-    tA+=x.amt; tC+=x.cost; tN+=x.n; tV+=x.vis;
-    var pre=byKey[(x.y-1)+"-"+pad2(x.mo)];
-    var yoy=(pre&&pre.amt)?dl(x.amt,pre.amt):{t:"—",c:""};
-    h+='<tr><td class="d">'+x.y+"/"+pad2(x.mo)+(x.part?' <small style="color:var(--ink-3)">途中</small>':"")+'</td>'+
-      '<td class="n">'+yen(x.amt)+'</td>'+
-      '<td class="n">'+yen(x.amt-x.cost)+'</td>'+
-      '<td class="n">'+x.n+'</td>'+
-      '<td class="n">'+(x.n?yen(x.amt/x.n):"—")+'</td>'+
-      (hasVis?'<td class="n">'+(x.vis?pct(x.n,x.vis):"—")+'</td>':"")+
-      '<td class="n '+yoy.c+'">'+yoy.t+'</td></tr>';
-  });
-  h+='</tbody><tfoot><tr><td>合計</td><td class="n">'+yen(tA)+'</td><td class="n">'+yen(tA-tC)+'</td>'+
-    '<td class="n">'+tN+'</td><td class="n">'+(tN?yen(tA/tN):"—")+'</td>'+
-    (hasVis?'<td class="n">'+(tV?pct(tN,tV):"—")+'</td>':"")+'<td class="n">—</td></tr></tfoot></table>';
-  $("#tbl").innerHTML=h;
-
-  renderIns(ms,c);
-}
-
-/* 気づき。数字を見てすぐ分かる言い方にして、多くても5つまでにする。 */
-function renderIns(ms,c){
-  var out=[];
-  function add(cls,ic,html){ out.push('<div class="i '+cls+'"><span class="ic">'+ic+'</span><span>'+html+'</span></div>') }
-
-  if(c&&c.b.amt){
-    var d=c.a.amt-c.b.amt, p=Math.round(d/c.b.amt*100);
-    var upv=(d>=0);
-    add(upv?"up":"dn", upv?"📈":"📉",
-      c.cur.m+"月の売上は、前の月の同じ日までとくらべて <em>"+(upv?"＋":"−")+Math.abs(p)+"%</em>（"+
-      (upv?"＋":"−")+yen(Math.abs(d))+"）です。");
-
-    /* 伸びた・落ちた理由を「お客さまの数」と「1回のお会計」に分ける */
-    var uA=c.a.n?c.a.amt/c.a.n:0, uB=c.b.n?c.b.amt/c.b.n:0;
-    var pn=c.b.n?Math.round((c.a.n-c.b.n)/c.b.n*100):0;
-    var pu=uB?Math.round((uA-uB)/uB*100):0;
-    if(c.b.n&&uB&&(Math.abs(pn)>=3||Math.abs(pu)>=3)){
-      var why;
-      if(Math.abs(pn)>=Math.abs(pu))
-        why="おもに<b>お客さまの数</b>が動いたぶんです（客数 <em>"+(pn>0?"＋":"")+pn+"%</em>、客単価 "+
-            (pu>0?"＋":"")+pu+"%）。";
-      else
-        why="おもに<b>1回のお会計の大きさ</b>が動いたぶんです（客単価 <em>"+(pu>0?"＋":"")+pu+"%</em>、客数 "+
-            (pn>0?"＋":"")+pn+"%）。";
-      add("", "🔍", why);
-    }
-
-    /* 来店は増えているのに買う人が減っている、は見つけたい形 */
-    if(c.a.vis&&c.b.vis){
-      var rA=c.a.n/c.a.vis, rB=c.b.n/c.b.vis;
-      var pr=Math.round((rA-rB)/rB*100);
-      if(Math.abs(pr)>=5){
-        if(pr<0&&c.a.vis>c.b.vis)
-          add("dn","⚠️","来店は増えているのに、<b>買ってくれた割合</b>は "+Math.round(rB*100)+"% → <em>"+
-            Math.round(rA*100)+"%</em> に下がっています。声かけや品ぞろえを見直す時かもしれません。");
-        else
-          add(pr>0?"up":"dn", pr>0?"🙌":"⚠️","買ってくれた割合が "+Math.round(rB*100)+"% → <em>"+
-            Math.round(rA*100)+"%</em> に"+(pr>0?"上がりました":"下がりました")+"。");
-      }
-    }
-  }
-
-  /* 終わった月だけで、何か月つづけて伸びているか／落ちているかを見る */
-  var done=ms.filter(function(x){ return !x.part&&x.amt>0 });
-  if(done.length>=3){
-    var dir=0, run=0;
-    for(var i=done.length-1;i>0;i--){
-      var s=(done[i].amt>done[i-1].amt)?1:(done[i].amt<done[i-1].amt)?-1:0;
-      if(!s) break;
-      if(!dir) dir=s;
-      if(s!==dir) break;
-      run++;
-    }
-    if(run>=2)
-      add(dir>0?"up":"dn", dir>0?"🔥":"🧊",
-        "<em>"+run+"か月</em>つづけて売上が"+(dir>0?"伸びています":"落ちています")+
-        "（"+done[done.length-1-run].mo+"月 → "+done[done.length-1].mo+"月）。");
-  }
-
-  /* 曜日のいちばんと、いちばん静かなところ */
-  var hd=heatData();
-  var dsum=[];
-  for(var w=0;w<7;w++){
-    var days=hd.days[w]||0; if(!days) continue;
-    var t=0;
-    for(var h=hd.hMin;h<=hd.hMax;h++){ var cc=hd.cell[w+"-"+h]; if(cc) t+=cc.amt }
-    dsum.push({w:w, v:t/days});
-  }
-  if(dsum.length>=3){
-    dsum.sort(function(a,b){ return b.v-a.v });
-    var hi=dsum[0], lo=dsum[dsum.length-1];
-    add("","🗓️","いちばん売れる曜日は <em>"+DOW[hi.w]+"曜</em>（1日 "+yen(hi.v)+"）、"+
-      "いちばん静かなのは <b>"+DOW[lo.w]+"曜</b>（"+yen(lo.v)+"）です。");
-  }
-
-  if(!out.length) add("","📋","まだくらべられるだけの記録がありません。会計が増えるとここに出ます。");
-  $("#ins").innerHTML=out.slice(0,5).join("");
 }
 
 function renderItems(){
@@ -973,6 +714,59 @@ function renderWhen(){
   }
   var hTop=hl.reduce(function(m,x){ return Math.max(m,x.amt) },0);
   bars($("#byHour"),hl,hTop,function(x){ return "会計 "+x.n+"件" });
+}
+
+/* ---------- 週次決算（月曜〜日曜） ---------- */
+function renderWeeks(){
+  var list=monthRows(pick);
+  $("#wkH").textContent=pick.y+"年"+pick.m+"月　週ごと";
+
+  var ws=weeksOf(pick);
+  ws.forEach(function(w){
+    w.amt=0; w.n=0;
+    list.forEach(function(s){
+      var d=+String(s.day).slice(8,10);
+      if(d>=w.from&&d<=w.to){ w.amt+=Number(s.total)||0; w.n++ }
+    });
+    w.per=w.days?w.amt/w.days:0;
+  });
+  var top=ws.reduce(function(m,w){ return Math.max(m,w.per) },0);
+
+  function dw(d){
+    var w=new Date(pick.y,pick.m-1,d).getDay();
+    var c=(w===0)?' class="s0"':(w===6)?' class="s6"':"";
+    return '<span'+c+'>'+pick.m+'/'+d+'('+DOW[w]+')</span>';
+  }
+  function box(k,v){ return '<div><div class="k">'+k+'</div><div class="v">'+v+'</div></div>' }
+
+  var h=ws.map(function(w,i){
+    return '<div class="wk">'+
+      '<div class="wh"><span class="wn">第'+(i+1)+'週</span>'+
+      '<span class="wr">'+dw(w.from)+'〜'+dw(w.to)+'</span>'+
+      '<span class="wd">'+w.days+'日ぶん</span></div>'+
+      '<div class="wg">'+
+        box("売上", yen(w.amt))+
+        box("購買数", w.n+"件")+
+        box("客単価", w.n?yen(w.amt/w.n):"—")+
+        box("1日あたり", yen(w.per))+
+      '</div>'+
+      '<div class="wb"><i style="width:'+(top?Math.round(w.per/top*100):0)+'%"></i></div>'+
+      '</div>';
+  }).join("");
+
+  var tA=0,tN=0,tD=0;
+  ws.forEach(function(w){ tA+=w.amt; tN+=w.n; tD+=w.days });
+  h+='<div class="wk tot"><div class="wh"><span class="wn">'+pick.m+'月の合計</span>'+
+     '<span class="wd">'+tD+'日ぶん</span></div>'+
+     '<div class="wg">'+
+       box("売上", yen(tA))+
+       box("購買数", tN+"件")+
+       box("客単価", tN?yen(tA/tN):"—")+
+       box("1日あたり", tD?yen(tA/tD):"—")+
+     '</div></div>';
+
+  $("#weeks").innerHTML=list.length?h
+    :'<div class="empty">'+pick.m+'月はまだ記録がありません。</div>'+h;
 }
 
 /* ---------- お客さま（来店と購買率・種類・支払い方法） ---------- */
@@ -1213,10 +1007,10 @@ $("#stfList").addEventListener("click",function(e){
 });
 
 /* ---------- 共通 ---------- */
-var VIEWS=["trend","item","guest","when","staff"];
-var BYMON={guest:1, staff:1};      /* 月を選んで見るタブ */
+var VIEWS=["week","item","guest","when","staff"];
+var BYMON={week:1, guest:1, staff:1};      /* 月を選んで見るタブ */
 function show(v){
-  if(VIEWS.indexOf(v)<0) v="trend";
+  if(VIEWS.indexOf(v)<0) v="week";
   VIEWS.forEach(function(k){ $("#v-"+k).toggleAttribute("data-off",k!==v) });
   document.querySelectorAll(".tab").forEach(function(t){
     t.setAttribute("aria-selected",String(t.dataset.v===v));
@@ -1224,13 +1018,19 @@ function show(v){
   /* 日付を選ぶところが2つ並ぶと迷うので、そのタブで使うほうだけを出す */
   $("#target").hidden=!!BYMON[v];
   $("#monWrap").hidden=!BYMON[v];
+  $("#spanBtn").hidden=false;
 }
+/* 期間はふだん出さない。変えたい人だけが開く。 */
+$("#spanBtn").addEventListener("click",function(){
+  $("#target").hidden=false; this.hidden=true;
+});
 $("#tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
   show(b.dataset.v);
   window.scrollTo({top:0});
 });
-(function(){ var h=(location.hash||"").replace("#",""); if(h) show(h) })();
+/* はじめに出すタブを決める。ここを通らないと、月を選ぶバーが出ない。 */
+show((location.hash||"").replace("#","")||"week");
 
 var toastEl=null,tt=null;
 function toast(m){
