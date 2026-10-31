@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>在庫管理</title>
+<meta name="description" content="カテゴリーごとの在庫と、月次で販売報告が必要な商品をまとめて見る画面。">
+<meta name="theme-color" content="#2BA55F">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+
+main{max-width:980px;margin:0 auto;padding:12px 12px calc(28px + env(safe-area-inset-bottom,0px))}
+.sec{padding:14px 15px}
+.card+.card{margin-top:12px}
+h3{font-size:13px;color:var(--ink-2);margin:0 0 10px}
+.note{font-size:12px;color:var(--ink-2);line-height:1.8;margin:12px 0 0}
+.note a{color:var(--accent)}
+.empty{font-size:13px;color:var(--ink-3);padding:14px 2px;line-height:1.9}
+.empty a{color:var(--accent)}
+
+/* 月を選ぶバー（分析の画面と同じ作り） */
+.monbar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:8px 10px;box-shadow:var(--shadow)}
+.monbar button{border:none;background:var(--surface-2);color:var(--ink-2);width:40px;height:40px;
+  border-radius:10px;font-size:19px;cursor:pointer;font-family:inherit;line-height:1}
+.monbar button:disabled{opacity:.3;cursor:not-allowed}
+.monbar .mon{flex:1;text-align:center;font-size:15.5px;font-weight:800}
+.monhint{font-size:11.5px;color:var(--ink-3);text-align:center;padding:7px 0 0;letter-spacing:.06em}
+.upd{font-size:12px;color:var(--ink-3);text-align:center;padding:11px 4px 3px}
+.upd b{font-family:var(--mono);font-weight:600;color:var(--ink-2)}
+
+/* 表 */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:9px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-size:11.5px;color:var(--ink-3);font-weight:600;letter-spacing:.04em;white-space:nowrap}
+td.n,th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+td.no{font-family:var(--mono);color:var(--ink-3);white-space:nowrap;font-size:12px}
+td.z{color:var(--ink-3)}
+tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.lowrow td{background:var(--ng-bg)}
+.lowrow td.nm{color:var(--ng);font-weight:700}
+
+/* プルダウン（カテゴリーを押すと中の商品が出る） */
+details.cat{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+details.cat+details.cat{margin-top:9px}
+details.cat>summary{list-style:none;cursor:pointer;padding:12px 13px;display:flex;align-items:center;gap:10px}
+details.cat>summary::-webkit-details-marker{display:none}
+details.cat>summary::after{content:"›";margin-left:auto;font-size:19px;color:var(--ink-3);
+  transition:transform .15s;line-height:1}
+details.cat[open]>summary::after{transform:rotate(90deg)}
+details.cat>summary .ct{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+details.cat>summary .cn{font-size:14.5px;font-weight:800}
+details.cat>summary .cs{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);
+  font-variant-numeric:tabular-nums;line-height:1.6}
+details.cat>summary .cn.none{color:var(--ink-3)}
+details.cat .in{padding:0 13px 13px}
+/* 横にすべらせて見る。せまい画面で商品名が1文字ずつ折り返さないように。 */
+details.cat .in table{min-width:430px}
+details.cat .in th,details.cat .in td{padding:8px 5px}
+/* 携帯では単価の列を外して、売れた数と売上がそのまま見えるようにする。
+   単価はコピーする文字のほうには入っている。 */
+@media (max-width:480px){
+  details.cat.rep .in table{min-width:0}
+  details.cat.rep .in table .u{display:none}
+}
+details.cat.rep{border-color:var(--am);background:var(--am-bg)}
+details.cat.rep>summary .cn{color:var(--am)}
+details.cat.rep .in table th{color:var(--am)}
+details.cat.rep .in table td{border-bottom-color:rgba(0,0,0,.08)}
+.badge{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;padding:1px 7px;
+  background:var(--am-bg);color:var(--am);margin-left:6px;vertical-align:1px;white-space:nowrap}
+.cwrap{margin-top:12px}
+
+/* 報告の合計とコピー */
+.rtot{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap;margin-top:12px;
+  padding:11px 13px;border-radius:11px;background:var(--am-bg);font-size:12px;color:var(--am)}
+.rtot b{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:18.5px;
+  font-weight:800;color:var(--am);line-height:1.3}
+.rtot .sp{margin-left:auto}
+/* 報告をコピーするところ */
+.cpbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.cpbar .lbl{font-size:12px;color:var(--ink-3);letter-spacing:0}
+textarea.cp{width:100%;margin-top:10px;font-family:var(--mono);font-size:12px;line-height:1.7;
+  border:1px solid var(--line-2);border-radius:9px;padding:10px;background:var(--surface);
+  color:var(--ink);min-height:160px}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>在庫管理</span></a>
+
+<main>
+  <div class="monbar">
+    <button type="button" id="monPrev" aria-label="前の月">‹</button>
+    <div class="mon" id="monLbl">—</div>
+    <button type="button" id="monNext" aria-label="次の月">›</button>
+  </div>
+  <div class="monhint" id="monHint"></div>
+  <div class="upd">更新日時：<b id="upd">—</b></div>
+
+  <div id="noneCard" hidden><div class="card"><div class="sec">
+    <div class="empty" id="noneMsg"></div>
+  </div></div></div>
+
+  <div id="body" hidden>
+    <div class="card">
+      <div class="card-h"><h2>月次の販売報告</h2><span class="hint" id="repCount"></span></div>
+      <div class="sec">
+        <div id="repBox"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>カテゴリーごとの在庫</h2><span class="hint" id="catCount"></span></div>
+      <div class="sec">
+        <div id="cats"></div>
+        <p class="note">カテゴリーを押すと、その中の商品が出ます。<br>
+          <b>在庫</b>は<a href="../settings/#item">設定 → 商品</a>の「店舗にある数」です。
+          お会計をすると自動で減ります。数え直したときは設定の画面で直してください。<br>
+          <b>売れた数</b>と<b>売上</b>は、上で選んでいる月のぶんです。打ち消したお会計は入っていません。<br>
+          赤い行は<b>足りない数</b>以下になっているものです。
+          注文は<a href="../order/">発注</a>の画面からできます。</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="../shared/sync.js"></script>
+<script src="../shared/sales.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function yen(n){ return "¥"+Math.round(Number(n)||0).toLocaleString("ja-JP") }
+function pad2(n){ return ("0"+n).slice(-2) }
+function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
+
+/* 置き場所は設定の画面と同じものを借りる（仕入れ値を見るので店長用キーが要る） */
+var K_SHIFT="shiftadmin.v1", K_ITEM="storeitems.v1";
+var DB=(function(){ var v=null; try{ v=JSON.parse(localStorage.getItem(K_SHIFT)) }catch(e){} return v||{} })();
+if(window.Sync&&DB.sync&&DB.sync.url) Sync.configure(DB.sync);
+function connected(){ return !!(window.Sync&&DB.sync&&DB.sync.url&&DB.sync.anon&&DB.sync.key) }
+
+/* ---------- 月を選ぶ ---------- */
+/* 直近6か月ぶんを一度に受け取って、その中から月を切り出すだけ。
+   月を送っても受け取り直しはしない。 */
+var SPAN=6;
+var now=new Date();
+function monthKeys(){
+  var out=[], d=new Date(now.getFullYear(),now.getMonth(),1);
+  d.setMonth(d.getMonth()-(SPAN-1));
+  for(var i=0;i<SPAN;i++){
+    out.push({y:d.getFullYear(), m:d.getMonth()+1});
+    d.setMonth(d.getMonth()+1);
+  }
+  return out;
+}
+function range(){
+  var ks=monthKeys(), a=ks[0], b=ks[ks.length-1];
+  var last=new Date(b.y,b.m,0).getDate();
+  return {from:a.y+"-"+pad2(a.m)+"-01", to:b.y+"-"+pad2(b.m)+"-"+pad2(last)};
+}
+var pick=null;
+function pickIdx(){
+  var ks=monthKeys();
+  if(pick) for(var i=0;i<ks.length;i++) if(ks[i].y===pick.y&&ks[i].m===pick.m) return i;
+  return ks.length-1;
+}
+function syncMon(){
+  var ks=monthKeys(), i=pickIdx();
+  pick={y:ks[i].y, m:ks[i].m};
+  $("#monLbl").textContent=pick.y+"年"+pick.m+"月";
+  $("#monPrev").disabled=(i<=0);
+  $("#monNext").disabled=(i>=ks.length-1);
+  $("#monHint").textContent="直近"+SPAN+"か月から選べます。先月ぶんを出すときは ‹ で戻ってください";
+}
+$("#monPrev").addEventListener("click",function(){ stepMon(-1) });
+$("#monNext").addEventListener("click",function(){ stepMon(1) });
+function stepMon(d){
+  var ks=monthKeys(), i=pickIdx()+d;
+  if(i<0||i>=ks.length) return;
+  pick={y:ks[i].y, m:ks[i].m};
+  syncMon(); render();
+}
+function monthPre(k){ return k.y+"-"+pad2(k.m) }
+
+/* ---------- 受け取る ---------- */
+var rows=[], items=[], cats=[], busy=false;
+async function load(quiet){
+  if(busy) return;
+  busy=true;
+  try{
+    var r0=range();
+    var r=await Sales.rows(r0.from,r0.to);
+    if(!r.connected){
+      $("#body").hidden=true; $("#noneCard").hidden=false;
+      $("#noneMsg").innerHTML='まだ置き場所につないでいません。<br>'+
+        '<a href="../settings/#conn">設定 → 置き場所</a>でつないでください。';
+      $("#upd").textContent="—";
+      busy=false; return;
+    }
+    rows=r.rows||[];
+    items=await pullItems();
+    await applyRep();
+    var d=new Date();
+    $("#upd").textContent=d.getFullYear()+"/"+pad2(d.getMonth()+1)+"/"+pad2(d.getDate())+" "+
+      pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());
+    syncMon();
+    render();
+  }catch(e){
+    $("#body").hidden=true; $("#noneCard").hidden=false;
+    $("#noneMsg").textContent="受け取れませんでした："+((e&&e.message)||"");
+    if(!quiet) toast("受け取れませんでした");
+  }
+  busy=false;
+}
+/* 商品リストは見るだけ。設定や発注の画面が持っているものを書きかえない。 */
+function localItems(){
+  var v=null; try{ v=JSON.parse(localStorage.getItem(K_ITEM)) }catch(e){}
+  if(Array.isArray((v||{}).cats)) cats=v.cats.slice();
+  return (((v||{}).items)||[]).filter(function(x){ return !x.del });
+}
+async function pullItems(){
+  if(!connected()) return localItems();
+  var r=await Sync.itemsGet(null);
+  var out=[];
+  (r.items||[]).forEach(function(sr){
+    if(sr.deleted) return;
+    var it={id:sr.id, name:String(sr.name||""), no:String(sr.no||""), cat:String(sr.cat||"")};
+    ["price","cost","stock","alert"].forEach(function(f){ if(typeof sr[f]==="number") it[f]=sr[f] });
+    out.push(it);
+  });
+  if(!out.length) return localItems();
+  cats=Array.isArray(r.cats)?r.cats.slice():[];
+  return out;
+}
+/* 「月次で報告が必要」の印。商品そのものではなく、置き場所の
+   ちょっとした設定（rep）に、商品のidをならべて入れてある。
+   入れているのは 設定 → 商品 の画面。ここは読むだけ。 */
+async function applyRep(){
+  var ids=null;
+  if(connected()){
+    try{ var r=await Sync.metaGet("rep"); if(Array.isArray(r&&r.v)) ids=r.v }catch(e){ ids=null }
+  }
+  if(ids){
+    var set={}; ids.forEach(function(id){ set[id]=1 });
+    items.forEach(function(it){ if(set[it.id]) it.rep=1; else delete it.rep });
+    return;
+  }
+  /* 受け取れなかったときは、この端末に残っている印で出す */
+  var loc={};
+  try{
+    var v=JSON.parse(localStorage.getItem(K_ITEM));
+    (((v||{}).items)||[]).forEach(function(x){ if(x.rep) loc[x.id]=1 });
+  }catch(e){}
+  items.forEach(function(it){ if(loc[it.id]) it.rep=1 });
+}
+
+/* ---------- まとめる ---------- */
+/* 選んでいる月に、どの商品が何点売れたか。
+   金額はお会計のときの売価で数えている（あとで売価を変えても報告は変わらない）。 */
+function soldOf(){
+  var pre=monthPre(pick), m={};
+  rows.forEach(function(s){
+    if(s.voided) return;
+    if(String(s.day).slice(0,7)!==pre) return;
+    (s.lines||[]).forEach(function(l){
+      var id=l.id||("name:"+(l.name||""));
+      if(!m[id]) m[id]={qty:0, amt:0, pr:{}};
+      var q=Number(l.qty)||0, p=Number(l.price)||0;
+      m[id].qty+=q; m[id].amt+=p*q; m[id].pr[p]=1;
+    });
+  });
+  return m;
+}
+function unitOf(s,it){
+  if(s){ var ks=Object.keys(s.pr); if(ks.length===1) return +ks[0] }
+  return numOf(it.price);
+}
+function isLow(it){
+  var s=numOf(it.stock), a=numOf(it.alert);
+  return s!==null&&a!==null&&s<=a;
+}
+function byNo(a,b){
+  var na=String(a.no||"").trim(), nb=String(b.no||"").trim();
+  if(na&&nb){
+    var ia=parseInt(na,10), ib=parseInt(nb,10);
+    if(!isNaN(ia)&&!isNaN(ib)&&ia!==ib) return ia-ib;
+    if(na!==nb) return na.localeCompare(nb,"ja");
+  }else if(na!==nb){ return na?-1:1 }
+  return String(a.name||"").localeCompare(String(b.name||""),"ja");
+}
+/* カテゴリーごとにまとめる。並びは設定の一覧と同じ順で、無いものはいちばん下。 */
+function groups(list){
+  var ord={}, m={}, keys=[];
+  cats.forEach(function(c,i){ ord[c]=i });
+  list.forEach(function(x){
+    var c=x.cat||"";
+    if(!m[c]){ m[c]=[]; keys.push(c) }
+    m[c].push(x);
+  });
+  keys.sort(function(a,b){
+    var oa=a?(ord[a]==null?9000:ord[a]):9999;
+    var ob=b?(ord[b]==null?9000:ord[b]):9999;
+    return oa-ob || a.localeCompare(b,"ja");
+  });
+  return keys.map(function(c){ return {cat:c, list:m[c].slice().sort(byNo)} });
+}
+
+/* ---------- 出す ---------- */
+var open={};                               /* 開いているカテゴリーを覚えておく */
+function render(){
+  $("#body").hidden=false; $("#noneCard").hidden=true;
+  renderRep();
+  renderCats();
+}
+
+/* 月次の報告が必要なもの。カテゴリーがちがっても、ここにぜんぶまとめて出す。 */
+function renderRep(){
+  var sold=soldOf();
+  var rep=items.filter(function(it){ return it.rep });
+  $("#repCount").textContent=rep.length?(rep.length+"点"):"";
+  if(!rep.length){
+    $("#repBox").innerHTML='<div class="empty">月次で報告が必要な商品がまだありません。<br>'+
+      '<a href="../settings/#item">設定 → 商品</a>の<b>月次の報告</b>に印を付けると、'+
+      'カテゴリーがちがっても<b>ここにまとめて</b>出ます。<br>'+
+      '登録のときに選べますし、あとから一覧で付け外しもできます。</div>';
+    return;
+  }
+  var gs=groups(rep), h="", tq=0, ta=0;
+  gs.forEach(function(g){
+    var sq=0, sa=0, body="";
+    g.list.forEach(function(it){
+      var s=sold[it.id], q=s?s.qty:0, a=s?s.amt:0, u=unitOf(s,it), st=numOf(it.stock);
+      sq+=q; sa+=a;
+      body+='<tr>'+
+        '<td class="no">'+esc(it.no||"")+'</td>'+
+        '<td>'+esc(it.name)+'</td>'+
+        '<td class="n u'+(u===null?" z":"")+'">'+(u===null?"—":yen(u))+'</td>'+
+        '<td class="n'+(q?"":" z")+'">'+(q?q:"—")+'</td>'+
+        '<td class="n'+(q?"":" z")+'">'+(q?yen(a):"—")+'</td>'+
+        '<td class="n'+(st===null?" z":"")+'">'+(st===null?"—":st)+'</td>'+
+      '</tr>';
+    });
+    tq+=sq; ta+=sa;
+    h+='<div class="cwrap"><details class="cat rep" '+(open["rep:"+g.cat]!==false?"open":"")+
+      ' data-k="rep:'+esc(g.cat)+'">'+
+      '<summary><span class="ct"><span class="cn'+(g.cat?"":" none")+'">'+esc(g.cat||"（未分類）")+'</span>'+
+      '<span class="cs">'+g.list.length+'点 ・ '+(sq?sq+"点 "+yen(sa):"売れていません")+'</span></span></summary>'+
+      '<div class="in"><div class="tw"><table>'+
+      '<thead><tr><th>No</th><th>商品</th><th class="n u">単価</th><th class="n">売れた数</th>'+
+      '<th class="n">売上</th><th class="n">残り</th></tr></thead>'+
+      '<tbody>'+body+'</tbody>'+
+      (gs.length>1?'<tfoot><tr><td></td><td>小計</td><td class="u"></td><td class="n">'+sq+'</td>'+
+        '<td class="n">'+yen(sa)+'</td><td></td></tr></tfoot>':"")+
+      '</table></div></div></details></div>';
+  });
+  h='<h3>'+pick.y+'年'+pick.m+'月のぶん</h3>'+h+
+    '<div class="rtot"><span>合計</span><b>'+tq+'点</b><span class="sp"></span><b>'+yen(ta)+'</b></div>'+
+    '<div class="cpbar"><button class="btn primary" id="cpBtn">この月の報告をコピー</button>'+
+    '<span class="lbl" id="cpMsg"></span></div>'+
+    '<textarea class="cp" id="cpTxt" hidden readonly></textarea>'+
+    '<p class="note">印を付けた商品を、カテゴリーごとにまとめて出しています。'+
+    '売れていない商品も、報告のために残しています。<br>'+
+    '<b>単価</b>はお会計のときの売価です。月の中で売価が変わっていたときは、'+
+    'いまの売価を出しています。<b>売上</b>はどちらも実際のお会計の金額です'+
+    '（せまい画面では単価の列は出ませんが、コピーには入ります）。<br>'+
+    '<b>残り</b>はいまの在庫です（月末の数ではありません）。<br>'+
+    '<b>コピー</b>すると、表のままメールや表計算に貼れる形で写します。</p>';
+  $("#repBox").innerHTML=h;
+  $("#cpBtn").addEventListener("click",copyRep);
+}
+function repText(){
+  var sold=soldOf(), gs=groups(items.filter(function(it){ return it.rep }));
+  var out=[pick.y+"年"+pick.m+"月　販売報告"];
+  var tq=0, ta=0;
+  gs.forEach(function(g){
+    out.push("");
+    out.push(g.cat||"（未分類）");
+    out.push(["商品No","商品名","単価","売れた数","売上","残り"].join("\t"));
+    var sq=0, sa=0;
+    g.list.forEach(function(it){
+      var s=sold[it.id], q=s?s.qty:0, a=s?s.amt:0, u=unitOf(s,it), st=numOf(it.stock);
+      sq+=q; sa+=a;
+      out.push([String(it.no||""), it.name, (u===null?"":u), q, a, (st===null?"":st)].join("\t"));
+    });
+    out.push(["","小計","",sq,sa,""].join("\t"));
+    tq+=sq; ta+=sa;
+  });
+  out.push("");
+  out.push(["","合計","",tq,ta,""].join("\t"));
+  return out.join("\n");
+}
+function copyRep(){
+  var t=repText();
+  function fallback(){
+    var el=$("#cpTxt");
+    el.hidden=false; el.value=t; el.focus(); el.select();
+    $("#cpMsg").textContent="長押しして「コピー」を選んでください";
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(function(){
+      $("#cpMsg").textContent="コピーしました";
+      toast("報告をコピーしました");
+    }).catch(fallback);
+  }else fallback();
+}
+
+/* カテゴリーごとの在庫。押すと中の商品が出る。 */
+function renderCats(){
+  var sold=soldOf();
+  if(!items.length){
+    $("#cats").innerHTML='<div class="empty">まだ商品の登録がありません。<br>'+
+      '<a href="../settings/#item">設定 → 商品</a>から登録してください。</div>';
+    $("#catCount").textContent="";
+    return;
+  }
+  var gs=groups(items), low=items.filter(isLow).length;
+  $("#catCount").textContent=items.length+"点"+(low?" ・ 在庫少 "+low:"");
+  $("#cats").innerHTML=gs.map(function(g){
+    var st=0, hasSt=false, sq=0, sa=0, lw=0, body="";
+    g.list.forEach(function(it){
+      var s=sold[it.id], q=s?s.qty:0, a=s?s.amt:0, n=numOf(it.stock);
+      if(n!==null){ st+=n; hasSt=true }
+      sq+=q; sa+=a;
+      if(isLow(it)) lw++;
+      body+='<tr'+(isLow(it)?' class="lowrow"':'')+'>'+
+        '<td class="no">'+esc(it.no||"")+'</td>'+
+        '<td class="nm">'+esc(it.name)+(it.rep?'<span class="badge">報告</span>':'')+'</td>'+
+        '<td class="n'+(n===null?" z":"")+'">'+(n===null?"—":n)+'</td>'+
+        '<td class="n'+(q?"":" z")+'">'+(q?q:"—")+'</td>'+
+        '<td class="n'+(q?"":" z")+'">'+(q?yen(a):"—")+'</td>'+
+      '</tr>';
+    });
+    var sum=g.list.length+"点"+(hasSt?" ・ 在庫 "+st:"")+
+      (sq?" ・ この月 "+sq+"点 "+yen(sa):"")+(lw?" ・ 在庫少 "+lw:"");
+    return '<details class="cat" '+(open["cat:"+g.cat]?"open":"")+' data-k="cat:'+esc(g.cat)+'">'+
+      '<summary><span class="ct"><span class="cn'+(g.cat?"":" none")+'">'+esc(g.cat||"（未分類）")+'</span>'+
+      '<span class="cs">'+sum+'</span></span></summary>'+
+      '<div class="in"><div class="tw"><table>'+
+      '<thead><tr><th>No</th><th>商品</th><th class="n">在庫</th>'+
+      '<th class="n">売れた数</th><th class="n">売上</th></tr></thead>'+
+      '<tbody>'+body+'</tbody></table></div></div></details>';
+  }).join("");
+}
+/* 開いたままにしておく。月を送っても閉じないように覚えておく。 */
+document.addEventListener("toggle",function(e){
+  var d=e.target;
+  if(!d||!d.classList||!d.classList.contains("cat")) return;
+  open[d.dataset.k]=d.open;
+},true);
+
+var toastEl=null,tt=null;
+function toast(m){
+  if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }
+  toastEl.textContent=m; toastEl.hidden=false;
+  clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3000);
+}
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible") load(true);
+});
+syncMon();
+load(true);
+})();
+</script>
+<script>
+(function(){
+"use strict";
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+  var swCheck=function(){
+    if(document.visibilityState!=="visible") return;
+    try{ navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update() }).catch(function(){}) }catch(e){}
+  };
+  document.addEventListener("visibilitychange",swCheck);
+  window.addEventListener("pageshow",swCheck);
+}
+})();
+</script>
+</body>
+</html>

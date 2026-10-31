@@ -63,6 +63,9 @@ button.dot::after{content:"";position:absolute;left:-9px;top:-9px;right:-9px;bot
 .ri-sub+.ri-sub{margin-top:7px}
 /* 項目名が途中で改行しないよう、ひとかたまりで折り返す */
 .fg{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.fg.chk{cursor:pointer;color:var(--ink-2);font-weight:600}
+.fg.chk input{width:17px;height:17px;margin:0;accent-color:var(--am);flex:0 0 auto}
+.fg.chk.on{color:var(--am)}
 select{font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);
   border-radius:9px;padding:6px 8px;max-width:10.5em}
 select:focus{outline:2px solid var(--accent);outline-offset:1px}
@@ -173,6 +176,7 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
           </div>
           <div class="nf-row">
             <span class="fg">カテゴリー <select id="nCat"></select></span>
+            <label class="fg chk" id="nRepL"><input type="checkbox" id="nRep"> 月次の報告が必要</label>
           </div>
           <div class="nf-row">
             <span class="fg">売価 <input type="number" id="nPrice" class="num" min="0" step="10" inputmode="numeric" placeholder="—"> 円</span>
@@ -186,6 +190,10 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
           <div class="nf-row end"><button class="btn primary" id="addItem">保存</button></div>
         </div>
         <p class="note">商品名だけ入れれば登録できます。ほかは空のままでも構いません。<br>
+          <b>月次の報告が必要</b>に印を付けると、
+          <a href="../stock/">在庫管理</a>の<b>月次の販売報告</b>に、
+          カテゴリーがちがってもまとめて出ます。委託でお預かりしている商品に付けてください。
+          印は<b>次の登録にも残ります</b>（続けて登録しやすいように）。<br>
           <b>原価率</b>は売価と仕入れ値から自動で出します（仕入れ値 ÷ 売価）。<br>
           <b>店舗にある数</b>が<b>足りない数</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
           そのとき<a href="../order/">発注</a>の画面に出て、<b>いつもの数</b>まで戻る分を注文します。
@@ -225,6 +233,9 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
         <div id="itemEmpty" class="empty" hidden>まだ登録がありません。上の「商品を登録」から追加してください。</div>
         <p class="note"><b>カテゴリーごと</b>に分けて並べています。カテゴリーの無いものは
           いちばん下の<b>（未分類）</b>に入ります。<br>
+          <b>月次の報告</b>の印は、ここであとから付け外しできます。
+          付けたものは<a href="../stock/">在庫管理</a>の<b>月次の販売報告</b>にまとまります。
+          上の「表示」で<b>月次の報告が必要なもの</b>だけに絞れます。<br>
           上の「表示」でひとつのカテゴリーだけに絞ったり、名前・Noで探したりできます。<br>
           点数の多いお店では、はじめは上から40点だけ出します。
           「のこり◯点を表示」で続きが出ます。</p>
@@ -631,7 +642,8 @@ function renderCatPickers(){
   var cur=$("#catFilter").value;
   $("#catFilter").innerHTML='<option value="">すべて</option>'+
     IT.cats.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>' }).join("")+
-    '<option value="__none__">（未分類）</option>';
+    '<option value="__none__">（未分類）</option>'+
+    '<option value="__rep__">月次の報告が必要なもの</option>';
   $("#catFilter").value=cur||"";
 }
 function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
@@ -668,7 +680,9 @@ function renderItems(){
   $("#itemCount").textContent=n?(n+"点"+(low?" ・ 在庫少 "+low:"")):"";
   var f=$("#catFilter").value, q=$("#q").value.trim().toLowerCase();
   var list=all.filter(function(x){
-    if(f==="__none__"){ if(x.cat) return false } else if(f&&x.cat!==f) return false;
+    if(f==="__rep__"){ if(!x.rep) return false }
+    else if(f==="__none__"){ if(x.cat) return false }
+    else if(f&&x.cat!==f) return false;
     return matchQ(x,q);
   });
   $("#itemEmpty").hidden=!!n;
@@ -725,6 +739,8 @@ function row(it){
         '<span class="ri-act"><button class="btn sm ghost" data-iren="'+esc(it.id)+'">名前</button>'+
         '<button class="btn sm ghost" data-idel="'+esc(it.id)+'">削除</button></span></div>'+
       '<div class="ri-sub"><span class="fg">カテゴリー <select data-cat="'+esc(it.id)+'">'+catOpts(it.cat||"",true)+'</select></span>'+
+        '<label class="fg chk'+(it.rep?" on":"")+'"><input type="checkbox" data-rep="'+esc(it.id)+'"'+
+        (it.rep?" checked":"")+'> 月次の報告</label>'+
         '<span class="fg rate">原価率 '+rateText(it)+'</span></div>'+
       '<div class="ri-sub">'+fld(it,"price","売価","円")+fld(it,"cost","仕入れ","円")+'</div>'+
       '<div class="ri-sub">'+fld(it,"stock","店舗にある数","",1)+fld(it,"alert","足りない数","",1)+
@@ -766,6 +782,7 @@ $("#addItem").addEventListener("click",function(){
     var v=parseInt($(pair[1]).value,10);
     if(!isNaN(v)&&v>=0) it[pair[0]]=v;
   });
+  if($("#nRep").checked){ it.rep=1; IT.repDirty=1 }
   touch(it); IT.items.push(it); saveItems(IT); queueSync();
   justAdded=it.id;
   ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
@@ -785,6 +802,12 @@ $("#nCat").addEventListener("change",function(){
   this.value=v||"";
 });
 $("#itemTbl").addEventListener("change",function(e){
+  var rp=e.target.closest("[data-rep]");
+  if(rp){
+    var itr=IT.items.filter(function(x){ return x.id===rp.dataset.rep })[0]; if(!itr) return;
+    if(rp.checked) itr.rep=1; else delete itr.rep;
+    IT.repDirty=1; saveItems(IT); queueSync(); renderItems(); return;
+  }
   var cs=e.target.closest("[data-cat]");
   if(cs){
     var it0=IT.items.filter(function(x){ return x.id===cs.dataset.cat })[0]; if(!it0) return;
@@ -957,6 +980,29 @@ function pushDirty(){
     return dirty.length;
   });
 }
+/* 「月次で報告が必要」の印。
+   商品の表には列を足さず、置き場所の「ちょっとした設定」に商品のidをならべて入れる。
+   こうすると、SupabaseのSQLを入れ直さなくてもこの印が使える。
+   ひとつの印を2つの端末で同時に変えると、あとに送ったほうが残る。 */
+function repIds(){
+  return live().filter(function(x){ return x.rep }).map(function(x){ return x.id });
+}
+function pushRep(){
+  if(!IT.repDirty) return Promise.resolve(0);
+  return Sync.metaPut("rep",repIds()).then(function(){
+    delete IT.repDirty; saveItems(IT); return 1;
+  });
+}
+function pullRep(){
+  if(IT.repDirty) return Promise.resolve(0);        /* この端末で付けたぶんを先に送る */
+  return Sync.metaGet("rep").then(function(r){
+    if(!Array.isArray(r&&r.v)) return 0;            /* まだ一度も送っていない。手元の印を残す */
+    var set={}; r.v.forEach(function(id){ set[id]=1 });
+    IT.items.forEach(function(x){ if(set[x.id]) x.rep=1; else delete x.rep });
+    saveItems(IT); return 1;
+  });
+}
+
 /* 仕入先も商品と同じやり方で、送って受け取る */
 function pushVen(){
   var dirty=VEN.list.filter(function(x){ return x.d });
@@ -1038,7 +1084,7 @@ function syncNow(quiet){
   if(!syncOn()||syncBusy) return Promise.resolve();
   clearTimeout(syncT);
   syncBusy=true; renderSync();
-  return pushDirty().then(pushVen).then(pullItems).then(pullVen).then(function(){
+  return pushDirty().then(pushVen).then(pushRep).then(pullItems).then(pullRep).then(pullVen).then(function(){
     syncBusy=false; syncErr=""; syncMsg="ほかの端末と同じです（"+hhmm()+" に確認）";
     renderItems(); renderVen();
   }).catch(function(e){
