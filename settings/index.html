@@ -195,6 +195,25 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
     </div>
 
     <div class="card">
+      <div class="card-h"><h2>カテゴリー</h2><span class="hint" id="catCount"></span></div>
+      <div class="sec">
+        <div class="addbox" style="margin-top:0">
+          <input type="text" id="nCatName" placeholder="新しいカテゴリーの名前（例）和雑貨" autocomplete="off" enterkeyhint="done">
+          <button class="btn sm primary" id="addCatBtn">追加</button>
+        </div>
+        <div class="catl" id="catList" style="margin-top:12px"></div>
+        <p class="note">商品を分ける名前です。ここで作っておくと、
+          上の<b>商品を登録</b>と、下の一覧の<b>カテゴリー</b>から選べます。<br>
+          <b>名前</b>を押すと直せます。そのカテゴリーの商品ぜんぶがいっしょに変わります。
+          すでにある名前にすると、ひとつにまとまります。<br>
+          <b>消す</b>と、そのカテゴリーの商品は<b>（未分類）</b>に戻ります。商品そのものは消えません。<br>
+          <a href="../analyze/">分析</a>の<b>週次決算</b>は、
+          <b>歴博委託商品</b>という名前のカテゴリーを見ています。
+          歴博からお預かりしている商品は、この名前のカテゴリーに入れてください。</p>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
       <div class="sec">
         <div class="syncbar"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
@@ -209,25 +228,6 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
           上の「表示」でひとつのカテゴリーだけに絞ったり、名前・Noで探したりできます。<br>
           点数の多いお店では、はじめは上から40点だけ出します。
           「のこり◯点を表示」で続きが出ます。</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>カテゴリー</h2><span class="hint" id="catCount"></span></div>
-      <div class="sec">
-        <div class="addbox" style="margin-top:0">
-          <input type="text" id="nCatName" placeholder="新しいカテゴリーの名前（例）和雑貨" autocomplete="off" enterkeyhint="done">
-          <button class="btn sm primary" id="addCatBtn">追加</button>
-        </div>
-        <div class="catl" id="catList" style="margin-top:12px"></div>
-        <p class="note">商品を分ける名前です。ここで作っておくと、
-          <b>商品を登録</b>と一覧の<b>カテゴリー</b>から選べます。<br>
-          <b>名前</b>を押すと直せます。そのカテゴリーの商品ぜんぶがいっしょに変わります。
-          すでにある名前にすると、ひとつにまとまります。<br>
-          <b>消す</b>と、そのカテゴリーの商品は<b>（未分類）</b>に戻ります。商品そのものは消えません。<br>
-          <a href="../analyze/">分析</a>の<b>週次決算</b>は、
-          <b>歴博委託商品</b>という名前のカテゴリーを見ています。
-          歴博からお預かりしている商品は、この名前のカテゴリーに入れてください。</p>
       </div>
     </div>
 
