@@ -53,6 +53,18 @@ h3 .lbl{margin-left:8px}
 .sw button[aria-pressed="true"]{background:var(--accent)}
 .sw button[aria-pressed="true"]::after{transform:translateX(22px)}
 .gwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--ink-2);margin-top:9px;flex-wrap:wrap}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;
+  vertical-align:-1px}
+/* 3つの切り替え */
+.seg3{display:flex;gap:6px;background:var(--surface-2);border-radius:11px;padding:4px;margin-bottom:12px}
+.seg3 button{flex:1;border:none;background:transparent;border-radius:9px;padding:9px 4px;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:700;color:var(--ink-2);line-height:1.3}
+.seg3 button[aria-selected="true"]{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+/* 日ごとの表 */
+table.gu td.d{font-family:var(--mono);white-space:nowrap}
+table.gu td.d .s0{color:var(--sun)} table.gu td.d .s6{color:var(--sat)}
+table.gu td.z{color:var(--ink-3)}
 
 /* 週ごと */
 .wk{border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:var(--surface)}
@@ -139,22 +151,8 @@ tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
 .monhint .lnk{background:none;border:none;color:var(--accent);font-family:inherit;font-size:11.5px;
   font-weight:700;cursor:pointer;padding:0 0 0 9px;text-decoration:underline}
 
-/* 来店と購買率 */
+/* スタッフの中身の小見出し */
 h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;letter-spacing:.04em}
-table.conv{width:100%;border-collapse:collapse;font-size:13.5px}
-table.conv th,table.conv td{padding:9px 7px;border-bottom:1px solid var(--line);text-align:left}
-table.conv th{font-size:11.5px;color:var(--ink-3);font-weight:600;white-space:nowrap}
-table.conv td.n,table.conv th.n{font-family:var(--mono);font-variant-numeric:tabular-nums;
-  text-align:right;white-space:nowrap}
-table.conv td.rate{font-family:var(--mono);text-align:right;font-weight:800;color:var(--ok);white-space:nowrap}
-table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bottom:none}
-.visbig{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:9px}
-.visbig>div{background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
-.visbig .k{font-size:11.5px;color:var(--ink-3)}
-.visbig .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:23px;font-weight:800;
-  line-height:1.35}
-.visbig .rate .v{color:var(--ok)}
-
 /* ---- スタッフ ---- */
 .stfsum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .stfsum>div{flex:1;min-width:88px;background:var(--surface-2);border:1px solid var(--line);
@@ -309,27 +307,31 @@ table.conv tfoot td{font-weight:800;border-top:2px solid var(--line);border-bott
 
     <!-- お客さま -->
     <section class="view" id="v-guest" data-off>
-      <div class="card" id="cVisit"><div class="sec">
-        <h3>来店と購買率</h3>
-        <div id="visSum"></div>
-        <h4 class="sub">区分ごと</h4>
-        <div id="visGrid"></div>
-        <h4 class="sub">担当ごと</h4>
-        <div id="visStaff"></div>
-        <h4 class="sub">時間帯ごと</h4>
-        <div id="visHour"></div>
-        <p class="note"><b>購買率</b>は 会計の件数 ÷ 来店数。来店は<a href="../visit/">来店の画面</a>で数えたぶんです。<br>
-          担当ごとの来店数は、<b>そのとき担当になっていた人</b>のぶんとして数えます。</p>
-      </div></div>
-      <div class="card" id="cGuest"><div class="sec">
-        <h3>お客様の種類</h3><div class="bars" id="byGuest"></div>
-      </div></div>
       <div class="card"><div class="sec">
-        <h3>支払い方法</h3><div class="bars" id="byPay"></div>
+        <h3 id="guH">日ごとのお客さま</h3>
+        <div class="seg3" id="guSeg">
+          <button type="button" data-m="vis" aria-selected="true">来店</button>
+          <button type="button" data-m="buy" aria-selected="false">購入</button>
+          <button type="button" data-m="rate" aria-selected="false">購買率</button>
+        </div>
+        <div class="gwrap"><div id="guChart"></div></div>
+        <div class="legend" id="guLeg"></div>
+      </div></div>
+
+      <div class="card"><div class="sec">
+        <h3>日ごとの表</h3>
+        <div class="tw" id="guTbl"></div>
+        <p class="note"><b>来店</b>は<a href="../visit/">来店の画面</a>で数えたぶん、
+          <b>購入</b>はレジでその区分を選んでしたお会計の件数です。<br>
+          <b>購買率</b>は その区分の 購入÷来店。区分を選ばずにしたお会計は、
+          どの区分にも入りません。<br>
+          購買率が<b>100%を超える日</b>は、来店を数えそびれた日です。
+          グラフは200%までで止めていますが、表には本当の数が出ます。<br>
+          記録のない日は「—」になります。</p>
       </div></div>
     </section>
 
-    <!-- いつ忙しいか -->
+    <!-- いつ忙しいか -->    <!-- いつ忙しいか -->
     <section class="view" id="v-when" data-off>
       <div class="card"><div class="sec">
         <div class="ghead"><h3>曜日と時間帯</h3>
@@ -384,7 +386,6 @@ function yen(n){ return "¥"+Math.round(Number(n)||0).toLocaleString("ja-JP") }
 function pad2(n){ return ("0"+n).slice(-2) }
 function pct(a,b){ return b?Math.round(a/b*100)+"%" : "—" }
 var DOW=["日","月","火","水","木","金","土"];
-function payName(k){ return (window.Sync&&Sync.payName(k))||"現金" }
 
 /* 置き場所は設定の画面と同じものを借りる（仕入れ値を見るので店長用キーが要る） */
 var K_SHIFT="shiftadmin.v1", K_ITEM="storeitems.v1";
@@ -630,6 +631,12 @@ function heatData(){
 }
 
 /* ---------- 絵 ---------- */
+function niceMax(v){
+  if(v<=0) return 1;
+  var p=Math.pow(10,Math.floor(Math.log10(v))), f=v/p;
+  var s=f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10;
+  return s*p;
+}
 var heatN=false;      /* false=売上 / true=件数 */
 $("#hSw").addEventListener("click",function(){
   heatN=!heatN;
@@ -973,95 +980,162 @@ function renderWeeks(){
     :'<div class="empty">'+pick.m+'月はまだ記録がありません。</div>'+h;
 }
 
-/* ---------- お客さま（来店と購買率・種類・支払い方法） ---------- */
-/* 来店は「日・時間帯・担当・区分」でまとめて届く。購入は会計の件数。
-   ここは選んだ1か月ぶんだけを出す。 */
-function renderGuest(){
-  var list=monthRows(pick), vs=monthVisits(pick);
-  var amt=0; list.forEach(function(s){ amt+=s.total });
-
-  var all=0, byA={}, byS={}, byH={};
-  vs.forEach(function(g){
-    var k=Number(g.n)||0; all+=k;
-    byA[g.area+"-"+g.kind]=(byA[g.area+"-"+g.kind]||0)+k;
-    byS[g.staff||""]=(byS[g.staff||""]||0)+k;
-    byH[g.hour]=(byH[g.hour]||0)+k;
+/* ---------- お客さま（日ごと・区分ごと） ---------- */
+/* 区分の色。この3つは来店の画面とレジで同じものを使っている。 */
+var ACOL={west:"var(--pm)", asia:"var(--am)", jp:"var(--ok)"};
+var guMode="vis";                     /* vis=来店 / buy=購入 / rate=購買率 */
+$("#guSeg").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-m]"); if(!b) return;
+  guMode=b.dataset.m;
+  this.querySelectorAll("button").forEach(function(t){
+    t.setAttribute("aria-selected",String(t===b));
   });
-  $("#cVisit").hidden=!all;
+  renderGuest();
+});
 
-  if(all){
-    var buy=list.length;
-    $("#visSum").innerHTML='<div class="visbig">'+
-      '<div><div class="k">来店</div><div class="v">'+all+'人</div></div>'+
-      '<div><div class="k">購入</div><div class="v">'+buy+'件</div></div>'+
-      '<div class="rate"><div class="k">購買率</div><div class="v">'+pct(buy,all)+'</div></div>'+
-      '</div>';
-
-    /* 区分ごと（紙の表と同じ並び） */
-    var A=(window.Sync&&Sync.AREAS)||[], K=(window.Sync&&Sync.KINDS)||[];
-    var h='<table class="conv"><thead><tr><th></th>'+
-      K.map(function(k){ return '<th class="n">'+esc(k.nm)+'</th>' }).join("")+
-      '<th class="n">合計</th></tr></thead><tbody>';
-    A.forEach(function(a){
-      var sum=0;
-      h+='<tr><td>'+esc(a.nm)+'</td>'+K.map(function(k){
-        var v=byA[a.k+"-"+k.k]||0; sum+=v;
-        return '<td class="n">'+(v||"—")+'</td>';
-      }).join("")+'<td class="n">'+(sum||"—")+'</td></tr>';
-    });
-    h+='</tbody><tfoot><tr><td>合計</td>'+K.map(function(k){
-      var v=0; A.forEach(function(a){ v+=byA[a.k+"-"+k.k]||0 });
-      return '<td class="n">'+(v||"—")+'</td>';
-    }).join("")+'<td class="n">'+all+'</td></tr></tfoot></table>';
-    $("#visGrid").innerHTML=h;
-
-    /* 担当ごと */
-    var sBuy={};
-    list.forEach(function(s){ var k=s.staff||""; sBuy[k]=(sBuy[k]||0)+1 });
-    var names={};
-    Object.keys(byS).forEach(function(k){ names[k]=1 });
-    Object.keys(sBuy).forEach(function(k){ names[k]=1 });
-    var rowsS=Object.keys(names).map(function(k){
-      return {name:k||"（担当なし）", vis:byS[k]||0, buy:sBuy[k]||0};
-    }).sort(function(a,b){
-      var ra=a.vis?a.buy/a.vis:-1, rb=b.vis?b.buy/b.vis:-1;
-      return rb-ra || b.buy-a.buy;
-    });
-    $("#visStaff").innerHTML='<table class="conv"><thead><tr><th>担当</th>'+
-      '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
-      rowsS.map(function(x){
-        return '<tr><td>'+esc(x.name)+'</td><td class="n">'+(x.vis||"—")+'</td>'+
-          '<td class="n">'+x.buy+'</td><td class="rate">'+pct(x.buy,x.vis)+'</td></tr>';
-      }).join("")+
-      '</tbody><tfoot><tr><td>合計</td><td class="n">'+all+'</td><td class="n">'+buy+
-      '</td><td class="rate">'+pct(buy,all)+'</td></tr></tfoot></table>';
-
-    /* 時間帯ごと */
-    var hBuy={};
-    list.forEach(function(s){
-      var hh=parseInt(String(s.at||"").slice(11,13),10);
-      if(!isNaN(hh)) hBuy[hh]=(hBuy[hh]||0)+1;
-    });
-    var hs={};
-    Object.keys(byH).forEach(function(k){ hs[k]=1 });
-    Object.keys(hBuy).forEach(function(k){ hs[k]=1 });
-    $("#visHour").innerHTML='<table class="conv"><thead><tr><th>時間帯</th>'+
-      '<th class="n">来店</th><th class="n">購入</th><th class="n">購買率</th></tr></thead><tbody>'+
-      Object.keys(hs).map(Number).sort(function(a,b){ return a-b }).map(function(hh){
-        var v=byH[hh]||0, b2=hBuy[hh]||0;
-        return '<tr><td>'+hh+'時台</td><td class="n">'+(v||"—")+'</td>'+
-          '<td class="n">'+b2+'</td><td class="rate">'+pct(b2,v)+'</td></tr>';
-      }).join("")+'</tbody></table>';
+/* 選んだ月の日を、ぜんぶ並べる（今月は今日まで）。紙の表と同じ読み方にする。 */
+function guDays(){
+  var last=new Date(pick.y,pick.m,0).getDate();
+  if(pick.y===now.getFullYear()&&pick.m===now.getMonth()+1) last=Math.min(last,now.getDate());
+  var AR=(window.Sync&&Sync.AREAS)||[], out=[], m={};
+  for(var d=1;d<=last;d++){
+    var w=new Date(pick.y,pick.m-1,d).getDay();
+    var o={d:d, w:w, vis:{}, buy:{}, tv:0, tb:0};
+    AR.forEach(function(a){ o.vis[a.k]=0; o.buy[a.k]=0 });
+    out.push(m[d]=o);
   }
-
-  var g=group(list,function(s){ return s.guest },"（選んでいない）");
-  $("#cGuest").hidden=(!g.length||(g.length===1&&g[0].name==="（選んでいない）"));
-  bars($("#byGuest"),g,amt,function(x){ return x.n+"件・"+x.qty+"点" });
-  bars($("#byPay"),group(list,function(s){ return payName(s.pay) },"現金"),amt,
-    function(x){ return x.n+"件" });
+  monthVisits(pick).forEach(function(g){
+    var o=m[+String(g.day).slice(8,10)]; if(!o) return;
+    var k=Number(g.n)||0;
+    o.tv+=k;
+    if(o.vis[g.area]!=null) o.vis[g.area]+=k;
+  });
+  monthRows(pick).forEach(function(x){
+    var o=m[+String(x.day).slice(8,10)]; if(!o) return;
+    o.tb++;
+    if(o.buy[x.area]!=null) o.buy[x.area]++;
+  });
+  return out;
+}
+function guVal(o,k){
+  if(guMode==="vis") return o.vis[k];
+  if(guMode==="buy") return o.buy[k];
+  return o.vis[k] ? o.buy[k]/o.vis[k]*100 : null;
+}
+function guTotal(o){
+  if(guMode==="vis") return o.tv;
+  if(guMode==="buy") return o.tb;
+  return o.tv ? o.tb/o.tv*100 : null;
 }
 
-/* ---------- スタッフ（5つの力） ---------- */
+/* 来店と購入は積み上げ、購買率は区分を並べて出す（積み上げても意味が無いため）。 */
+function guSvg(ds){
+  var AR=(window.Sync&&Sync.AREAS)||[];
+  var rate=(guMode==="rate");
+  var step=rate?30:24, padL=40, padR=10, padT=12, padB=36, h=214;
+  var w=Math.max(padL+padR+ds.length*step, 320);
+  var gh=h-padT-padB;
+  var max;
+  if(rate){
+    /* 来店を数えそびれた日は100%を超える。そういう日が1日あるだけで
+       ほかの棒がつぶれてしまうので、上は200%で止める（表には本当の数が出る）。 */
+    var hi=100;
+    ds.forEach(function(o){ AR.forEach(function(a){
+      var v=guVal(o,a.k); if(v!=null&&v>hi) hi=v;
+    }) });
+    max=Math.max(100,Math.min(200,Math.ceil(hi/25)*25));
+  }else{
+    max=niceMax(Math.max.apply(null,ds.map(guTotal).concat([0])));
+  }
+  var y=function(v){ return padT+gh-(v/max)*gh };
+  var x=function(i){ return padL+step*i+step/2 };
+
+  var g="";
+  for(var t=0;t<=4;t++){
+    var v=max*t/4, yy=y(v);
+    g+='<line x1="'+padL+'" y1="'+yy+'" x2="'+(w-padR)+'" y2="'+yy+'" stroke="var(--line)" stroke-width="1"/>'+
+       '<text x="'+(padL-6)+'" y="'+(yy+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)">'+
+       (rate?Math.round(v)+"%":Math.round(v))+'</text>';
+  }
+  ds.forEach(function(o,i){
+    if(rate){
+      var bw=Math.min((step-6)/AR.length,8);
+      AR.forEach(function(a,j){
+        var v=guVal(o,a.k); if(v==null||v<=0) return;
+        var x0=x(i)-(AR.length*bw)/2+j*bw, vv=Math.min(v,max);
+        g+='<rect x="'+x0+'" y="'+y(vv)+'" width="'+(bw-1)+'" height="'+(padT+gh-y(vv))+'" rx="1.5" '+
+           'fill="'+ACOL[a.k]+'"><title>'+esc(pick.m+"/"+o.d+"　"+a.nm+"　"+Math.round(v)+"%")+'</title></rect>';
+      });
+    }else{
+      var bw2=Math.min(step-8,18), base=padT+gh;
+      AR.forEach(function(a){
+        var v2=guVal(o,a.k); if(!v2) return;
+        var hh=(v2/max)*gh;
+        base-=hh;
+        g+='<rect x="'+(x(i)-bw2/2)+'" y="'+base+'" width="'+bw2+'" height="'+hh+'" '+
+           'fill="'+ACOL[a.k]+'"><title>'+esc(pick.m+"/"+o.d+"　"+a.nm+"　"+v2)+'</title></rect>';
+      });
+    }
+    var col=(o.w===0)?"var(--sun)":(o.w===6)?"var(--sat)":"var(--ink-2)";
+    g+='<text x="'+x(i)+'" y="'+(h-19)+'" text-anchor="middle" font-size="10" fill="'+col+'">'+
+       o.d+'</text>'+
+       '<text x="'+x(i)+'" y="'+(h-6)+'" text-anchor="middle" font-size="9.5" fill="'+col+'">'+
+       DOW[o.w]+'</text>';
+  });
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" '+
+    'aria-label="日ごとの区分べつ">'+g+'</svg>';
+}
+
+function renderGuest(){
+  var AR=(window.Sync&&Sync.AREAS)||[];
+  var ds=guDays();
+  var nm=(guMode==="vis")?"来店":(guMode==="buy")?"購入":"購買率";
+  $("#guH").textContent=pick.y+"年"+pick.m+"月　日ごとの"+nm;
+
+  var any=ds.some(function(o){ return o.tv>0||o.tb>0 });
+  if(!any){
+    $("#guChart").innerHTML='<div class="empty">'+pick.m+'月はまだ記録がありません。</div>';
+    $("#guLeg").innerHTML=""; $("#guTbl").innerHTML="";
+    return;
+  }
+  $("#guChart").innerHTML=guSvg(ds);
+  $("#guLeg").innerHTML=AR.map(function(a){
+    return '<span><i style="background:'+ACOL[a.k]+'"></i>'+esc(a.nm)+'</span>';
+  }).join("")+(guMode==="rate"?'<span>（区分ごとに並べています）</span>':'<span>（積み上げ）</span>');
+
+  function cell(v){
+    if(v==null) return '<td class="n z">—</td>';
+    if(guMode==="rate") return '<td class="n">'+Math.round(v)+'%</td>';
+    return v?('<td class="n">'+v+'</td>'):'<td class="n z">—</td>';
+  }
+  var h='<table class="gu"><thead><tr><th>日</th>'+
+    AR.map(function(a){ return '<th class="n">'+esc(a.nm)+'</th>' }).join("")+
+    '<th class="n">合計</th></tr></thead><tbody>';
+  ds.forEach(function(o){
+    var c=(o.w===0)?' class="s0"':(o.w===6)?' class="s6"':"";
+    h+='<tr><td class="d"><span'+c+'>'+pick.m+'/'+o.d+'('+DOW[o.w]+')</span></td>'+
+      AR.map(function(a){ return cell(guVal(o,a.k)) }).join("")+
+      cell(guTotal(o))+'</tr>';
+  });
+  /* 月ぜんぶの合計。購買率は、合計どうしで割り直す（日ごとの平均ではない） */
+  var tv={}, tb={}, TV=0, TB=0;
+  AR.forEach(function(a){ tv[a.k]=0; tb[a.k]=0 });
+  ds.forEach(function(o){
+    TV+=o.tv; TB+=o.tb;
+    AR.forEach(function(a){ tv[a.k]+=o.vis[a.k]; tb[a.k]+=o.buy[a.k] });
+  });
+  function tcell(k){
+    if(guMode==="vis") return '<td class="n">'+tv[k]+'</td>';
+    if(guMode==="buy") return '<td class="n">'+tb[k]+'</td>';
+    return '<td class="n">'+(tv[k]?Math.round(tb[k]/tv[k]*100)+"%":"—")+'</td>';
+  }
+  h+='</tbody><tfoot><tr><td>合計</td>'+AR.map(function(a){ return tcell(a.k) }).join("")+
+    '<td class="n">'+(guMode==="vis"?TV:guMode==="buy"?TB:(TV?Math.round(TB/TV*100)+"%":"—"))+
+    '</td></tr></tfoot></table>';
+  $("#guTbl").innerHTML=h;
+}
+
+/* ---------- スタッフ（5つの力） ---------- *//* ---------- スタッフ（5つの力） ---------- */
 /* スタッフ用アプリと同じ出し方（shared/power.js）で、全員ぶんを店長が見るところ。
    店長なので、ここだけは売上と粗利も並べて出す。
    先月ぶんは、もう受け取ってある中から切り出すので、取り直しはしない。 */
