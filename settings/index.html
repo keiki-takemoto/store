@@ -100,19 +100,26 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .nf-row.end{justify-content:flex-end}
 .nf-row .grow{flex:1;min-width:150px}
 .view .card+.card{margin-top:12px}
-/* 一覧のカテゴリーの区切り */
-.grp{display:flex;align-items:baseline;gap:9px;margin:18px 0 9px;padding-bottom:6px;
-  border-bottom:2px solid var(--line-2)}
-.grp:first-child{margin-top:2px}
-.grp .gn{font-size:14px;font-weight:800}
-.grp .gn.none{color:var(--ink-3)}
-.grp .gc{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
-.catl{display:flex;flex-direction:column;gap:8px}
-.catl .c{display:flex;align-items:center;gap:9px;background:var(--surface-2);
-  border:1px solid var(--line);border-radius:10px;padding:9px 11px}
-.catl .c .nm{font-size:14px;font-weight:700;min-width:0;overflow:hidden;
+/* カテゴリーのプルダウン。押すと、その中の商品だけが出る。 */
+details.cat{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+details.cat+details.cat{margin-top:9px}
+details.cat>summary{list-style:none;cursor:pointer;padding:11px 12px;display:flex;align-items:center;gap:9px}
+details.cat>summary::-webkit-details-marker{display:none}
+details.cat>summary:hover{background:var(--surface-2)}
+details.cat>summary .ct{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+details.cat>summary .cn{font-size:14.5px;font-weight:800;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
-.catl .c .n{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+details.cat>summary .cn.none{color:var(--ink-3)}
+details.cat>summary .cs{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);
+  font-variant-numeric:tabular-nums}
+details.cat>summary .cs b{color:var(--warn)}
+details.cat>summary .ca{display:flex;gap:4px;flex:0 0 auto}
+details.cat>summary .ca .btn{padding:5px 9px}
+details.cat>summary .mk{font-size:19px;color:var(--ink-3);line-height:1;flex:0 0 auto;
+  transition:transform .15s}
+details.cat[open]>summary .mk{transform:rotate(90deg)}
+details.cat[open]>summary{border-bottom:1px solid var(--line)}
+details.cat .in{padding:2px 12px 10px}
 .catl .c .sp{margin-left:auto;display:flex;gap:6px;flex:0 0 auto}
 .addbox{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .addbox input[type=text]{flex:1;min-width:140px}
@@ -203,42 +210,32 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
     </div>
 
     <div class="card">
-      <div class="card-h"><h2>カテゴリー</h2><span class="hint" id="catCount"></span></div>
+      <div class="card-h"><h2>カテゴリーと商品</h2><span class="hint" id="itemCount"></span></div>
       <div class="sec">
         <div class="addbox" style="margin-top:0">
           <input type="text" id="nCatName" placeholder="新しいカテゴリーの名前（例）和雑貨" autocomplete="off" enterkeyhint="done">
           <button class="btn sm primary" id="addCatBtn">追加</button>
         </div>
-        <div class="catl" id="catList" style="margin-top:12px"></div>
-        <p class="note">商品を分ける名前です。ここで作っておくと、
-          上の<b>商品を登録</b>と、下の一覧の<b>カテゴリー</b>から選べます。<br>
-          <b>名前</b>を押すと直せます。そのカテゴリーの商品ぜんぶがいっしょに変わります。
-          すでにある名前にすると、ひとつにまとまります。<br>
-          <b>消す</b>と、そのカテゴリーの商品は<b>（未分類）</b>に戻ります。商品そのものは消えません。<br>
-          <a href="../analyze/">分析</a>の<b>週次決算</b>は、
-          <b>歴博委託商品</b>という名前のカテゴリーを見ています。
-          歴博からお預かりしている商品は、この名前のカテゴリーに入れてください。</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
-      <div class="sec">
-        <div class="syncbar"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
+        <div class="syncbar" style="margin-top:12px"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
         <div class="filter">表示 <select id="catFilter"></select>
           <input type="text" id="q" placeholder="商品名・Noで探す" autocomplete="off" enterkeyhint="search">
           <span class="sum" id="itemShown"></span></div>
         <div id="itemTbl"></div>
-        <div class="morerow"><button class="btn sm ghost" id="more" hidden></button></div>
         <div id="itemEmpty" class="empty" hidden>まだ登録がありません。上の「商品を登録」から追加してください。</div>
-        <p class="note"><b>カテゴリーごと</b>に分けて並べています。カテゴリーの無いものは
-          いちばん下の<b>（未分類）</b>に入ります。<br>
-          <b>月次の報告</b>の印は、ここであとから付け外しできます。
-          付けたものは<a href="../stock/">在庫管理</a>の<b>月次の販売報告</b>にまとまります。
-          上の「表示」で<b>月次の報告が必要なもの</b>だけに絞れます。<br>
-          上の「表示」でひとつのカテゴリーだけに絞ったり、名前・Noで探したりできます。<br>
-          点数の多いお店では、はじめは上から40点だけ出します。
-          「のこり◯点を表示」で続きが出ます。</p>
+        <p class="note"><b>カテゴリーを押すと、その中の商品が出ます。</b>
+          カテゴリーの無いものはいちばん下の<b>（未分類）</b>に入ります。<br>
+          商品の欄を直して画面のどこかを押せば、その場で保存されます。
+          <b>月次の報告</b>の印もここで付け外しできます。
+          付けたものは<a href="../stock/">在庫管理</a>の<b>月次の販売報告</b>にまとまります。<br>
+          カテゴリーの<b>名前</b>を押すと直せます。そのカテゴリーの商品ぜんぶがいっしょに変わります。
+          すでにある名前にすると、ひとつにまとまります。
+          <b>消す</b>と、そのカテゴリーの商品は<b>（未分類）</b>に戻ります。商品そのものは消えません。<br>
+          「商品名・Noで探す」や「表示」で絞ると、見つかったカテゴリーだけが開いて出ます。<br>
+          点数の多いカテゴリーは、はじめは上から40点だけ出します。
+          「のこり◯点を表示」で続きが出ます。<br>
+          <a href="../analyze/">分析</a>の<b>週次決算</b>は、
+          <b>歴博委託商品</b>という名前のカテゴリーを見ています。
+          歴博からお預かりしている商品は、この名前のカテゴリーに入れてください。</p>
       </div>
     </div>
 
@@ -571,29 +568,13 @@ function addCat(){
   if(IT.cats.indexOf(v)<0){ IT.cats.push(v); IT.cats.sort(); IT.catsDirty=1; saveItems(IT); queueSync() }
   return v;
 }
-/* カテゴリーの一覧。名前を直すと、そのカテゴリーの商品ぜんぶを書きかえる。 */
+/* カテゴリーの名前を直すと、そのカテゴリーの商品ぜんぶを書きかえる。 */
 function catUse(c){
   return live().filter(function(x){ return (x.cat||"")===c }).length;
 }
-function renderCatList(){
-  $("#catCount").textContent=IT.cats.length?IT.cats.length+"種類":"";
-  var none=live().filter(function(x){ return !x.cat }).length;
-  if(!IT.cats.length){
-    $("#catList").innerHTML='<div class="empty">まだありません。上から追加してください。</div>';
-  }else{
-    $("#catList").innerHTML=IT.cats.map(function(c){
-      var k=catUse(c);
-      return '<div class="c"><span class="nm">'+esc(c)+'</span>'+
-        '<span class="n">'+k+'点</span>'+
-        '<span class="sp"><button class="btn sm ghost" data-catren="'+esc(c)+'">名前</button>'+
-        '<button class="btn sm ghost" data-catdel="'+esc(c)+'">消す</button></span></div>';
-    }).join("");
-  }
-  if(none) $("#catList").innerHTML+='<div class="empty">（未分類）'+none+'点</div>';
-}
 function catsChanged(){
   IT.cats.sort(); IT.catsDirty=1; saveItems(IT);
-  renderItems();                     /* 中で一覧も選ぶところも描き直している */
+  renderItems();                     /* 中でプルダウンも選ぶところも描き直している */
   queueSync();
 }
 $("#addCatBtn").addEventListener("click",function(){
@@ -608,9 +589,12 @@ $("#addCatBtn").addEventListener("click",function(){
 $("#nCatName").addEventListener("keydown",function(e){
   if(e.key==="Enter"){ e.preventDefault(); $("#addCatBtn").click() }
 });
-$("#catList").addEventListener("click",function(e){
+/* カテゴリーの 名前／消す は、プルダウンの見出しの中にある。
+   そのまま押すとプルダウンが開いてしまうので、preventDefault で止めている。 */
+$("#itemTbl").addEventListener("click",function(e){
   var r=e.target.closest("[data-catren]");
   if(r){
+    e.preventDefault();
     var c=r.dataset.catren;
     var v=prompt("カテゴリーの名前",c);
     if(v===null) return;
@@ -626,6 +610,7 @@ $("#catList").addEventListener("click",function(e){
   }
   var d=e.target.closest("[data-catdel]");
   if(d){
+    e.preventDefault();
     var c2=d.dataset.catdel, k=catUse(c2);
     var msg=k?("「"+c2+"」を消します。\nこのカテゴリーの商品 "+k+"点 は（未分類）に戻ります。\n商品そのものは消えません。よろしいですか？")
              :("「"+c2+"」を消します。よろしいですか？");
@@ -668,68 +653,83 @@ function fld(it,f,label,unit,step){
     ' <input type="number" class="num" data-f="'+f+'" data-id="'+esc(it.id)+'" min="0" step="'+(step||10)+'" '+
     'inputmode="numeric" value="'+(numOf(it[f])!==null?it[f]:"")+'" placeholder="—">'+(unit?" "+unit:"")+'</span>';
 }
-var LIMIT=40, shown=LIMIT, justAdded=null;
+var LIMIT=40, perShow={}, openCat={}, justAdded=null;
+var GRP={};                                  /* いま出しているカテゴリーごとの商品 */
+var NARROW=false;                            /* 探しているあいだは true */
 function matchQ(it,q){
   if(!q) return true;
   return (String(it.name)+" "+String(it.no||"")).toLowerCase().indexOf(q)>=0;
 }
+/* 出す順番。カテゴリーの一覧の順 → 一覧に無い名前 → （未分類）はいちばん下。 */
+function catKeys(){
+  var out=IT.cats.slice(), seen={}, extra=[];
+  out.forEach(function(c){ seen[c]=1 });
+  live().forEach(function(x){
+    var c=x.cat||"";
+    if(c&&!seen[c]){ seen[c]=1; extra.push(c) }
+  });
+  extra.sort(function(a,b){ return a.localeCompare(b,"ja") });
+  return out.concat(extra).concat([""]);
+}
 function renderItems(){
-  renderCatPickers(); renderCatList();
+  renderCatPickers();
   var all=live();
   var n=all.length, low=all.filter(isLow).length;
-  $("#itemCount").textContent=n?(n+"点"+(low?" ・ 在庫少 "+low:"")):"";
+  $("#itemCount").textContent=
+    (IT.cats.length?IT.cats.length+"種類":"")+
+    (n?(IT.cats.length?" ・ ":"")+n+"点":"")+
+    (low?" ・ 在庫少 "+low:"");
+  $("#itemEmpty").hidden=!!n;
+
   var f=$("#catFilter").value, q=$("#q").value.trim().toLowerCase();
-  var list=all.filter(function(x){
+  var narrow=!!(q||f);                       /* 探しているとき。見つかったところを開いて出す */
+  NARROW=narrow;
+  var hit=all.filter(function(x){
     if(f==="__rep__"){ if(!x.rep) return false }
     else if(f==="__none__"){ if(x.cat) return false }
     else if(f&&x.cat!==f) return false;
     return matchQ(x,q);
   });
-  $("#itemEmpty").hidden=!!n;
-  if(n&&!list.length){
+  GRP={};
+  hit.forEach(function(x){ var c=x.cat||""; (GRP[c]=GRP[c]||[]).push(x) });
+  /* 登録したばかりのものは、そのカテゴリーのいちばん上に出す（794点の中で迷子にならないように） */
+  if(justAdded) for(var c0 in GRP){
+    var k0=GRP[c0].map(function(x){ return x.id }).indexOf(justAdded);
+    if(k0>0) GRP[c0].unshift(GRP[c0].splice(k0,1)[0]);
+  }
+  $("#itemShown").textContent=narrow?(hit.length+"点"):"";
+  if(narrow&&!hit.length){
     $("#itemTbl").innerHTML='<div class="empty">見つかりませんでした。</div>';
-    $("#itemShown").textContent=""; $("#more").hidden=true; return;
+    renderSync(); return;
   }
-  /* 商品が何百点もあるので、一度に出すのは少しだけにする。
-     ぜんぶ出すと携帯では重くて動かなくなるため。 */
-  /* カテゴリーごとにまとめる。並びはカテゴリーの一覧と同じ順で、
-     カテゴリーの無いものはいちばん下。同じカテゴリーの中の順番は変えない。 */
-  var ord={};
-  IT.cats.forEach(function(c,i){ ord[c]=i });
-  list=list.map(function(x,i){ return {x:x, i:i} }).sort(function(a,b){
-    var ca=a.x.cat||"", cb=b.x.cat||"";
-    var oa=ca?(ord[ca]==null?9000:ord[ca]):9999;
-    var ob=cb?(ord[cb]==null?9000:ord[cb]):9999;
-    return oa-ob || ca.localeCompare(cb,"ja") || a.i-b.i;
-  }).map(function(o){ return o.x });
-
-  var per={};
-  list.forEach(function(x){ var c=x.cat||""; per[c]=(per[c]||0)+1 });
-
-  var view=list.slice(0,shown), head=null;
-  if(justAdded){
-    var j=list.filter(function(x){ return x.id===justAdded })[0];
-    /* まだ下のほうにいて見えないときだけ、いちばん上に出す */
-    if(j&&view.indexOf(j)<0){ head=j; view=view.slice(0,shown-1) }
-  }
-  var rest=list.length-view.length-(head?1:0);
-  var seen=view.length+(head?1:0);
-  $("#itemShown").textContent=list.length?(rest>0?seen+" / "+list.length+"点":list.length+"点"):"";
-  $("#more").hidden=rest<=0;
-  $("#more").textContent="のこり "+rest+"点を表示";
-  function grp(c,cnt){
-    return '<div class="grp"><span class="gn'+(c?"":" none")+'">'+esc(c||"（未分類）")+'</span>'+
-      '<span class="gc">'+cnt+'点</span></div>';
-  }
-  var cur=null;
-  $("#itemTbl").innerHTML=
-    (head?'<div class="grp"><span class="gn">いま登録したもの</span></div>'+row(head):"")+
-    view.map(function(it){
-      var c=it.cat||"", h="";
-      if(c!==cur){ cur=c; h=grp(c,per[c]||0) }
-      return h+row(it);
-    }).join("");
+  /* ふだんは、空のカテゴリーも出す（名前を直したり消したりできるように） */
+  var keys=catKeys().filter(function(c){
+    if(narrow) return (GRP[c]||[]).length>0;
+    return c!=="" || (GRP[c]||[]).length>0;
+  });
+  $("#itemTbl").innerHTML=keys.map(function(c){
+    var list=GRP[c]||[], lw=list.filter(isLow).length;
+    var op=narrow?true:!!openCat[c];
+    return '<details class="cat"'+(op?" open":"")+' data-c="'+esc(c)+'">'+
+      '<summary><span class="ct">'+
+        '<span class="cn'+(c?"":" none")+'">'+esc(c||"（未分類）")+'</span>'+
+        '<span class="cs">'+list.length+'点'+(lw?' ・ <b>在庫少 '+lw+'</b>':'')+'</span></span>'+
+      (c?'<span class="ca"><button class="btn sm ghost" data-catren="'+esc(c)+'">名前</button>'+
+         '<button class="btn sm ghost" data-catdel="'+esc(c)+'">消す</button></span>':'')+
+      '<span class="mk">›</span></summary>'+
+      '<div class="in">'+(op?groupHtml(c):"")+'</div></details>';
+  }).join("");
   renderSync();
+}
+/* 中身は開いたときに作る。794点をいっぺんに出すと携帯が固まるため。 */
+function groupHtml(c){
+  var list=GRP[c]||[];
+  if(!list.length) return '<div class="empty">このカテゴリーの商品はまだありません。</div>';
+  var k=perShow[c]||LIMIT;
+  var view=list.slice(0,k), rest=list.length-view.length;
+  return view.map(row).join("")+
+    (rest>0?'<div class="morerow"><button class="btn sm ghost" data-more="'+esc(c)+
+      '">のこり '+rest+'点を表示</button></div>':"");
 }
 function row(it){
     return '<div class="rowitem'+(isLow(it)?" lowstock":"")+(it.id===justAdded?" just":"")+'">'+
@@ -753,10 +753,21 @@ function row(it){
         fld(it,"lot","1箱の数","",1)+'</div>'+
       '</div>';
 }
-$("#more").addEventListener("click",function(){ shown+=200; renderItems() });
+/* プルダウンを開け閉めしたとき。開いたところだけ中身を作る。
+   toggle は上に伝わらないので、つかまえる側（capture）で受ける。 */
+$("#itemTbl").addEventListener("toggle",function(e){
+  var d=e.target.closest&&e.target.closest("details.cat"); if(!d) return;
+  if(!d.isConnected) return;                 /* 描き直す前の古いものは放っておく */
+  var c=d.dataset.c;
+  /* 探しているあいだは勝手に開くので、開け閉めを覚えない
+     （探すのをやめたときに、ぜんぶ開いたままにならないように） */
+  if(!NARROW) openCat[c]=d.open;
+  var box=d.querySelector(".in");
+  if(d.open&&box&&!box.innerHTML) box.innerHTML=groupHtml(c);
+},true);
 var qT=null;
 $("#q").addEventListener("input",function(){
-  clearTimeout(qT); qT=setTimeout(function(){ shown=LIMIT; renderItems() },180);
+  clearTimeout(qT); qT=setTimeout(function(){ perShow={}; renderItems() },180);
 });
 function itemByName(n){
   var k=normName(n);
@@ -785,6 +796,7 @@ $("#addItem").addEventListener("click",function(){
   if($("#nRep").checked){ it.rep=1; IT.repDirty=1 }
   touch(it); IT.items.push(it); saveItems(IT); queueSync();
   justAdded=it.id;
+  openCat[it.cat||""]=true;                /* 入れたカテゴリーを開いて見せる */
   ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
   renderItems(); $("#nNo").focus();      /* カテゴリーは続けて登録しやすいよう残す */
   toast(name+" を登録しました");
@@ -793,13 +805,20 @@ $("#addItem").addEventListener("click",function(){
   $(sel).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
 });
 
-$("#catFilter").addEventListener("change",function(){ shown=LIMIT; renderItems() });
+$("#catFilter").addEventListener("change",function(){ perShow={}; renderItems() });
 $("#nCat").addEventListener("change",function(){
   if(this.value!==NEWCAT){ this.dataset.v=this.value; return }
   var v=addCat();
   this.dataset.v=v||"";
-  renderCatPickers(); renderCatList();
+  renderItems();
   this.value=v||"";
+});
+$("#itemTbl").addEventListener("click",function(e){
+  var mo=e.target.closest("[data-more]"); if(!mo) return;
+  var mc=mo.dataset.more;
+  perShow[mc]=(perShow[mc]||LIMIT)+200;
+  var box=mo.closest(".in");
+  if(box) box.innerHTML=groupHtml(mc);
 });
 $("#itemTbl").addEventListener("change",function(e){
   var rp=e.target.closest("[data-rep]");
@@ -1153,7 +1172,7 @@ $("#impBtn").addEventListener("click",function(){
   b.disabled=true; $("#impInfo").textContent="読み込み中…";
   loadSeed().then(function(src){
     var r=mergeSeed(src);
-    shown=LIMIT; renderItems();
+    perShow={}; renderItems();
     $("#impInfo").textContent="追加 "+r.add+"点 ／ 更新 "+r.upd+"点";
     toast("原価表を読み込みました");
   }).catch(function(){
@@ -1376,7 +1395,7 @@ function autoSeed(){
   loadSeed().then(function(src){
     if(live().length) return;
     var r=mergeSeed(src);
-    shown=LIMIT; renderItems();
+    perShow={}; renderItems();
     $("#impInfo").textContent="追加 "+r.add+"点";
     toast("商品 "+r.add+"点を読み込みました");
   }).catch(function(){});
