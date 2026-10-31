@@ -97,6 +97,13 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .nf-row.end{justify-content:flex-end}
 .nf-row .grow{flex:1;min-width:150px}
 .view .card+.card{margin-top:12px}
+/* 一覧のカテゴリーの区切り */
+.grp{display:flex;align-items:baseline;gap:9px;margin:18px 0 9px;padding-bottom:6px;
+  border-bottom:2px solid var(--line-2)}
+.grp:first-child{margin-top:2px}
+.grp .gn{font-size:14px;font-weight:800}
+.grp .gn.none{color:var(--ink-3)}
+.grp .gc{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
 .catl{display:flex;flex-direction:column;gap:8px}
 .catl .c{display:flex;align-items:center;gap:9px;background:var(--surface-2);
   border:1px solid var(--line);border-radius:10px;padding:9px 11px}
@@ -157,36 +164,9 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
   <!-- 商品 -->
   <section class="view" id="v-item" data-off>
     <div class="card">
-      <div class="card-h"><h2>カテゴリー</h2><span class="hint" id="catCount"></span></div>
+      <div class="card-h"><h2>商品を登録</h2></div>
       <div class="sec">
-        <div class="addbox" style="margin-top:0">
-          <input type="text" id="nCatName" placeholder="新しいカテゴリーの名前（例）和雑貨" autocomplete="off" enterkeyhint="done">
-          <button class="btn sm primary" id="addCatBtn">追加</button>
-        </div>
-        <div class="catl" id="catList" style="margin-top:12px"></div>
-        <p class="note">商品を分ける名前です。ここで作っておくと、下の商品リストの
-          <b>カテゴリー</b>から選べます。<br>
-          <b>名前</b>を押すと直せます。そのカテゴリーの商品ぜんぶがいっしょに変わります。
-          すでにある名前にすると、ひとつにまとまります。<br>
-          <b>消す</b>と、そのカテゴリーの商品は<b>（未分類）</b>に戻ります。商品そのものは消えません。<br>
-          <a href="../analyze/">分析</a>の<b>週次決算</b>は、
-          <b>歴博委託商品</b>という名前のカテゴリーを見ています。
-          歴博からお預かりしている商品は、この名前のカテゴリーに入れてください。</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
-      <div class="sec">
-        <div class="syncbar"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
-        <div class="filter">表示 <select id="catFilter"></select>
-          <input type="text" id="q" placeholder="商品名・Noで探す" autocomplete="off" enterkeyhint="search">
-          <span class="sum" id="itemShown"></span></div>
-        <div id="itemTbl"></div>
-        <div class="morerow"><button class="btn sm ghost" id="more" hidden></button></div>
-        <div id="itemEmpty" class="empty" hidden>まだ登録がありません。下から追加してください。</div>
-        <div class="newform">
-          <h3>商品を登録</h3>
+        <div class="newform" style="margin-top:0;padding-top:0;border-top:none">
           <div class="nf-row">
             <span class="fg">商品No <input type="text" id="nNo" class="no" placeholder="001" autocomplete="off"></span>
             <input type="text" id="nName" class="grow" placeholder="商品名" autocomplete="off">
@@ -210,11 +190,50 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
           <b>店舗にある数</b>が<b>足りない数</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
           そのとき<a href="../order/">発注</a>の画面に出て、<b>いつもの数</b>まで戻る分を注文します。
           <b>1箱の数</b>を入れておくと、箱の単位に切り上げます。<br>
-          <b>カテゴリー</b>は「＋ 新しいカテゴリー…」からその場で作れます。上の「表示」で絞り込めます。<br>
-          登録したあとは、一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
+          登録したあとは、下の一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>商品リスト</h2><span class="hint" id="itemCount"></span></div>
       <div class="sec">
-        <h3>原価表の読み込み</h3>
+        <div class="syncbar"><span id="syncState">—</span><button class="btn sm ghost" id="syncNow" hidden>今すぐ合わせる</button></div>
+        <div class="filter">表示 <select id="catFilter"></select>
+          <input type="text" id="q" placeholder="商品名・Noで探す" autocomplete="off" enterkeyhint="search">
+          <span class="sum" id="itemShown"></span></div>
+        <div id="itemTbl"></div>
+        <div class="morerow"><button class="btn sm ghost" id="more" hidden></button></div>
+        <div id="itemEmpty" class="empty" hidden>まだ登録がありません。上の「商品を登録」から追加してください。</div>
+        <p class="note"><b>カテゴリーごと</b>に分けて並べています。カテゴリーの無いものは
+          いちばん下の<b>（未分類）</b>に入ります。<br>
+          上の「表示」でひとつのカテゴリーだけに絞ったり、名前・Noで探したりできます。<br>
+          点数の多いお店では、はじめは上から40点だけ出します。
+          「のこり◯点を表示」で続きが出ます。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>カテゴリー</h2><span class="hint" id="catCount"></span></div>
+      <div class="sec">
+        <div class="addbox" style="margin-top:0">
+          <input type="text" id="nCatName" placeholder="新しいカテゴリーの名前（例）和雑貨" autocomplete="off" enterkeyhint="done">
+          <button class="btn sm primary" id="addCatBtn">追加</button>
+        </div>
+        <div class="catl" id="catList" style="margin-top:12px"></div>
+        <p class="note">商品を分ける名前です。ここで作っておくと、
+          <b>商品を登録</b>と一覧の<b>カテゴリー</b>から選べます。<br>
+          <b>名前</b>を押すと直せます。そのカテゴリーの商品ぜんぶがいっしょに変わります。
+          すでにある名前にすると、ひとつにまとまります。<br>
+          <b>消す</b>と、そのカテゴリーの商品は<b>（未分類）</b>に戻ります。商品そのものは消えません。<br>
+          <a href="../analyze/">分析</a>の<b>週次決算</b>は、
+          <b>歴博委託商品</b>という名前のカテゴリーを見ています。
+          歴博からお預かりしている商品は、この名前のカテゴリーに入れてください。</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h2>原価表の読み込み</h2></div>
+      <div class="sec">
         <div class="row" style="gap:9px;flex-wrap:wrap;align-items:center">
           <button class="btn sm" id="impBtn">原価表を読み込む</button>
           <span class="sum" id="impInfo"></span>
@@ -659,16 +678,46 @@ function renderItems(){
   }
   /* 商品が何百点もあるので、一度に出すのは少しだけにする。
      ぜんぶ出すと携帯では重くて動かなくなるため。 */
-  var view=list.slice(0,shown);
+  /* カテゴリーごとにまとめる。並びはカテゴリーの一覧と同じ順で、
+     カテゴリーの無いものはいちばん下。同じカテゴリーの中の順番は変えない。 */
+  var ord={};
+  IT.cats.forEach(function(c,i){ ord[c]=i });
+  list=list.map(function(x,i){ return {x:x, i:i} }).sort(function(a,b){
+    var ca=a.x.cat||"", cb=b.x.cat||"";
+    var oa=ca?(ord[ca]==null?9000:ord[ca]):9999;
+    var ob=cb?(ord[cb]==null?9000:ord[cb]):9999;
+    return oa-ob || ca.localeCompare(cb,"ja") || a.i-b.i;
+  }).map(function(o){ return o.x });
+
+  var per={};
+  list.forEach(function(x){ var c=x.cat||""; per[c]=(per[c]||0)+1 });
+
+  var view=list.slice(0,shown), head=null;
   if(justAdded){
     var j=list.filter(function(x){ return x.id===justAdded })[0];
-    if(j&&view.indexOf(j)<0){ view=[j].concat(view.slice(0,shown-1)) }
+    /* まだ下のほうにいて見えないときだけ、いちばん上に出す */
+    if(j&&view.indexOf(j)<0){ head=j; view=view.slice(0,shown-1) }
   }
-  var rest=list.length-view.length;
-  $("#itemShown").textContent=list.length?(rest>0?view.length+" / "+list.length+"点":list.length+"点"):"";
+  var rest=list.length-view.length-(head?1:0);
+  var seen=view.length+(head?1:0);
+  $("#itemShown").textContent=list.length?(rest>0?seen+" / "+list.length+"点":list.length+"点"):"";
   $("#more").hidden=rest<=0;
   $("#more").textContent="のこり "+rest+"点を表示";
-  $("#itemTbl").innerHTML=view.map(function(it){
+  function grp(c,cnt){
+    return '<div class="grp"><span class="gn'+(c?"":" none")+'">'+esc(c||"（未分類）")+'</span>'+
+      '<span class="gc">'+cnt+'点</span></div>';
+  }
+  var cur=null;
+  $("#itemTbl").innerHTML=
+    (head?'<div class="grp"><span class="gn">いま登録したもの</span></div>'+row(head):"")+
+    view.map(function(it){
+      var c=it.cat||"", h="";
+      if(c!==cur){ cur=c; h=grp(c,per[c]||0) }
+      return h+row(it);
+    }).join("");
+  renderSync();
+}
+function row(it){
     return '<div class="rowitem'+(isLow(it)?" lowstock":"")+(it.id===justAdded?" just":"")+'">'+
       '<div class="ri-top">'+
         '<input type="text" class="no" data-f="no" data-id="'+esc(it.id)+'" value="'+esc(it.no||"")+'" placeholder="No">'+
@@ -687,8 +736,6 @@ function renderItems(){
         '" value="'+esc(it.vno||"")+'" placeholder="—"></span>'+
         fld(it,"lot","1箱の数","",1)+'</div>'+
       '</div>';
-  }).join("");
-  renderSync();
 }
 $("#more").addEventListener("click",function(){ shown+=200; renderItems() });
 var qT=null;
