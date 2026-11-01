@@ -347,14 +347,17 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
     <div class="sub" id="dSub"></div>
     <div class="row">
       <button class="btn primary" id="nextBtn">次のお会計</button>
+      <button class="btn" id="rcptBtn">レシートを印刷</button>
       <button class="btn danger" id="voidBtn">この会計を取り消す</button>
     </div>
+    <div class="sub" id="rcptNote" hidden></div>
   </div>
 
 </div>
 <div class="log" id="log"></div>
 
 <script src="../shared/sync.js"></script>
+<script src="../shared/receipt.js"></script>
 <script>
 (function(){
 "use strict";
@@ -848,6 +851,8 @@ $("#payBtn").addEventListener("click",function(){
     subtotal:s.sub, discount:s.disc, total:s.total, cost:s.cost, qty:s.qty,
     lines:cart.map(function(l){ return {id:l.id,no:l.no,name:l.name,price:l.price,cost:l.cost,qty:l.qty} }),
     note:"", voided:false };
+  /* お預かりはレシートに出すためだけのもの。置き場所には送らない（flush の並びに入れていない） */
+  if(pay==="cash"&&got) sale.cash=got;
   REG.sales.unshift(sale); saveReg(); touchStaff();
   lastSale=sale;
 
@@ -859,12 +864,24 @@ $("#payBtn").addEventListener("click",function(){
   show("done"); renderBar();
   flush();
 });
+/* ---------- レシート ---------- */
+/* Bluetoothのプリンタはブラウザからは繋げない（iPadはAppleが禁止している）ので、
+   端末の「プリント」に渡す。Wi-Fiで繋がっているAirPrint対応のレシートプリンタなら、
+   ここから出る。店名などは 設定 → レジ → レシート。 */
+$("#rcptBtn").addEventListener("click",function(){
+  if(!lastSale||!window.Receipt) return;
+  $("#rcptNote").hidden=false;
+  $("#rcptNote").textContent="プリンタが出てこないときは、設定 → レジ → レシート を見てください。";
+  Receipt.print(lastSale);
+});
+
 $("#nextBtn").addEventListener("click",function(){
   cart=[]; buf=""; guest=""; lastSale=null; pay="cash";
   $("#disc").value=""; $("#cashIn").value=""; $("#q").value="";
   renderPays();
   $("#cashBox").hidden=false;
   renderFound(); renderBar();
+  $("#rcptNote").hidden=true;
   openFor(document.body.dataset.mode);
 });
 $("#voidBtn").addEventListener("click",async function(){

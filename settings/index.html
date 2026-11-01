@@ -85,6 +85,12 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
   flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;
   font-family:inherit;font-size:13.5px;background:var(--surface);color:var(--ink)}
 .ven .vrow textarea{min-height:92px;line-height:1.7;resize:vertical;width:100%}
+.rc .vrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px}
+.rc .vrow label{font-size:12px;color:var(--ink-3);font-weight:600;flex:0 0 auto;min-width:6em}
+.rc .vrow input[type=text],.rc .vrow textarea{
+  flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;
+  font-family:inherit;font-size:13.5px;background:var(--surface);color:var(--ink)}
+.rc .vrow textarea{min-height:60px;line-height:1.7;resize:vertical}
 .ven .hows{display:flex;gap:6px;background:var(--surface-2);border-radius:9px;padding:3px}
 .ven .hows button{border:none;background:transparent;border-radius:7px;padding:7px 12px;cursor:pointer;
   font-family:inherit;font-size:12.5px;font-weight:700;color:var(--ink-2)}
@@ -349,10 +355,52 @@ details.cat .in{padding:2px 12px 10px}
           スタッフ用アプリのランキングに出ます。空のままなら 3,000円 で数えます。</p>
       </div>
     </div>
+
+    <div class="card rc">
+      <div class="card-h"><h2>レシート</h2><span class="hint" id="rcState"></span></div>
+      <div class="sec">
+        <p class="note" style="margin-top:0">レジで会計したあとの画面に出る
+          「<b>レシートを印刷</b>」で、紙に出す中身です。</p>
+        <div class="vrow"><label>店名</label>
+          <input type="text" id="rcShop" placeholder="ZIPANG"></div>
+        <div class="vrow"><label>住所・電話</label>
+          <textarea id="rcAddr" placeholder="空のままなら、レシートには出ません"></textarea></div>
+        <div class="vrow"><label>登録番号</label>
+          <input type="text" id="rcInv" placeholder="T0000000000000（空のままなら出ません）"></div>
+        <div class="vrow"><label>消費税</label>
+          <span class="fg"><input type="number" id="rcTax" class="num" min="0" max="20" step="1"
+            inputmode="numeric" placeholder="10"> ％</span></div>
+        <div class="vrow"><label>紙の幅</label>
+          <select id="rcW">
+            <option value="80">80mm（ふつう）</option>
+            <option value="58">58mm（小さい）</option>
+          </select></div>
+        <div class="vrow"><label>下のひとこと</label>
+          <input type="text" id="rcFoot" placeholder="ありがとうございました"></div>
+        <div class="row" style="margin-top:13px">
+          <button class="btn sm primary" id="rcSave">保存</button>
+          <button class="btn sm ghost" id="rcTest">見本を印刷して確かめる</button>
+        </div>
+        <p class="note"><b>登録番号</b>を入れると、レシートに「10%対象」と「内 消費税」の行が出ます
+          （適格簡易請求書の形）。空のままなら出ません。<br>
+          軽減税率（8%）の商品もあるお店では、この形では足りません。必要なら言ってください。</p>
+      </div>
+      <div class="sec">
+        <h3>プリンタの繋ぎ方</h3>
+        <p class="note" style="margin-top:0"><b>Bluetoothのプリンタは、このアプリからは繋げません。</b>
+          iPad・iPhone では、ブラウザからBluetoothを触る仕組みがApple側で用意されていないためです
+          （Safari でも Chrome でも同じです）。<br>
+          <b>Wi-Fi（AirPrint）に対応したレシートプリンタ</b>を、iPadと同じWi-Fiに繋いでください。
+          それだけで、上のボタンから出るようになります。<br>
+          「プリント」の画面にプリンタが出てこないときは、
+          iPadとプリンタが<b>同じWi-Fi</b>に入っているか見てください。</p>
+      </div>
+    </div>
   </section>
 </main>
 
 <script src="../shared/sync.js"></script>
+<script src="../shared/receipt.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1321,12 +1369,51 @@ var REGSET=null;
 try{ REGSET=JSON.parse(localStorage.getItem(K_REGSET)) }catch(e){}
 if(!REGSET||typeof REGSET!=="object") REGSET={};
 
+/* レシートの決めごと。高単価のラインと同じ REGSET の中（rc）に入れる。
+   読むのは shared/receipt.js。SupabaseのSQLは触らずに済む。 */
+function renderRcpt(){
+  var rc=(REGSET.rc&&typeof REGSET.rc==="object")?REGSET.rc:{};
+  $("#rcShop").value=rc.shop||"";
+  $("#rcAddr").value=rc.addr||"";
+  $("#rcInv").value=rc.inv||"";
+  $("#rcTax").value=(typeof rc.tax==="number")?rc.tax:"";
+  $("#rcW").value=(String(rc.w)==="58")?"58":"80";
+  $("#rcFoot").value=(rc.foot==null)?"":rc.foot;
+  $("#rcState").textContent = syncOn() ? "" : "この端末だけに入っています";
+}
+/* 入れたものをこの端末に控える。見本を出すときも先にこれを通す（見本は控えたものを読むため） */
+function rcLocal(){
+  var t=parseInt($("#rcTax").value,10);
+  REGSET.rc={ shop:$("#rcShop").value.trim(), addr:$("#rcAddr").value.trim(),
+    inv:$("#rcInv").value.trim(), foot:$("#rcFoot").value.trim(),
+    tax:(isNaN(t)||t<0||t>20)?10:t, w:($("#rcW").value==="58")?"58":"80" };
+  $("#rcTax").value=REGSET.rc.tax;
+  try{ localStorage.setItem(K_REGSET,JSON.stringify(REGSET)) }catch(e){}
+}
+$("#rcSave").addEventListener("click",function(){
+  rcLocal();
+  if(!syncOn()){ $("#rcState").textContent="この端末だけに入っています"; toast("保存しました"); return }
+  $("#rcState").textContent="送っています…";
+  Sync.metaPut("reg",REGSET).then(function(){
+    $("#rcState").textContent="保存しました";
+    toast("レシートの決めごとを保存しました");
+  }).catch(function(e){
+    $("#rcState").textContent="送れませんでした："+((e&&e.message)||"");
+  });
+});
+$("#rcTest").addEventListener("click",function(){
+  if(!window.Receipt){ toast("レシートの部品が読めていません"); return }
+  rcLocal();
+  Receipt.sample();
+});
+
 function renderGuests(){
   $("#areaList").innerHTML=((window.Sync&&Sync.AREAS)||[]).map(function(a){
     return '<span class="btn sm" style="cursor:default">'+esc(a.nm)+'</span>';
   }).join("");
   $("#hiPrice").value=(typeof REGSET.hiprice==="number")?REGSET.hiprice:"";
   $("#hiState").textContent = syncOn() ? "" : "この端末だけに入っています";
+  renderRcpt();
 }
 $("#hiSave").addEventListener("click",function(){
   var v=parseInt($("#hiPrice").value,10);
