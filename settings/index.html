@@ -1404,7 +1404,14 @@ $("#rcSave").addEventListener("click",function(){
 $("#rcTest").addEventListener("click",function(){
   if(!window.Receipt){ toast("レシートの部品が読めていません"); return }
   rcLocal();
-  Receipt.sample();
+  var b=this; b.disabled=true;
+  if(Receipt.inShell()) $("#rcState").textContent="印刷しています…";
+  Promise.resolve(Receipt.sample()).then(function(){
+    if(Receipt.inShell()){ $("#rcState").textContent="印刷しました"; toast("見本を印刷しました") }
+  }).catch(function(e){
+    $("#rcState").textContent=(e&&e.message)||"印刷できませんでした";
+    toast("印刷できませんでした");
+  }).then(function(){ b.disabled=false });
 });
 
 function renderGuests(){

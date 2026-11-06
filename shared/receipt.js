@@ -7,8 +7,13 @@
    Wi-Fiで繋がっているレシートプリンタ（AirPrint対応のもの）なら、これで出る。
    ふつうのプリンタでも、PDFとして保存するのでも、同じものが出る。
 
+   ガワのアプリ（store-ios）の中で開いているときは、
+   `window.ZipangShell` があるので、そちらに渡して Bluetooth のプリンタに出す。
+   ふつうのSafariで開いているときは、これまで通り端末の「プリント」に渡す。
+   どちらに出るかは、HTML側は気にしなくてよい。
+
    使い方
-     Receipt.print(sale)   … 会計1件を印刷する
+     Receipt.print(sale)   … 会計1件を印刷する（Promiseを返す）
      Receipt.sample()      … 見本を印刷する（設定の確認用）
      Receipt.cfg()         … いまの決めごとを読む
 
@@ -109,6 +114,68 @@ function html(sale,c){
   return h;
 }
 
+/* ---------- ガワのアプリ（Bluetoothのプリンタ）に渡すとき ---------- */
+
+/* ガワの中にいるか */
+function inShell(){ return !!(window.ZipangShell && window.ZipangShell.print) }
+
+/* 紙の幅ぶんの文字数。ふつうの大きさの字で何文字入るか。 */
+function cols(c){ return c.w==="58" ? 32 : 48 }
+
+/* 紙に並べる行。見た目はHTMLのレシートと同じにしてある。 */
+function doc(sale,c){
+  sale=sale||{};
+  var lines=sale.lines||[], L=[];
+  function tx(v,big,bold){ L.push({t:"l", v:v, big:!!big, bold:!!bold}) }
+  function ct(v,big,bold){ L.push({t:"c", v:v, big:!!big, bold:!!bold}) }
+  function lr(l,r,big,bold){ L.push({t:"lr", l:l, r:r, big:!!big, bold:!!bold}) }
+  function rule(){ L.push({t:"rule"}) }
+
+  ct(c.shop,true,true);
+  if(c.addr) c.addr.split("\n").forEach(function(x){ if(x) ct(x) });
+  if(c.inv) ct("登録番号 "+c.inv);
+  rule();
+  tx(when(sale));
+  var who=[];
+  if(sale.staff) who.push("担当 "+sale.staff);
+  if(sale.guest) who.push(sale.guest);
+  if(who.length) tx(who.join("　"));
+  rule();
+
+  var sub=Number(sale.subtotal);
+  if(isNaN(sub)){ sub=0; lines.forEach(function(l){ sub+=(Number(l.price)||0)*(Number(l.qty)||0) }) }
+  var disc=Number(sale.discount)||0;
+  var tot=Number(sale.total); if(isNaN(tot)) tot=sub-disc;
+  var qty=Number(sale.qty); if(isNaN(qty)){ qty=0; lines.forEach(function(l){ qty+=Number(l.qty)||0 }) }
+
+  if(!lines.length) tx("—");
+  lines.forEach(function(l){
+    var q=Number(l.qty)||0, pr=Number(l.price)||0;
+    tx(String(l.name||""));
+    lr("  "+q+" × "+yen(pr), yen(pr*q));
+  });
+  rule();
+  if(disc){ lr("小計",yen(sub)); lr("値引き","-"+yen(disc)) }
+  lr("合計（"+qty+"点）",yen(tot),true,true);
+  if(c.inv){
+    lr(c.tax+"%対象",yen(tot));
+    lr("内 消費税",yen(Math.floor(tot*c.tax/(100+c.tax))));
+  }
+  rule();
+  var pn=payName(sale.pay);
+  if(pn) lr("お支払い",pn);
+  if(typeof sale.cash==="number"&&sale.cash>0){
+    lr("お預かり",yen(sale.cash));
+    lr("お釣り",yen(sale.cash-tot));
+  }
+  rule();
+  if(c.foot) ct(c.foot);
+  if(sale.id) ct("No. "+sale.id);
+  L.push({t:"feed", n:2});
+  L.push({t:"cut"});
+  return { w:cols(c), lines:L };
+}
+
 /* 印刷のときだけ、画面のかわりにレシートを出す。
    レジの画面は html,body を overflow:hidden で固めてあるので、ここで戻している。 */
 var CSS=
@@ -154,19 +221,24 @@ function mount(){
 }
 
 function print(sale){
-  var c=cfg(), box=mount();
+  var c=cfg();
+  /* ガワの中なら、Bluetoothのプリンタへ。失敗の文句はそのまま呼び元に返す。 */
+  if(inShell()) return window.ZipangShell.print(doc(sale,c));
+  /* ふつうのSafariなら、これまで通り端末の「プリント」へ */
+  var box=mount();
   box.setAttribute("data-w",c.w);
   box.innerHTML=html(sale,c);
   window.print();
+  return Promise.resolve();
 }
 
 /* 設定の見本。実際の会計とは関係ない中身で、紙の出かただけ確かめる。 */
 function sample(){
-  print({ id:"sample", at:new Date().toISOString(), staff:"見本", guest:"日本人", pay:"cash",
+  return print({ id:"sample", at:new Date().toISOString(), staff:"見本", guest:"日本人", pay:"cash",
     lines:[{name:"手ぬぐい　藍",price:1200,qty:2},
            {name:"桐の箸置き（五客組）",price:3800,qty:1}],
     subtotal:6200, discount:200, total:6000, qty:3, cash:10000 });
 }
 
-window.Receipt={ cfg:cfg, html:html, print:print, sample:sample };
+window.Receipt={ cfg:cfg, html:html, doc:doc, print:print, sample:sample, inShell:inShell };
 })();

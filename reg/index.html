@@ -870,9 +870,16 @@ $("#payBtn").addEventListener("click",function(){
    ここから出る。店名などは 設定 → レジ → レシート。 */
 $("#rcptBtn").addEventListener("click",function(){
   if(!lastSale||!window.Receipt) return;
-  $("#rcptNote").hidden=false;
-  $("#rcptNote").textContent="プリンタが出てこないときは、設定 → レジ → レシート を見てください。";
-  Receipt.print(lastSale);
+  var b=this, note=$("#rcptNote");
+  b.disabled=true; note.hidden=false;
+  note.textContent=Receipt.inShell()
+    ? "印刷しています…"
+    : "プリンタが出てこないときは、設定 → レジ → レシート を見てください。";
+  Promise.resolve(Receipt.print(lastSale)).then(function(){
+    if(Receipt.inShell()) note.textContent="印刷しました";
+  }).catch(function(e){
+    note.textContent=(e&&e.message)||"印刷できませんでした";
+  }).then(function(){ b.disabled=false });
 });
 
 $("#nextBtn").addEventListener("click",function(){
