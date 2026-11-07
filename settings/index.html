@@ -396,13 +396,7 @@ details.cat .in{padding:2px 12px 10px}
       </div>
       <div class="sec">
         <h3>プリンタの繋ぎ方</h3>
-        <p class="note" style="margin-top:0"><b>Bluetoothのプリンタは、このアプリからは繋げません。</b>
-          iPad・iPhone では、ブラウザからBluetoothを触る仕組みがApple側で用意されていないためです
-          （Safari でも Chrome でも同じです）。<br>
-          <b>Wi-Fi（AirPrint）に対応したレシートプリンタ</b>を、iPadと同じWi-Fiに繋いでください。
-          それだけで、上のボタンから出るようになります。<br>
-          「プリント」の画面にプリンタが出てこないときは、
-          iPadとプリンタが<b>同じWi-Fi</b>に入っているか見てください。</p>
+        <p class="note" style="margin-top:0" id="rcHow"></p>
       </div>
     </div>
   </section>
@@ -1423,6 +1417,21 @@ function renderRcpt(){
   $("#rcW").value=(String(rc.w)==="58")?"58":"80";
   $("#rcFoot").value=(rc.foot==null)?"":rc.foot;
   $("#rcState").textContent = syncOn() ? "" : "この端末だけに入っています";
+  /* 繋ぎ方の説明は、いまどこで開いているかで変わる */
+  $("#rcHow").innerHTML = (window.Receipt&&Receipt.inShell())
+    ? '<b>Bluetoothのレシートプリンタに出します。</b>'+
+      'いまは店舗管理アプリ（ZIPANGレジ）の中で開いているので、'+
+      'Wi-Fiを使わずにプリンタへ直接送れます。<br>'+
+      'あらかじめ <b>iPadの「設定 → Bluetooth」でプリンタを繋いでおいてください。</b>'+
+      'このアプリから新しくペアリングすることはできません（Appleの決まりです）。<br>'+
+      '「プリンタが見つかりません」と出るときは、'+
+      '<b>プリンタの電源</b>と、<b>エアレジなど他のアプリがプリンタを使っていないか</b>を見てください。'+
+      'Bluetoothのプリンタは、一度にひとつのアプリとしか繋がりません。'
+    : '<b>いまはブラウザで開いています。この状態ではBluetoothのプリンタには繋げません。</b>'+
+      'iPad・iPhone では、ブラウザからBluetoothを触る仕組みがApple側で用意されていないためです'+
+      '（Safari でも Chrome でも同じです）。端末の「プリント」に渡す形になります。<br>'+
+      '<b>Wi-Fi（AirPrint）に対応したレシートプリンタ</b>を、iPadと同じWi-Fiに繋いでください。<br>'+
+      'Bluetoothで出したいときは、<b>ホーム画面の「ZIPANGレジ」アプリから開いてください。</b>';
 }
 /* 入れたものをこの端末に控える。見本を出すときも先にこれを通す（見本は控えたものを読むため） */
 function rcLocal(){
