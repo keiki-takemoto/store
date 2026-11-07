@@ -483,6 +483,10 @@ function pushStaff(){
       return {name:normName(x.name), disp:x.name, tok:x.tok||"",
               wage:(typeof x.wage==="number"?x.wage:null)};
     }).filter(function(x){ return x.name });
+    /* 名簿が空のときは送らない。置き場所の staff_put は
+       「送った名前に無い人を消す」作りなので、空で送ると全員消える。
+       2026-11-07、空のまま開いた端末がこれで名簿を消してしまった。 */
+    if(!rows.length) return;
     Sync.staffPut(rows).catch(function(){});
   },800);
 }
