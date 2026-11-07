@@ -742,8 +742,20 @@ function addToCart(it){
   var cur=cart.filter(function(l){ return l.id===it.id })[0];
   if(cur) cur.qty++;
   else cart.push({id:it.id, no:String(it.no||""), name:String(it.name||""),
-                  price:numOf(it.price), cost:numOf(it.cost), qty:1});
+                  price:numOf(it.price), cost:numOf(it.cost), qty:1, tx:rateOf(it)});
   renderCart();
+}
+/* その商品の消費税の率。飲み物などに「8%」の印が付いていれば軽減税率。
+   会計のときに1件ずつ焼きつけるので、あとで印を変えても昔のレシートは変わらない。 */
+function rateOf(it){
+  var r=regset();
+  return it&&it.t8 ? r.tax2 : r.tax;
+}
+function regset(){
+  var v=null; try{ v=JSON.parse(localStorage.getItem("storeregset.v1")) }catch(e){}
+  var rc=(v&&v.rc&&typeof v.rc==="object")?v.rc:{};
+  return { tax:(typeof rc.tax==="number"?rc.tax:10),
+           tax2:(typeof rc.tax2==="number"?rc.tax2:8) };
 }
 function sums(){
   var sub=0, cost=0, qty=0;
@@ -849,7 +861,7 @@ $("#payBtn").addEventListener("click",function(){
   var sale={ id:saleId(), at:new Date().toISOString(), day:today(), staff:REG.staff,
     area:guest, guest:guestName(), pay:pay,
     subtotal:s.sub, discount:s.disc, total:s.total, cost:s.cost, qty:s.qty,
-    lines:cart.map(function(l){ return {id:l.id,no:l.no,name:l.name,price:l.price,cost:l.cost,qty:l.qty} }),
+    lines:cart.map(function(l){ return {id:l.id,no:l.no,name:l.name,price:l.price,cost:l.cost,qty:l.qty,tx:l.tx} }),
     note:"", voided:false };
   /* お預かりはレシートに出すためだけのもの。置き場所には送らない（flush の並びに入れていない） */
   if(pay==="cash"&&got) sale.cash=got;
@@ -987,6 +999,18 @@ async function pullItems(){
   if(step==="till"){ renderPad(); renderFound() }
 }
 
+/* 「軽減税率 8%」の印。商品の表ではなく、置き場所の "tax8" に入っている。
+   受け取れなかったときは、この端末に残っている印のまま会計する。 */
+async function pullTax8(){
+  if(!syncOn()) return;
+  var r=null;
+  try{ r=await Sync.metaGet("tax8") }catch(e){ return }
+  if(!Array.isArray(r&&r.v)) return;
+  var set={}; r.v.forEach(function(id){ set[id]=1 });
+  IT.items.forEach(function(x){ if(set[x.id]) x.t8=1; else delete x.t8 });
+  saveItems();
+}
+
 /* ---------- まとめ ---------- */
 var toastEl=null,tt=null;
 function toast(m){
@@ -1002,6 +1026,7 @@ async function refresh(quiet){
   $("#log").textContent="受け取っています…";
   try{
     await pullItems();
+    await pullTax8();
     await pullToday();
     await pullVisit();
     await flush();

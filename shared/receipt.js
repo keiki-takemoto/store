@@ -39,7 +39,8 @@ function cfg(){
     addr:String(rc.addr||""),                               /* 住所・電話。空なら出さない */
     inv :String(rc.inv||""),                                /* 登録番号。入れると消費税の行も出る */
     foot:(rc.foot==null?"ありがとうございました":String(rc.foot)),
-    tax :(typeof rc.tax==="number"?rc.tax:10),              /* 消費税の率（％） */
+    tax :(typeof rc.tax==="number"?rc.tax:10),              /* ふつうの消費税の率（％） */
+    tax2:(typeof rc.tax2==="number"?rc.tax2:8),             /* 軽減税率（飲み物など） */
     w   :(String(rc.w)==="58"?"58":"80")                    /* 紙の幅 mm */
   };
 }
@@ -56,10 +57,46 @@ function when(sale){
     ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
 }
 
+/* ---------- 消費税 ---------- */
+
+/* この1行の消費税の率。会計のときに焼きつけた `tx` を使う。
+   印を付ける前の古い会計には `tx` が無いので、ふつうの率で見る。 */
+function rateOf(l,c){
+  var t=Number(l&&l.tx);
+  return (isFinite(t)&&t>=0) ? t : c.tax;
+}
+/* 軽減税率の行か（レシートに ※ を付ける目印） */
+function isLow(l,c){ return rateOf(l,c)!==c.tax }
+
+/* 税率ごとに、売上・値引き・消費税を出す。
+   値引きは、税率ごとの売上の割合で分ける（端数は最後の率で調整する）。
+   返すのは税率の高い順（10% → 8%）。 */
+function taxBreak(sale,c){
+  var lines=(sale&&sale.lines)||[], by={}, sub=0;
+  lines.forEach(function(l){
+    var r=rateOf(l,c), amt=(Number(l.price)||0)*(Number(l.qty)||0);
+    if(!by[r]) by[r]={rate:Number(r), sub:0};
+    by[r].sub+=amt; sub+=amt;
+  });
+  var keys=Object.keys(by).sort(function(a,b){ return Number(b)-Number(a) });
+  var disc=Math.max(0,Math.min(sub,Number(sale&&sale.discount)||0)), used=0;
+  keys.forEach(function(k,i){
+    var g=by[k];
+    var d=(i===keys.length-1) ? (disc-used)
+        : (sub>0 ? Math.round(disc*g.sub/sub) : 0);
+    g.disc=Math.max(0,Math.min(g.sub,d));
+    used+=g.disc;
+    g.total=g.sub-g.disc;
+    g.tax=Math.floor(g.total*g.rate/(100+g.rate));
+  });
+  return keys.map(function(k){ return by[k] });
+}
+
 /* 1行ぶん。名前が長くても折り返して、数量と金額は下の行の右に出す。 */
-function lineHtml(l){
+function lineHtml(l,c){
   var q=Number(l&&l.qty)||0, p=Number(l&&l.price)||0;
-  return '<div class="rl"><div class="rn">'+esc((l&&l.name)||"")+'</div>'+
+  return '<div class="rl"><div class="rn">'+esc((l&&l.name)||"")+
+    (isLow(l,c)?'<span class="mk">※</span>':"")+'</div>'+
     '<div class="rq"><span>'+q+' × '+yen(p)+'</span><b>'+yen(p*q)+'</b></div></div>';
 }
 function tr(k,v,cls){
@@ -87,17 +124,19 @@ function html(sale,c){
   if(who.length) h+='<div class="meta">'+esc(who.join("　"))+'</div>';
 
   h+='<div class="hr"></div>';
-  h+=lines.length?lines.map(lineHtml).join(""):'<div class="rl"><div class="rn">—</div></div>';
+  h+=lines.length?lines.map(function(l){ return lineHtml(l,c) }).join("")
+                  :'<div class="rl"><div class="rn">—</div></div>';
   h+='<div class="hr"></div>';
 
   if(disc){ h+=tr("小計",yen(sub)); h+=tr("値引き","-"+yen(disc)) }
   h+=tr("合計（"+qty+"点）",yen(tot),"big");
 
-  /* 登録番号を入れているときだけ、税率と内税を出す（適格簡易請求書の形） */
+  /* 登録番号を入れているときだけ、税率ごとの内訳を出す（適格簡易請求書の形） */
   if(c.inv){
-    var t=Math.floor(tot*c.tax/(100+c.tax));
-    h+=tr(c.tax+"%対象",yen(tot));
-    h+=tr("内 消費税",yen(t));
+    taxBreak(sale,c).forEach(function(g){
+      h+=tr(g.rate+"%対象",yen(g.total));
+      h+=tr("　内 消費税",yen(g.tax));
+    });
   }
 
   h+='<div class="hr"></div>';
@@ -109,6 +148,8 @@ function html(sale,c){
   }
 
   h+='<div class="hr"></div>';
+  if(lines.some(function(l){ return isLow(l,c) }))
+    h+='<div class="note">※ は軽減税率（'+c.tax2+'%）対象</div>';
   if(c.foot) h+='<div class="foot">'+esc(c.foot)+'</div>';
   if(sale.id) h+='<div class="no">No. '+esc(sale.id)+'</div>';
   return h;
@@ -151,15 +192,17 @@ function doc(sale,c){
   if(!lines.length) tx("—");
   lines.forEach(function(l){
     var q=Number(l.qty)||0, pr=Number(l.price)||0;
-    tx(String(l.name||""));
+    tx(String(l.name||"")+(isLow(l,c)?" ※":""));
     lr("  "+q+" × "+yen(pr), yen(pr*q));
   });
   rule();
   if(disc){ lr("小計",yen(sub)); lr("値引き","-"+yen(disc)) }
   lr("合計（"+qty+"点）",yen(tot),true,true);
   if(c.inv){
-    lr(c.tax+"%対象",yen(tot));
-    lr("内 消費税",yen(Math.floor(tot*c.tax/(100+c.tax))));
+    taxBreak(sale,c).forEach(function(g){
+      lr(g.rate+"%対象",yen(g.total));
+      lr("  内 消費税",yen(g.tax));
+    });
   }
   rule();
   var pn=payName(sale.pay);
@@ -169,6 +212,7 @@ function doc(sale,c){
     lr("お釣り",yen(sale.cash-tot));
   }
   rule();
+  if(lines.some(function(l){ return isLow(l,c) })) tx("※ は軽減税率（"+c.tax2+"%）対象");
   if(c.foot) ct(c.foot);
   if(sale.id) ct("No. "+sale.id);
   L.push({t:"feed", n:2});
@@ -196,6 +240,8 @@ var CSS=
   '#__rcpt .meta{font-size:9pt}'+
   '#__rcpt .rl{margin:0 0 3px}'+
   '#__rcpt .rn{word-break:break-all}'+
+  '#__rcpt .rn .mk{margin-left:.3em;font-weight:700}'+
+  '#__rcpt .note{font-size:8.5pt;margin:4px 0 0}'+
   '#__rcpt .rq{display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums}'+
   '#__rcpt .rq span{font-size:9pt;padding-left:1em}'+
   '#__rcpt .rt{display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums}'+
@@ -235,9 +281,10 @@ function print(sale){
 /* 設定の見本。実際の会計とは関係ない中身で、紙の出かただけ確かめる。 */
 function sample(){
   return print({ id:"sample", at:new Date().toISOString(), staff:"見本", guest:"日本人", pay:"cash",
-    lines:[{name:"手ぬぐい　藍",price:1200,qty:2},
-           {name:"桐の箸置き（五客組）",price:3800,qty:1}],
-    subtotal:6200, discount:200, total:6000, qty:3, cash:10000 });
+    lines:[{name:"手ぬぐい　藍",price:1200,qty:2,tx:cfg().tax},
+           {name:"桐の箸置き（五客組）",price:3800,qty:1,tx:cfg().tax},
+           {name:"緑茶（ペットボトル）",price:160,qty:2,tx:cfg().tax2}],
+    subtotal:6520, discount:200, total:6320, qty:5, cash:10000 });
 }
 
 window.Receipt={ cfg:cfg, html:html, doc:doc, print:print, sample:sample, inShell:inShell };
