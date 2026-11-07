@@ -1,5 +1,5 @@
 /* オフラインでも開けるようにする。直したら番号を1つ上げること。 */
-const CACHE = "store-v98";
+const CACHE = "store-v99";
 const SHELL = ["./","./index.html","./manifest.webmanifest","./icons/icon-192.png","./icons/icon-512.png",
   "./icons/apple-touch-icon.png","./icons/favicon-32.png",
   "./shift/","./shift/index.html","./shift/setup.html",
@@ -10,6 +10,7 @@ const SHELL = ["./","./index.html","./manifest.webmanifest","./icons/icon-192.pn
   "./order/","./order/index.html",
   "./stock/","./stock/index.html",
   "./visit/","./visit/index.html",
+  "./fix/","./fix/index.html",
   "./cost/","./cost/index.html","./pl/","./pl/index.html",
   "./shared/theme.css","./shared/shift-format.js","./shared/sync.js","./shared/receipt.js","./shared/books.js","./shared/sales.js","./shared/power.js"];
 self.addEventListener("install",(e)=>{e.waitUntil(caches.open(CACHE)

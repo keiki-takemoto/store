@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>商品の押し戻し</title>
+<meta name="theme-color" content="#2BA55F">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* 置き場所の商品が上書きされてしまったときに、この端末に残っているぶんを
+   押し戻すための画面。ふだんは使わない。
+   わざと「開いただけでは何も通信しない」作りにしてある（開いた拍子に
+   受け取ってしまうと、この端末に残っている最後のデータまで消えるため）。 */
+body{margin:0;background:var(--bg,#F2F2F2);color:var(--ink,#1B1B1B);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+  font-size:15px;line-height:1.8}
+.top{background:#2BA55F;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 14px;
+  font-weight:700;font-size:17px}
+main{max-width:560px;margin:0 auto;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 40px)}
+.card{background:var(--surface,#fff);border-radius:14px;padding:16px;margin-bottom:14px;
+  box-shadow:0 1px 3px rgba(0,0,0,.07)}
+h2{font-size:16px;margin:0 0 10px}
+.big{font-size:30px;font-weight:800;font-family:var(--mono,ui-monospace,monospace)}
+.ok{color:#2BA55F} .ng{color:#D9534F} .lbl{color:var(--ink-2,#6B6B6B);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}
+td{padding:4px 0;border-bottom:1px solid var(--line,#E6E6E6)}
+td:last-child{text-align:right;font-family:var(--mono,ui-monospace,monospace)}
+button{font:inherit;font-weight:700;border:none;border-radius:11px;padding:14px 18px;
+  background:#2BA55F;color:#fff;cursor:pointer;width:100%;margin-top:6px}
+button[disabled]{opacity:.45}
+button.ghost{background:var(--surface-2,#EFEFEF);color:var(--ink,#1B1B1B)}
+.note{font-size:13px;color:var(--ink-2,#6B6B6B);margin:10px 0 0}
+.warn{background:#FFF6E5;border-radius:11px;padding:12px 14px;font-size:13.5px;margin-top:10px}
+#log{font-family:var(--mono,ui-monospace,monospace);font-size:12.5px;white-space:pre-wrap;
+  background:var(--surface-2,#EFEFEF);border-radius:10px;padding:12px;margin-top:12px;display:none}
+</style>
+</head>
+<body>
+<div class="top">商品の押し戻し</div>
+<main>
+
+  <div class="card">
+    <h2>この端末に残っている商品</h2>
+    <div id="sum">調べています…</div>
+    <table id="cats"></table>
+    <p class="note">この画面は、<b>開いただけでは何も送りません。</b>
+      下のボタンを押したときだけ、置き場所に送ります。</p>
+  </div>
+
+  <div class="card">
+    <h2>置き場所に押し戻す</h2>
+    <p class="note" style="margin-top:0">上に出ている<b>この端末の商品を、そのまま置き場所に書き込みます。</b>
+      カテゴリーも一緒に戻ります。ほかの端末からは、次に開いたときに見えるようになります。</p>
+    <div class="warn" id="warn" hidden></div>
+    <button id="go" disabled>置き場所に押し戻す</button>
+    <button class="ghost" id="dl" style="margin-top:10px">念のため、この端末の商品をファイルに保存</button>
+    <div id="log"></div>
+  </div>
+
+</main>
+<script src="../shared/sync.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c] })}
+function log(m){ var el=$("#log"); el.style.display="block"; el.textContent+=m+"\n" }
+
+var K_ITEM="storeitems.v1", K_SHIFT="shiftadmin.v1";
+var IT=null;
+try{ IT=JSON.parse(localStorage.getItem(K_ITEM)) }catch(e){}
+if(!IT||!Array.isArray(IT.items)) IT={items:[],cats:[]};
+var live=IT.items.filter(function(x){ return !x.del });
+var withCat=live.filter(function(x){ return x.cat });
+
+/* つなぎ先は設定の画面と同じものを借りる。ここでは何も書き換えない。 */
+function cfg(){ try{ return (JSON.parse(localStorage.getItem(K_SHIFT))||{}).sync||null }catch(e){ return null } }
+var C=cfg();
+if(window.Sync) Sync.configure(C);
+var on=!!(window.Sync&&C&&C.url&&C.anon&&C.key);
+
+/* ---- 何が残っているか出す ---- */
+var by={};
+live.forEach(function(x){ var c=x.cat||"（未分類）"; by[c]=(by[c]||0)+1 });
+var keys=Object.keys(by).sort(function(a,b){ return by[b]-by[a] });
+
+$("#sum").innerHTML=
+  '<div class="big '+(withCat.length?"ok":"ng")+'">'+withCat.length+' 点</div>'+
+  '<div class="lbl">カテゴリーが付いています（商品ぜんぶで '+live.length+' 点）</div>';
+$("#cats").innerHTML=keys.map(function(c){
+  return '<tr><td>'+esc(c)+'</td><td>'+by[c]+'点</td></tr>';
+}).join("");
+
+if(!on){
+  $("#warn").hidden=false;
+  $("#warn").innerHTML="<b>この端末は置き場所につながっていません。</b>"+
+    "設定 → 置き場所 でつないでから、もう一度この画面を開いてください。";
+}else if(!withCat.length){
+  $("#warn").hidden=false;
+  $("#warn").innerHTML="<b>この端末にも、カテゴリーの付いた商品がありません。</b>"+
+    "押し戻しても元には戻りません。別の端末で、この画面を開いてみてください。";
+  $("#go").disabled=false;   /* それでも送りたいときのために、押せるようにはしておく */
+}else{
+  $("#go").disabled=false;
+}
+
+/* ---- ファイルに保存（保険） ---- */
+$("#dl").addEventListener("click",function(){
+  var blob=new Blob([JSON.stringify({v:1,at:new Date().toISOString(),
+    cats:IT.cats||[], items:live},null,1)],{type:"application/json"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="商品のひかえ-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href) },3000);
+});
+
+/* ---- 押し戻す ---- */
+function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
+function chunk(a,n){ var o=[]; for(var i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o }
+
+$("#go").addEventListener("click",async function(){
+  if(!on){ alert("置き場所につながっていません"); return }
+  if(!confirm("この端末の商品 "+live.length+"点を、置き場所に書き込みます。\n\n"+
+              "ほかの端末のぶんは、次に開いたときにこの内容に合わせられます。\nよろしいですか？")) return;
+  var b=this; b.disabled=true; b.textContent="送っています…";
+  var pay=live.map(function(x){
+    return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
+      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:numOf(x.alert),
+      vendor:String(x.vendor||""), vno:String(x.vno||""),
+      par:numOf(x.par), lot:numOf(x.lot), deleted:false};
+  });
+  var parts=chunk(pay,200), first=true, done=0;
+  try{
+    for(var i=0;i<parts.length;i++){
+      await Sync.itemsPut(parts[i], first?(IT.cats||[]):null);
+      first=false; done+=parts[i].length;
+      log("送りました "+done+" / "+pay.length+"点");
+    }
+    b.textContent="押し戻しました";
+    log("\n完了しました。ほかの端末は、開き直すとこの内容になります。");
+    alert("押し戻しました（"+pay.length+"点）。\n\nほかの端末は開き直してください。");
+  }catch(e){
+    b.disabled=false; b.textContent="もう一度ためす";
+    log("\n送れませんでした："+((e&&e.message)||e));
+    alert("送れませんでした："+((e&&e.message)||e));
+  }
+});
+})();
+</script>
+</body>
+</html>
