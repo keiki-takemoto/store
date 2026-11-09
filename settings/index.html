@@ -316,7 +316,12 @@ details.cat .in{padding:2px 12px 10px}
           <input type="file" id="restoreFile" accept="application/json,.json" hidden>
           <button class="btn sm danger" id="wipe">全部消す</button>
         </div>
-        <p class="note">スタッフ・シフト・つなぎ先を書き出します（商品リストは置き場所にあるので入りません）。<br>
+        <p class="note">この端末が持っているものを<b>ぜんぶ</b>書き出します
+          ── スタッフ・シフト・<b>商品</b>・仕入先・レシートの決めごと・つなぎ先。<br>
+          <b>月に一度は取っておくことをおすすめします。</b>
+          取ったファイルは、メールで自分に送るか iCloud Drive に移しておくと、端末が壊れても残ります。<br>
+          <b>読み込む</b>と、この端末の中身が入れ替わります。そのとき
+          「置き場所にも書き戻すか」を聞きます。<b>直すときだけ「OK」</b>にしてください。<br>
           <b>全部消す</b>は、この端末のスタッフ・希望・シフトを消します。取り消せません。</p>
       </div>
       <div class="sec">
@@ -1378,10 +1383,24 @@ function downloadFile(name,text,type){
   var a=document.createElement("a"); a.href=u; a.download=name; a.click();
   setTimeout(function(){ URL.revokeObjectURL(u) },1000);
 }
+/* バックアップは、この端末が持っているものをぜんぶ入れる。
+   もとはスタッフとシフトだけで、商品が入っていなかった。
+   2026-11-07 に商品が消えたとき、戻せるものが無かったのでこうした。 */
+function backupAll(){
+  return {
+    v:2, at:new Date().toISOString(),
+    shift:DB,                                   /* スタッフ・希望・シフト・つなぎ先 */
+    items:{ items:(IT&&IT.items)||[], cats:(IT&&IT.cats)||[] },
+    vendors:{ list:(VEN&&VEN.list)||[] },
+    regset:REGSET||{}                           /* レシートの決めごと・高単価のライン */
+  };
+}
 $("#backup").addEventListener("click",function(){
-  downloadFile("シフト_バックアップ_"+new Date().toISOString().slice(0,10)+".json",
-    JSON.stringify(DB,null,1),"application/json");
-  toast("バックアップを保存しました");
+  var b=backupAll();
+  downloadFile("店舗管理_バックアップ_"+new Date().toISOString().slice(0,10)+".json",
+    JSON.stringify(b,null,1),"application/json");
+  toast("スタッフ "+((b.shift.staff||[]).length)+"人・商品 "+
+    (b.items.items.filter(function(x){ return !x.del }).length)+"点を保存しました");
 });
 $("#restoreBtn").addEventListener("click",function(){ $("#restoreFile").click() });
 $("#restoreFile").addEventListener("change",function(){
@@ -1390,15 +1409,59 @@ $("#restoreFile").addEventListener("change",function(){
   r.onload=function(){
     try{
       var d=JSON.parse(r.result);
-      if(!d||!Array.isArray(d.staff)) throw new Error("形式が違います");
-      if(!confirm("今のデータを、読み込んだ内容で置き換えます。よろしいですか？")) return;
-      DB=d;
+      /* 新しい形（v2、商品も入っている）と、古い形（スタッフだけ）の両方を受ける */
+      var isNew=(d&&d.shift&&Array.isArray(d.shift.staff));
+      var sh=isNew?d.shift:d;
+      if(!sh||!Array.isArray(sh.staff)) throw new Error("形式が違います");
+
+      var nI=(isNew&&d.items&&Array.isArray(d.items.items))
+        ? d.items.items.filter(function(x){ return !x.del }).length : 0;
+      if(!confirm("この端末のデータを、読み込んだ内容で置き換えます。\n\n"+
+        "スタッフ "+sh.staff.length+"人"+(nI?("・商品 "+nI+"点"):"（商品は入っていません）")+
+        "\n\nよろしいですか？")) return;
+
+      DB=sh;
       if(!DB.months) DB.months={};
       if(!DB.closedDow) DB.closedDow=[false,false,false,false,false,false,false];
       if(typeof DB.need!=="number") DB.need=2;
       if(!Array.isArray(DB.hidden)) DB.hidden=[];
       saveShift(DB); if(DB.sync&&window.Sync) Sync.configure(DB.sync);
-      fillCfg(); renderStaff(); renderSyncUI(); renderAnn(); toast("読み込みました");
+
+      var back=false;
+      if(isNew){
+        if(d.items&&Array.isArray(d.items.items)){
+          IT.items=d.items.items;
+          IT.cats=Array.isArray(d.items.cats)?d.items.cats:[];
+          delete IT.pulledAt;                   /* 受け取り直しの目印は捨てる */
+          /* 置き場所にも戻すかどうかは、ここで聞く。
+             聞かずに送ると、見るだけのつもりが置き場所を書き換えてしまう。 */
+          back=confirm("読み込んだ商品を、置き場所にも書き戻しますか？\n\n"+
+            "「OK」… ほかの端末もこの内容になります（壊れたものを直すとき）\n"+
+            "「キャンセル」… この端末だけに入れます");
+          if(back){
+            IT.items.forEach(function(x){ x.d=1 });
+            IT.catsDirty=1; IT.repDirty=1; IT.t8Dirty=1;
+          }else{
+            IT.items.forEach(function(x){ delete x.d });
+            delete IT.catsDirty; delete IT.repDirty; delete IT.t8Dirty;
+          }
+          saveItems(IT);
+        }
+        if(d.vendors&&Array.isArray(d.vendors.list)){
+          VEN.list=d.vendors.list; delete VEN.pulledAt;
+          VEN.list.forEach(function(x){ if(back) x.d=1; else delete x.d });
+          saveVen();
+        }
+        if(d.regset&&typeof d.regset==="object"){
+          REGSET=d.regset;
+          try{ localStorage.setItem(K_REGSET,JSON.stringify(REGSET)) }catch(e){}
+        }
+      }
+
+      fillCfg(); renderStaff(); renderSyncUI(); renderAnn();
+      renderItems(); renderVen(); renderGuests();
+      toast("読み込みました"+(back?"。置き場所にも送ります":""));
+      if(back) queueSync();
     }catch(e){ toast("読み込めませんでした") }
   };
   r.readAsText(f); this.value="";
