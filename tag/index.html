@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>カテゴリー分け</title>
+<meta name="theme-color" content="#2BA55F">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* 商品にカテゴリーを付けていくだけの画面。
+   設定の商品タブは1点ずつ直す作りなので、794点を入れ直すには向かない。
+   ここは「まとめて選んで、まとめて入れる」だけに絞ってある。 */
+*{-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg,#F2F2F2);color:var(--ink,#1B1B1B);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+  font-size:15px;line-height:1.7;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 150px)}
+a{color:inherit}
+.top{position:sticky;top:0;z-index:20;background:#2BA55F;color:#fff;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 12px;
+  display:flex;align-items:center;gap:12px}
+.top a{text-decoration:none;font-weight:700;font-size:15px;opacity:.95}
+.top b{font-size:17px;flex:1}
+main{max-width:860px;margin:0 auto;padding:14px 14px 0}
+.card{background:var(--surface,#fff);border-radius:14px;padding:14px;margin-bottom:12px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.note{font-size:12.5px;color:var(--ink-2,#6B6B6B);line-height:1.8;margin:9px 0 0}
+.warn{background:#FFF6E5;border-radius:11px;padding:11px 13px;font-size:13px;margin-top:10px}
+
+/* のこり */
+.prog{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.prog .big{font-size:30px;font-weight:800;font-family:var(--mono,ui-monospace,monospace);
+  color:#2BA55F;line-height:1.2}
+.prog .sub{font-size:13px;color:var(--ink-2,#6B6B6B)}
+.bar{height:9px;border-radius:99px;background:var(--surface-2,#EFEFEF);margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;background:#2BA55F;border-radius:99px;transition:width .25s}
+
+/* しぼりこみ */
+.tools{display:flex;flex-direction:column;gap:10px}
+input[type=search]{width:100%;box-sizing:border-box;font-size:16px;color:var(--ink,#1B1B1B);
+  background:var(--surface,#fff);border:1px solid var(--line,#E6E6E6);border-radius:11px;
+  padding:12px 13px;-webkit-appearance:none}
+.segs{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.seg{flex:0 0 auto;font:inherit;font-size:13.5px;font-weight:700;border:1px solid var(--line,#E6E6E6);
+  background:var(--surface,#fff);color:var(--ink-2,#6B6B6B);border-radius:99px;
+  padding:8px 14px;cursor:pointer;white-space:nowrap}
+.seg[aria-pressed=true]{background:#2BA55F;border-color:#2BA55F;color:#fff}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:inherit;font-size:13.5px;font-weight:700;border:1px solid var(--line,#E6E6E6);
+  background:var(--surface,#fff);color:var(--ink,#1B1B1B);border-radius:11px;
+  padding:10px 14px;cursor:pointer}
+.btn.green{background:#2BA55F;border-color:#2BA55F;color:#fff}
+.btn[disabled]{opacity:.4}
+
+/* 商品 */
+.list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.it{text-align:left;font:inherit;border:1.5px solid var(--line,#E6E6E6);background:var(--surface,#fff);
+  color:var(--ink,#1B1B1B);border-radius:12px;padding:10px 11px;cursor:pointer;
+  display:flex;flex-direction:column;gap:3px;min-height:58px;overflow:hidden}
+.it .n{font-size:14px;font-weight:700;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.it .m{font-size:11px;color:var(--ink-3,#9A9A9A);font-family:var(--mono,ui-monospace,monospace)}
+.it .c{font-size:11px;color:#2BA55F;font-weight:700}
+.it{position:relative}
+.it[aria-pressed=true]{border-color:#2BA55F;background:#E9F6EE}
+/* 選んだ印。色だけだと、明るいところでは分かりにくい */
+.it[aria-pressed=true]::after{content:"";position:absolute;top:7px;right:8px;
+  width:17px;height:17px;border-radius:50%;background:#2BA55F;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path d='M3.6 8.4l2.6 2.6 6-6' fill='none' stroke='white' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-size:15px 15px;background-position:center;background-repeat:no-repeat}
+.it[aria-pressed=true] .n{padding-right:20px}
+.empty{color:var(--ink-2,#6B6B6B);font-size:13.5px;padding:14px 2px}
+
+/* 下の帯 */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:var(--surface,#fff);border-top:1px solid var(--line,#E6E6E6);
+  box-shadow:0 -3px 14px rgba(0,0,0,.08);
+  padding:11px 14px calc(env(safe-area-inset-bottom,0px) + 11px);
+  transform:translateY(105%);transition:transform .18s}
+.dock.on{transform:none}
+.dock .hd{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.dock .hd b{font-size:15px;flex:1}
+.cats{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.cats button{flex:0 0 auto;font:inherit;font-size:14px;font-weight:700;border:none;
+  background:#2BA55F;color:#fff;border-radius:11px;padding:11px 16px;cursor:pointer;white-space:nowrap}
+.cats button.off{background:var(--surface-2,#EFEFEF);color:var(--ink,#1B1B1B)}
+#toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 168px);
+  transform:translateX(-50%) translateY(10px);background:rgba(27,27,27,.94);color:#fff;
+  font-size:13.5px;padding:10px 16px;border-radius:11px;opacity:0;pointer-events:none;
+  transition:.2s;z-index:40;max-width:86vw;text-align:center}
+#toast.on{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<div class="top"><a href="../settings/">← もどる</a><b>カテゴリー分け</b>
+  <span id="sstate" style="font-size:12px;opacity:.9"></span></div>
+<main>
+
+  <div class="card">
+    <div class="prog">
+      <span class="big" id="left">—</span>
+      <span class="sub" id="leftSub">調べています…</span>
+    </div>
+    <div class="bar"><i id="barFill" style="width:0"></i></div>
+    <div class="warn" id="warn" hidden></div>
+  </div>
+
+  <div class="card">
+    <div class="tools">
+      <input type="search" id="q" placeholder="商品名・Noで探す" autocomplete="off" enterkeyhint="search">
+      <div class="segs" id="segs"></div>
+      <div class="row">
+        <button class="btn" id="selAll">出ているものをぜんぶ選ぶ</button>
+        <button class="btn" id="selLike" hidden></button>
+        <button class="btn" id="selNone" hidden>選びなおす</button>
+        <button class="btn" id="undo" hidden>もとに戻す</button>
+      </div>
+    </div>
+    <p class="note">商品を押すと選べます。<b>いくつでも選べます。</b>
+      下に出る帯でカテゴリーを押すと、選んだものがまとめて入ります。<br>
+      入れたものは<b>置き場所にも送られます</b>（つないでいるとき）。</p>
+  </div>
+
+  <div class="card">
+    <div class="list" id="list"></div>
+    <div class="empty" id="empty" hidden></div>
+  </div>
+
+</main>
+
+<div class="dock" id="dock">
+  <div class="hd"><b id="dockN">0点を選んでいます</b>
+    <button class="btn" id="clear">やめる</button></div>
+  <div class="cats" id="cats"></div>
+</div>
+<div id="toast"></div>
+
+<script src="../shared/sync.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s){ return document.querySelector(s) };
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c] }) }
+var toastT=null;
+function toast(m){
+  var el=$("#toast"); el.textContent=m; el.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(function(){ el.classList.remove("on") },2200);
+}
+
+/* ---------- データ ---------- */
+var K_ITEM="storeitems.v1", K_SHIFT="shiftadmin.v1";
+var IT=null;
+try{ IT=JSON.parse(localStorage.getItem(K_ITEM)) }catch(e){}
+if(!IT||!Array.isArray(IT.items)) IT={items:[],cats:[]};
+if(!Array.isArray(IT.cats)) IT.cats=[];
+function saveItems(){ try{ localStorage.setItem(K_ITEM,JSON.stringify(IT)) }catch(e){ toast("保存できませんでした") } }
+function live(){ return IT.items.filter(function(x){ return !x.del }) }
+
+/* つなぎ先は設定のものを借りる。ここでは書き換えない。 */
+var C=null;
+try{ C=(JSON.parse(localStorage.getItem(K_SHIFT))||{}).sync||null }catch(e){}
+if(window.Sync) Sync.configure(C);
+var on=!!(window.Sync&&C&&C.url&&C.anon&&C.key);
+
+/* ---------- 置き場所とのやりとり ---------- */
+/* 設定の画面と同じ決まりで受け取る。この端末で直したもの（d）は上書きしない。 */
+function pullItems(){
+  return Sync.itemsGet(IT.pulledAt||null).then(function(r){
+    var byId={}; IT.items.forEach(function(x){ byId[x.id]=x });
+    (r.items||[]).forEach(function(sr){
+      var cur=byId[sr.id];
+      if(cur&&cur.d) return;
+      if(sr.deleted){ if(cur) cur.del=1; return }
+      var it=cur||{id:sr.id};
+      it.name=String(sr.name||"");
+      if(sr.no) it.no=String(sr.no); else delete it.no;
+      if(sr.cat) it.cat=String(sr.cat); else delete it.cat;
+      if(sr.vendor) it.vendor=String(sr.vendor); else delete it.vendor;
+      if(sr.vno) it.vno=String(sr.vno); else delete it.vno;
+      ["price","cost","stock","alert","par","lot"].forEach(function(f){
+        if(typeof sr[f]==="number") it[f]=sr[f]; else delete it[f];
+      });
+      if(!cur){ IT.items.push(it); byId[sr.id]=it }
+    });
+    IT.items=IT.items.filter(function(x){ return !(x.del&&!x.d) });
+    if(Array.isArray(r.cats)&&!IT.catsDirty) IT.cats=r.cats.slice();
+    if(r.now) IT.pulledAt=r.now;
+    saveItems();
+  });
+}
+function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
+function chunk(a,n){ var o=[]; for(var i=0;i<a.length;i+=n) o.push(a.slice(i,i+n)); return o }
+var pushT=null, pushing=false;
+function queuePush(ms){
+  if(!on) return;
+  clearTimeout(pushT);
+  pushT=setTimeout(pushDirty,ms||1500);      /* 続けて押している間は送らない */
+}
+function pushDirty(){
+  if(!on||pushing) return Promise.resolve();
+  var dirty=IT.items.filter(function(x){ return x.d });
+  var cats=IT.catsDirty?(IT.cats||[]):null;
+  if(!dirty.length&&!cats) return Promise.resolve();
+  pushing=true; state("送っています…");
+  var pay=dirty.map(function(x){
+    return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
+      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:numOf(x.alert),
+      vendor:String(x.vendor||""), vno:String(x.vno||""),
+      par:numOf(x.par), lot:numOf(x.lot), deleted:!!x.del};
+  });
+  var parts=pay.length?chunk(pay,200):[[]], p=Promise.resolve(), first=true;
+  parts.forEach(function(part){
+    p=p.then(function(){ var c=first?cats:null; first=false; return Sync.itemsPut(part,c) });
+  });
+  return p.then(function(){
+    dirty.forEach(function(x){ delete x.d });
+    delete IT.catsDirty; saveItems();
+    pushing=false; state("送りました");
+  }).catch(function(e){
+    pushing=false; state("あとで送ります");
+    /* 失敗しても印（d）は消さない。少し待ってから送り直す。
+       すぐ送り直すと、電波の無いところで延々と叩き続けることになる。 */
+    queuePush(20000);
+  });
+}
+function state(t){ $("#sstate").textContent=t }
+
+/* ---------- 画面 ---------- */
+var view="none";        /* "none"=未分類 / "all"=ぜんぶ / それ以外はカテゴリー名 */
+var sel={}, selN=0;
+var undoList=null;
+
+function catCount(){
+  var by={none:0,all:0};
+  live().forEach(function(x){
+    by.all++;
+    if(x.cat) by[x.cat]=(by[x.cat]||0)+1; else by.none++;
+  });
+  return by;
+}
+function shown(){
+  var q=$("#q").value.trim().toLowerCase();
+  var L=live().filter(function(x){
+    if(view==="none"){ if(x.cat) return false }
+    else if(view!=="all"){ if(x.cat!==view) return false }
+    if(!q) return true;
+    return String(x.name||"").toLowerCase().indexOf(q)>=0 ||
+           String(x.no||"").toLowerCase().indexOf(q)>=0;
+  });
+  /* 名前の順に並べる。似た名前がとなり合うので、まとめて選びやすい */
+  L.sort(function(a,b){ return String(a.name||"").localeCompare(String(b.name||""),"ja") });
+  return L;
+}
+function renderProg(){
+  var by=catCount(), done=by.all-by.none;
+  $("#left").textContent=by.none+"点";
+  $("#leftSub").textContent="まだカテゴリーがありません（ぜんぶで "+by.all+"点）";
+  $("#barFill").style.width=(by.all?Math.round(done/by.all*100):0)+"%";
+  if(!by.none&&by.all){
+    $("#left").textContent="ぜんぶ入りました";
+    $("#leftSub").textContent=by.all+"点すべてにカテゴリーが付いています";
+  }
+}
+function renderSegs(){
+  var by=catCount();
+  var segs=[{k:"none",t:"まだ入れていない "+by.none},{k:"all",t:"ぜんぶ "+by.all}];
+  IT.cats.forEach(function(c){ segs.push({k:c,t:c+" "+(by[c]||0)}) });
+  $("#segs").innerHTML=segs.map(function(s){
+    return '<button class="seg" data-v="'+esc(s.k)+'" aria-pressed="'+(view===s.k)+'">'+esc(s.t)+'</button>';
+  }).join("");
+}
+function renderList(){
+  var L=shown();
+  $("#list").innerHTML=L.map(function(x){
+    return '<button class="it" data-id="'+esc(x.id)+'" aria-pressed="'+(!!sel[x.id])+'">'+
+      '<span class="n">'+esc(x.name||"（名前なし）")+'</span>'+
+      (x.no?'<span class="m">No '+esc(x.no)+'</span>':'')+
+      (x.cat?'<span class="c">'+esc(x.cat)+'</span>':'')+
+      '</button>';
+  }).join("");
+  $("#empty").hidden=!!L.length;
+  if(!L.length){
+    $("#empty").textContent = $("#q").value.trim()
+      ? "見つかりませんでした。別の言葉で探してみてください。"
+      : (view==="none" ? "この端末では、すべての商品にカテゴリーが付いています。"
+                       : "ここには商品がありません。");
+  }
+  $("#selAll").disabled=!L.length;
+  $("#selAll").textContent="出ている "+L.length+"点をぜんぶ選ぶ";
+}
+function renderDock(){
+  $("#dock").classList.toggle("on",selN>0);
+  $("#dockN").textContent=selN+"点を選んでいます";
+  $("#selNone").hidden=!selN;
+  $("#cats").innerHTML=IT.cats.map(function(c){
+    return '<button data-c="'+esc(c)+'">'+esc(c)+'</button>';
+  }).join("")+
+    '<button class="off" data-c="__new__">＋ 新しいカテゴリー</button>'+
+    (view==="none"?"":'<button class="off" data-c="__clear__">カテゴリーを外す</button>');
+  /* ひとつだけ選んでいるときは、名前の似たものもまとめて選べるようにする */
+  var b=$("#selLike");
+  if(selN===1){
+    var id=Object.keys(sel)[0];
+    var me=live().filter(function(x){ return x.id===id })[0];
+    var n=me?likeOf(me).length:0;
+    if(n>1){ b.hidden=false; b.textContent="名前が似たものも選ぶ（"+n+"点）"; }
+    else b.hidden=true;
+  }else b.hidden=true;
+}
+function likeOf(me){
+  var head=String(me.name||"").slice(0,2);
+  if(head.length<2) return [me];
+  return shown().filter(function(x){ return String(x.name||"").slice(0,2)===head });
+}
+function render(){ renderProg(); renderSegs(); renderList(); renderDock() }
+
+/* ---------- 操作 ---------- */
+function setSel(ids,on_){
+  ids.forEach(function(id){
+    if(on_){ if(!sel[id]){ sel[id]=1; selN++ } }
+    else{ if(sel[id]){ delete sel[id]; selN-- } }
+  });
+}
+function clearSel(){ sel={}; selN=0 }
+
+$("#list").addEventListener("click",function(e){
+  var b=e.target.closest(".it"); if(!b) return;
+  var id=b.getAttribute("data-id");
+  setSel([id],!sel[id]);
+  b.setAttribute("aria-pressed",String(!!sel[id]));
+  renderDock();
+});
+$("#segs").addEventListener("click",function(e){
+  var b=e.target.closest(".seg"); if(!b) return;
+  view=b.getAttribute("data-v"); clearSel(); render();
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+$("#q").addEventListener("input",function(){ renderList(); renderDock() });
+$("#selAll").addEventListener("click",function(){
+  setSel(shown().map(function(x){ return x.id }),true);
+  renderList(); renderDock();
+});
+$("#selNone").addEventListener("click",function(){ clearSel(); renderList(); renderDock() });
+$("#clear").addEventListener("click",function(){ clearSel(); renderList(); renderDock() });
+$("#selLike").addEventListener("click",function(){
+  var id=Object.keys(sel)[0];
+  var me=live().filter(function(x){ return x.id===id })[0];
+  if(!me) return;
+  setSel(likeOf(me).map(function(x){ return x.id }),true);
+  renderList(); renderDock();
+});
+
+function apply(cat){
+  var ids=Object.keys(sel); if(!ids.length) return;
+  var back=[];
+  live().forEach(function(x){
+    if(!sel[x.id]) return;
+    back.push({id:x.id,cat:x.cat||""});
+    if(cat) x.cat=cat; else delete x.cat;
+    x.d=1;
+  });
+  undoList=back;
+  saveItems(); queuePush();
+  var n=ids.length;
+  /* 探した言葉は消す。入れ終わったものは一覧から居なくなるので、
+     言葉が残っていると「見つかりませんでした」に見えてしまう。 */
+  $("#q").value="";
+  clearSel(); render();
+  $("#undo").hidden=false;
+  toast(n+"点を"+(cat?("「"+cat+"」に入れました"):"カテゴリーから外しました"));
+}
+$("#cats").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-c]"); if(!b) return;
+  var c=b.getAttribute("data-c");
+  if(c==="__clear__"){ apply(""); return }
+  if(c==="__new__"){
+    var name=prompt("新しいカテゴリーの名前");
+    name=String(name==null?"":name).trim();
+    if(!name) return;
+    if(IT.cats.indexOf(name)<0){ IT.cats.push(name); IT.catsDirty=1 }
+    apply(name);
+    return;
+  }
+  apply(c);
+});
+$("#undo").addEventListener("click",function(){
+  if(!undoList) return;
+  var byId={}; live().forEach(function(x){ byId[x.id]=x });
+  undoList.forEach(function(u){
+    var x=byId[u.id]; if(!x) return;
+    if(u.cat) x.cat=u.cat; else delete x.cat;
+    x.d=1;
+  });
+  undoList=null; $("#undo").hidden=true;
+  saveItems(); queuePush(); clearSel(); render();
+  toast("もとに戻しました");
+});
+
+/* 送りきらないうちに閉じられたとき用。次に開いたときにも送れる */
+window.addEventListener("pagehide",function(){ if(on) pushDirty() });
+
+/* ---------- はじめ ---------- */
+render();
+if(!on){
+  $("#warn").hidden=false;
+  $("#warn").innerHTML="<b>置き場所につながっていません。</b>"+
+    "入れたカテゴリーは、この端末にだけ残ります。"+
+    "設定 → 置き場所 でつないでから使うと、ほかの端末にも届きます。";
+  state("この端末だけ");
+}else{
+  state("受け取っています…");
+  pullItems().then(function(){
+    state(""); render();
+    return pushDirty();                      /* 前に送りきれなかったぶんがあれば送る */
+  }).catch(function(){
+    state("受け取れませんでした");
+    $("#warn").hidden=false;
+    $("#warn").innerHTML="<b>置き場所から受け取れませんでした。</b>"+
+      "この端末に残っているぶんを出しています。電波のよいところで開き直してください。";
+  });
+}
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+})();
+</script>
+</body>
+</html>

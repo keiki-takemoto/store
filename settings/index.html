@@ -242,6 +242,11 @@ details.cat .in{padding:2px 12px 10px}
     <div class="card">
       <div class="card-h"><h2>カテゴリーと商品</h2><span class="hint" id="itemCount"></span></div>
       <div class="sec">
+        <!-- まとめて入れる画面。ここは1点ずつ直す作りなので、たくさん入れ直すときは向かない -->
+        <div class="row" style="margin-bottom:12px">
+          <a class="btn sm primary" href="../tag/">まとめてカテゴリー分け</a>
+          <span class="lbl" id="tagLeft"></span>
+        </div>
         <div class="addbox" style="margin-top:0">
           <input type="text" id="nCatName" placeholder="新しいカテゴリーの名前（例）和雑貨" autocomplete="off" enterkeyhint="done">
           <button class="btn sm primary" id="addCatBtn">追加</button>
@@ -805,6 +810,9 @@ function renderItems(){
     (n?(IT.cats.length?" ・ ":"")+n+"点":"")+
     (low?" ・ 在庫少 "+low:"");
   $("#itemEmpty").hidden=!!n;
+  /* まだカテゴリーの付いていない数。入れ直しの途中が分かるように出す */
+  var noCat=all.filter(function(x){ return !x.cat }).length;
+  $("#tagLeft").textContent = n ? (noCat ? ("まだ "+noCat+"点 入っていません") : "ぜんぶ入っています") : "";
 
   var f=$("#catFilter").value, q=$("#q").value.trim().toLowerCase();
   var narrow=!!(q||f);                       /* 探しているとき。見つかったところを開いて出す */
