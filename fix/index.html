@@ -36,6 +36,9 @@ button.ghost{background:var(--surface-2,#EFEFEF);color:var(--ink,#1B1B1B)}
 </style>
 </head>
 <body>
+<!-- 設定から入る店長用の画面。暗証番号をかけていれば、入るまで中を見せない。 -->
+<script src="../shared/lock.js"></script>
+<script>if(window.Lock) Lock.guard();</script>
 <div class="top">商品の押し戻し</div>
 <main>
 

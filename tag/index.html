@@ -92,6 +92,9 @@ input[type=search]{width:100%;box-sizing:border-box;font-size:16px;color:var(--i
 </style>
 </head>
 <body>
+<!-- 設定から入る店長用の画面。暗証番号をかけていれば、入るまで中を見せない。 -->
+<script src="../shared/lock.js"></script>
+<script>if(window.Lock) Lock.guard();</script>
 <div class="top"><a href="../settings/">← もどる</a><b>カテゴリー分け</b>
   <span id="sstate" style="font-size:12px;opacity:.9"></span></div>
 <main>

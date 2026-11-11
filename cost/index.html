@@ -116,6 +116,10 @@ table.sum tr.tot td{font-weight:700;border-bottom:none}
 </style>
 </head>
 <body>
+<!-- 店長用の画面。暗証番号をかけていれば、入るまで中を見せない。
+     （設定 → かぎ で付け外しできる。かけていなければ素通り） -->
+<script src="../shared/lock.js"></script>
+<script>if(window.Lock) Lock.guard();</script>
 <a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
 <header class="top"><div class="top-in"><div class="tabs">
   <button class="tab" data-v="exp" aria-selected="true">変動費</button>

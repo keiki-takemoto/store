@@ -161,6 +161,10 @@ details.cat .in{padding:2px 12px 10px}
 </style>
 </head>
 <body>
+<!-- 店長用の画面。暗証番号をかけていれば、入るまで中を見せない。
+     （設定 → かぎ で付け外しできる。かけていなければ素通り） -->
+<script src="../shared/lock.js"></script>
+<script>if(window.Lock) Lock.guard();</script>
 <a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
 <header class="top"><div class="top-in"><div class="tabs">
   <button class="tab" data-v="staff" aria-selected="true">スタッフ</button>
@@ -355,6 +359,31 @@ details.cat .in{padding:2px 12px 10px}
           <b>ホーム画面に追加してもらうときは、必ずこのURLから開いた画面で追加してもらってください。</b>
           検索やブックマークから開いた画面で追加すると、店長とつながっていない状態になり、送れなくなります。
           そうなった場合も、スタッフの画面に出る「リンクを貼ってつなぐ」からこのURLを貼れば直ります。</p>
+      </div>
+
+      <div class="sec">
+        <h3>かぎ</h3>
+        <div id="lkState" class="lbl" style="display:block;margin-bottom:10px"></div>
+        <div class="connfld" id="lkForm" hidden>
+          <div class="two">
+            <div><div class="lbl">暗証番号（4〜8桁の数字）</div>
+              <input type="password" id="lkA" inputmode="numeric" autocomplete="off" maxlength="8"></div>
+            <div><div class="lbl">もう一度</div>
+              <input type="password" id="lkB" inputmode="numeric" autocomplete="off" maxlength="8"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:11px">
+          <button class="btn sm" id="lkOn">暗証番号をつける</button>
+          <button class="btn sm ghost" id="lkOff" hidden>かぎを外す</button>
+          <span class="lbl" id="lkMsg"></span>
+        </div>
+        <p class="note"><b>レジ</b>と<b>集計</b>は、だれでも使えるままです。
+          それ以外（分析・経費・収支表・在庫・シフト・ご意見箱・発注・この設定）に、かぎがかかります。<br>
+          <b>アプリを閉じると、また鍵がかかります。</b>10分さわらなかったときも同じです。<br>
+          集計の<b>粗利</b>は、かぎがかかっているあいだ出ません（仕入れ値が分かってしまうため）。<br>
+          番号を忘れたときは、かぎの画面の<b>「番号を忘れた」</b>から
+          <b>管理用キー</b>で開けられます。締め出されることはありません。<br>
+          これは<b>覗き見を止めるためのもの</b>です。本気で中を調べる人は止められません。</p>
       </div>
 
       <div class="sec">
@@ -1501,6 +1530,42 @@ $("#copyRemind").addEventListener("click",function(){
     "月のシフト希望がまだ届いていません。\nこちらからお願いします。\n"+joinUrl(),
     yet.length+"人ぶんの催促文をコピーしました");
 });
+
+/* ---------- かぎ ---------- */
+/* 店のiPadはカウンターに置きっぱなしになるので、店長用の画面に蓋をする。
+   くわしくは shared/lock.js。ここは付け外しだけ。 */
+function renderLock(){
+  if(!window.Lock) return;
+  var on=Lock.has();
+  $("#lkState").innerHTML = on
+    ? "いま <b>かぎがかかっています</b>（この端末）"
+    : "いま <b>かぎはかかっていません</b>。だれでも全部の画面に入れます。";
+  $("#lkOn").textContent = on ? "番号を変える" : "暗証番号をつける";
+  $("#lkOff").hidden=!on;
+}
+function lkShowForm(){
+  $("#lkForm").hidden=false;
+  $("#lkA").value=""; $("#lkB").value="";
+  $("#lkA").focus();
+}
+$("#lkOn").addEventListener("click",async function(){
+  if($("#lkForm").hidden){ lkShowForm(); $("#lkMsg").textContent="新しい番号を2回入れて、もう一度押してください"; return }
+  var a=$("#lkA").value.trim(), b=$("#lkB").value.trim();
+  if(!/^[0-9]{4,8}$/.test(a)){ $("#lkMsg").textContent="4〜8桁の数字にしてください"; return }
+  if(a!==b){ $("#lkMsg").textContent="2つが合っていません"; return }
+  try{
+    await Lock.set(a);
+    $("#lkForm").hidden=true; $("#lkA").value=""; $("#lkB").value="";
+    $("#lkMsg").textContent="つけました";
+    renderLock(); toast("かぎをつけました");
+  }catch(e){ $("#lkMsg").textContent=(e&&e.message)||"つけられませんでした" }
+});
+$("#lkOff").addEventListener("click",function(){
+  if(!confirm("かぎを外します。\n\nこの端末では、だれでも売上・お給料・仕入れ値・時給が見られるようになります。\n\nよろしいですか？")) return;
+  Lock.clear(); $("#lkForm").hidden=true; $("#lkMsg").textContent="外しました";
+  renderLock(); toast("かぎを外しました");
+});
+renderLock();
 
 /* データ */
 function downloadFile(name,text,type){

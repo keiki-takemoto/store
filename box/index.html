@@ -64,6 +64,10 @@ textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 </style>
 </head>
 <body>
+<!-- 店長用の画面。暗証番号をかけていれば、入るまで中を見せない。
+     （設定 → かぎ で付け外しできる。かけていなければ素通り） -->
+<script src="../shared/lock.js"></script>
+<script>if(window.Lock) Lock.guard();</script>
 <a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
 
 <main>

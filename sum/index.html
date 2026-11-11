@@ -168,7 +168,7 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
         <p class="note">日にちを押すと、その日の<b>担当ごとの売上</b>と<b>会計の一覧</b>が開きます。<br>
           打ち間違えた会計は、そこから中身を開いて<b>取り消す</b>を押してください。
           売上から外れ、在庫も戻ります（在庫を入れている商品だけ）。<br>
-          金額はすべて<b>税込</b>です。<b>粗利</b>は 売上 − 仕入れ値 で出しています（人件費や経費は含みません）。</p>
+          金額はすべて<b>税込</b>です。<span class="cnote"><b>粗利</b>は 売上 − 仕入れ値 で出しています（人件費や経費は含みません）。</span></p>
       </div></div>
     </section>
 
@@ -177,7 +177,7 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
       <div class="card"><div class="sec">
         <h3>商品ごと<span class="lbl" style="margin-left:8px" id="itemN"></span></h3>
         <div id="byItem"></div>
-        <p class="note">売れた数の多い順です。<b>金額</b>は売価×数（値引き前）、<b>粗利</b>は 金額 − 仕入れ値。</p>
+        <p class="note">売れた数の多い順です。<b>金額</b>は売価×数（値引き前）<span class="cnote">、<b>粗利</b>は 金額 − 仕入れ値</span>。</p>
       </div></div>
     </section>
 
@@ -186,12 +186,23 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
 
 <script src="../shared/sync.js"></script>
 <script src="../shared/sales.js"></script>
+<script src="../shared/lock.js"></script>
 <script>
 (function(){
 "use strict";
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function yen(n){ return "¥"+Math.round(Number(n)||0).toLocaleString("ja-JP") }
+/* 集計は「みんなが見られるところ」に置いてある（竹本さんの指示）。
+   ただし粗利は 売上 − 仕入れ値 なので、出すと仕入れ値が分かってしまう。
+   かぎがかかっているあいだは、粗利だけ隠す。 */
+function hideCost(){ return !!(window.Lock && Lock.has() && !Lock.open()) }
+function applyCostVis(){
+  var hc=hideCost();
+  [].forEach.call(document.querySelectorAll(".cnote"),function(el){ el.hidden=hc });
+}
+/* 売上がまだ無い日は render() が走らないので、ここでも一度あてる */
+applyCostVis();
 function pad2(n){ return ("0"+n).slice(-2) }
 var DOW=["日","月","火","水","木","金","土"];
 function payName(k){ return (window.Sync&&Sync.payName(k))||"現金" }
@@ -348,6 +359,7 @@ function chart(bs){
 
 /* ---------- 描く ---------- */
 function render(){
+  applyCostVis();
   $("#noneCard").hidden=true;
   $("#body").hidden=false;
 
@@ -371,14 +383,15 @@ function render(){
     });
   });
   var items=io.map(function(k){ return im[k] }).sort(function(a,b){ return b.qty-a.qty||b.amt-a.amt });
+  var hc=hideCost();
   $("#itemN").textContent=items.length?items.length+"種類":"";
   $("#byItem").innerHTML=items.length
     ? '<table><thead><tr><th>No</th><th>商品</th><th class="n">数</th><th class="n">金額</th>'+
-      '<th class="n">粗利</th></tr></thead><tbody>'+
+      (hc?"":'<th class="n">粗利</th>')+'</tr></thead><tbody>'+
       items.map(function(x){
         return '<tr><td class="d" style="color:var(--ink-3)">'+esc(x.no||"-")+'</td>'+
           '<td>'+esc(x.name)+'</td><td class="n">'+x.qty+'</td><td class="n">'+yen(x.amt)+'</td>'+
-          '<td class="n">'+yen(x.amt-x.cost)+'</td></tr>';
+          (hc?"":'<td class="n">'+yen(x.amt-x.cost)+'</td>')+'</tr>';
       }).join("")+'</tbody></table>'
     : '<span class="lbl">ありません</span>';
 
@@ -434,7 +447,7 @@ function dayBox(b){
   var st=group(day,function(s){ return s.staff },"（担当なし）");
   return '<div class="daybox">'+
     '<div class="chips">'+
-      '<span>粗利<b>'+yen(b.amt-b.cost)+'</b></span>'+
+      (hideCost()?"":'<span>粗利<b>'+yen(b.amt-b.cost)+'</b></span>')+
       '<span>点数<b>'+b.qty+'点</b></span>'+
       (disc?'<span>値引き<b>−'+yen(disc)+'</b></span>':"")+
     '</div>'+

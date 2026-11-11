@@ -1,5 +1,5 @@
 /* オフラインでも開けるようにする。直したら番号を1つ上げること。 */
-const CACHE = "store-v104";
+const CACHE = "store-v105";
 const SHELL = ["./","./index.html","./manifest.webmanifest","./icons/icon-192.png","./icons/icon-512.png",
   "./icons/apple-touch-icon.png","./icons/favicon-32.png",
   "./shift/","./shift/index.html","./shift/setup.html",
@@ -13,7 +13,7 @@ const SHELL = ["./","./index.html","./manifest.webmanifest","./icons/icon-192.pn
   "./fix/","./fix/index.html",
   "./tag/","./tag/index.html",
   "./cost/","./cost/index.html","./pl/","./pl/index.html",
-  "./shared/theme.css","./shared/shift-format.js","./shared/sync.js","./shared/receipt.js","./shared/books.js","./shared/sales.js","./shared/power.js"];
+  "./shared/theme.css","./shared/shift-format.js","./shared/sync.js","./shared/lock.js","./shared/receipt.js","./shared/books.js","./shared/sales.js","./shared/power.js"];
 self.addEventListener("install",(e)=>{e.waitUntil(caches.open(CACHE)
   .then((c)=>Promise.all(SHELL.map((u)=>c.add(u).catch(()=>null)))).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",(e)=>{e.waitUntil(caches.keys()
