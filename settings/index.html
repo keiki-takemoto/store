@@ -157,7 +157,6 @@ details.cat .in{padding:2px 12px 10px}
   font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);
   border-radius:9px;padding:8px 10px;line-height:1.7}
 .syncbar #syncState{flex:1;min-width:150px}
-#impInfo{margin-left:0}
 </style>
 </head>
 <body>
@@ -275,19 +274,6 @@ details.cat .in{padding:2px 12px 10px}
           <a href="../analyze/">分析</a>の<b>週次決算</b>は、
           <b>歴博委託商品</b>という名前のカテゴリーを見ています。
           歴博からお預かりしている商品は、この名前のカテゴリーに入れてください。</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-h"><h2>原価表の読み込み</h2></div>
-      <div class="sec">
-        <div class="row" style="gap:9px;flex-wrap:wrap;align-items:center">
-          <button class="btn sm" id="impBtn">原価表を読み込む</button>
-          <span class="sum" id="impInfo"></span>
-        </div>
-        <p class="note">お店の原価表（<b>794点</b>）をこの画面に入れ直します。<br>
-          同じ商品があれば<b>商品No・商品名・売価・仕入れ値</b>を原価表の内容に合わせます。<b>カテゴリーと在庫の数はそのまま残ります。</b><br>
-          原価表に無い商品が消えることはありません。売価と仕入れ値はどちらも<b>税込</b>です。</p>
       </div>
     </div>
   </section>
@@ -1316,66 +1302,12 @@ function queueSync(){
 }
 $("#syncNow").addEventListener("click",function(){ syncMsg=""; syncNow(false) });
 
-/* ---- 原価表（items.json）の読み込み ---- */
-/* 商品は数が多くて手で入れるのが大変なので、お店の原価表を
-   そのままファイルに書き出してアプリから読む形にしてある。 */
-function loadSeed(){
-  return fetch("./items.json",{cache:"no-store"}).then(function(r){
-    if(!r.ok) throw new Error("ng");
-    return r.json();
-  }).then(function(d){
-    if(!d||!Array.isArray(d.items)||!d.items.length) throw new Error("ng");
-    return d.items;
-  });
-}
-function mergeSeed(src){
-  var byId={},byNo={},byName={};
-  live().forEach(function(x){
-    byId[x.id]=x;
-    var k=String(x.no==null?"":x.no).trim();
-    if(k&&!byNo[k]) byNo[k]=x;
-    var nk=normName(x.name);
-    if(!byName[nk]) byName[nk]=x;
-  });
-  var add=0,upd=0;
-  src.forEach(function(sr){
-    var nk=normName(sr.name), k=String(sr.no==null?"":sr.no).trim();
-    var cur=byId[sr.id]||(k?byNo[k]:null)||byName[nk];
-    if(cur){
-      /* 一度あてた行は使い回さない。同じNoの商品が何点かあるため */
-      delete byId[cur.id];
-      if(cur.no) delete byNo[String(cur.no).trim()];
-      delete byName[normName(cur.name)];
-      cur.name=sr.name;
-      if(k) cur.no=k;
-      if(typeof sr.price==="number") cur.price=sr.price; else delete cur.price;
-      if(typeof sr.cost==="number") cur.cost=sr.cost; else delete cur.cost;
-      touch(cur); upd++;
-    }else{
-      var it={id:sr.id,name:sr.name};
-      if(k) it.no=k;
-      if(typeof sr.price==="number") it.price=sr.price;
-      if(typeof sr.cost==="number") it.cost=sr.cost;
-      touch(it); IT.items.push(it);
-      add++;
-    }
-  });
-  saveItems(IT); queueSync();
-  return {add:add,upd:upd};
-}
-$("#impBtn").addEventListener("click",function(){
-  var b=this;
-  b.disabled=true; $("#impInfo").textContent="読み込み中…";
-  loadSeed().then(function(src){
-    var r=mergeSeed(src);
-    perShow={}; renderItems();
-    $("#impInfo").textContent="追加 "+r.add+"点 ／ 更新 "+r.upd+"点";
-    toast("原価表を読み込みました");
-  }).catch(function(){
-    $("#impInfo").textContent="";
-    toast("読み込めませんでした。通信を確かめてください");
-  }).then(function(){ b.disabled=false });
-});
+/* 原価表（items.json）の読み込みは 2026-11-11 に外した。
+   お店の商品名と仕入れ値がそのまま入ったファイルを、公開リポジトリに
+   置いておくことになるため。商品はもう置き場所にあり、戻すなら
+   「データ → 読み込む」のバックアップのほうが中身が多い
+   （カテゴリー・在庫・仕入先・レシートの決めごとまで入っている）。
+   原本の控えは竹本さんのMacの ZIPANG/原価表のひかえ.json にある。 */
 
 /* ---------- 置き場所（つなぐ・配るもの・データ） ---------- */
 /* もとは シフト管理 の ④設定 にあったもの。設定がここ1か所にまとまるよう移した。 */
@@ -1817,30 +1749,21 @@ fillCfg(); renderSyncUI(); renderAnn();
   if(t) setTimeout(function(){ t.click() },0);
 })();
 
-/* まだ1点も入っていなければ、原価表を自動で入れておく */
-function autoSeed(){
-  if(live().length) return;
-  loadSeed().then(function(src){
-    if(live().length) return;
-    var r=mergeSeed(src);
-    perShow={}; renderItems();
-    $("#impInfo").textContent="追加 "+r.add+"点";
-    toast("商品 "+r.add+"点を読み込みました");
-  }).catch(function(){});
-}
-/* つないであるなら、まずほかの端末の分を受け取る。
-   それでも1点も無いときだけ原価表を入れる（2台目で二重に入らないように）。 */
-/* 置き場所につないでいない端末では、商品リストを自動で読み込まない。
-   読み込むと「カテゴリーの付いていない794点」が手元にできてしまい、
-   あとから置き場所をつないだ瞬間に、それが本物の商品を上書きしてしまうため
-   （初期リストは本物と同じidを持っている）。2026-11-07 にこれで事故を起こした。
-   つないでいる端末では、受け取ったうえで本当に空のときだけ読み込む。 */
-/* 2026-11-11 追記：受け取りに失敗したときも autoSeed が走っていた。
-   電波が悪いときに商品が1点も無い端末で開くと、カテゴリーの付いていない
-   794点が手元にできて、そのまま置き場所へ送られてしまう（11-07の事故と同じ）。
-   うまく受け取れたときだけ読み込む。 */
+/* つないであるなら、ほかの端末の分を受け取る。
+ *
+ * ここには前、商品が1点も無いときに原価表を自動で入れる処理があった。
+ * 2026-11-07、置き場所につないでいない端末でそれが走り、
+ * カテゴリーの付いていない794点が手元にでき、つないだ瞬間に
+ * 本物の商品を上書きした（初期リストが本物と同じidを持っていたため）。
+ * 11-11 には「受け取りに失敗したときも走る」という同じ経路も見つかった。
+ *
+ * いまは自動で入れる処理そのものを外してある。
+ * 新しい端末の商品は、置き場所から受け取るか、
+ * バックアップ（データ → 読み込む）から戻す。
+ * 空の端末が置き場所を上書きする道は、増やさないこと。
+ */
 if(syncOn()){
-  syncNow(true).then(function(ok){ if(ok) autoSeed() });
+  syncNow(true);
   pushStaff();
 }
 
