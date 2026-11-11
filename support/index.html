@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>サポート｜ZIPANGレジ</title>
+<meta name="description" content="ZIPANGレジの使い方と問い合わせ先">
+<meta name="theme-color" content="#2BA55F">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+/* App Store に出すために要るページ（サポートURLは必須）。
+   審査の人がここを見るので、アカウントが要らないことを先に書いてある。 */
+body{margin:0;background:var(--bg,#F2F2F2);color:var(--ink,#1B1B1B);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+  font-size:15px;line-height:1.9}
+.top{background:#2BA55F;color:#fff;padding:calc(env(safe-area-inset-top,0px) + 18px) 16px 18px;
+  text-align:center}
+.top h1{margin:0;font-size:19px;font-weight:700}
+.top p{margin:4px 0 0;font-size:13px;opacity:.9}
+main{max-width:720px;margin:0 auto;
+  padding:18px 16px calc(env(safe-area-inset-bottom,0px) + 56px)}
+.card{background:var(--surface,#fff);border-radius:14px;padding:18px 18px 20px;
+  margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+h2{font-size:16px;margin:0 0 10px}
+h3{font-size:14.5px;margin:16px 0 4px}
+p{margin:0 0 12px}
+p:last-child{margin-bottom:0}
+ol,ul{margin:0 0 12px;padding-left:1.4em}
+li{margin:0 0 6px}
+.lead{background:#E8F5EC;border-radius:11px;padding:14px 16px;font-size:14.5px}
+.q{font-weight:700;margin:16px 0 2px}
+.q:first-of-type{margin-top:0}
+.mail{display:inline-block;background:#2BA55F;color:#fff;text-decoration:none;
+  border-radius:11px;padding:13px 22px;font-weight:700;margin-top:4px}
+.date{color:var(--ink-2,#6B6B6B);font-size:13px;text-align:center;margin-top:18px}
+a{color:#1E7F5C}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>サポート</h1>
+  <p>ZIPANGレジ</p>
+</div>
+
+<main>
+
+  <div class="card">
+    <p class="lead"><b>アカウント登録もログインも要りません。</b>
+      アプリを開けば、そのまま使えます。</p>
+  </div>
+
+  <div class="card">
+    <h2>はじめて使うとき</h2>
+    <p>商品を1つずつ入れなくても、見本で試せます。</p>
+    <ol>
+      <li><b>設定</b>（歯車）を開く</li>
+      <li>上のタブから <b>置き場所</b> を選ぶ</li>
+      <li>下のほうの <b>「お試しの商品とスタッフを入れる」</b> を押す</li>
+    </ol>
+    <p>見本の商品10点とスタッフ2人が入ります。
+      そのまま <b>レジ</b> で会計を試せます。
+      いらなくなったら、同じ画面の「全部消す」と、商品のタブから消せます。</p>
+
+    <h3>自分のお店の商品を入れる</h3>
+    <p><b>設定 → 商品</b> から、1つずつ登録できます。
+      商品名だけでも登録できます。値札の番号を入れておくと、
+      レジでその番号を打つだけで かごに入ります。</p>
+  </div>
+
+  <div class="card">
+    <h2>レシートプリンタ</h2>
+    <p>Star マイクロニクス社の <b>mC-Print3</b> など、
+      MFi対応の Bluetooth レシートプリンタに出せます。</p>
+    <ol>
+      <li>プリンタの電源を入れる</li>
+      <li>iPadの「設定 → Bluetooth」でプリンタとペアリングする</li>
+      <li>アプリの下の帯にある <b>「プリンタ」</b> を押す</li>
+      <li><b>「プリンタをさがす」</b> → 出てきた機械を押して選ぶ</li>
+      <li><b>「テスト印刷」</b> で紙が出れば完了です</li>
+    </ol>
+    <p>レシートに出す店名・住所・登録番号・紙の幅は、
+      <b>設定 → レジ → レシート</b> で決められます。
+      同じ画面の「見本を印刷して確かめる」で、出かたを試せます。</p>
+    <p>Wi-Fi（AirPrint）対応のプリンタでも印刷できます。</p>
+  </div>
+
+  <div class="card">
+    <h2>よくある質問</h2>
+
+    <p class="q">集計に「この端末で打ったぶんだけ」と出ます</p>
+    <p>1台だけで使っているときの表示です。そのままお使いいただけます。
+      2台以上で同じ売上を見たいときは、<b>設定 → 置き場所</b> で、
+      お店ご自身のデータベース（Supabase）につないでください。</p>
+
+    <p class="q">在庫管理・分析が空のままです</p>
+    <p>この2つは、複数の端末の内容をまとめる仕組みを使っています。
+      <b>設定 → 置き場所</b> でつなぐと出るようになります。</p>
+
+    <p class="q">プリンタが見つかりません</p>
+    <p>プリンタの電源と、iPadの「設定 → Bluetooth」でつながっているかをご確認ください。
+      ほかのレジアプリが同じプリンタを使っていると、見つからないことがあります。
+      そのアプリを閉じてから、もう一度おためしください。</p>
+
+    <p class="q">売上が消えないか心配です</p>
+    <p><b>設定 → 置き場所 → データ → 「バックアップを保存」</b> で、
+      端末の中身をまるごとファイルに書き出せます。月に一度を目安に取って、
+      iCloud Drive に移すか、ご自分宛にメールで送っておくことをおすすめします。
+      同じ画面の「自動の控え」にも、直近3日ぶんが自動で残っています。</p>
+
+    <p class="q">店長だけが見られるようにしたい</p>
+    <p><b>設定 → 置き場所 → かぎ</b> で暗証番号をかけられます。
+      レジと集計はだれでも使えるまま、それ以外（分析・経費・収支表・在庫・シフト・
+      ご意見箱・発注・設定）に かぎ がかかります。</p>
+  </div>
+
+  <div class="card">
+    <h2>お問い合わせ</h2>
+    <p>上で解決しないときは、メールでお知らせください。
+      <b>お使いの機種（iPad / iPhone）</b>と、
+      <b>どの画面で何をしたときか</b>を書いていただけると助かります。</p>
+    <p><a class="mail" href="mailto:takemotokeiki@gmail.com?subject=ZIPANG%E3%83%AC%E3%82%B8%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6">メールで問い合わせる</a></p>
+    <p>takemotokeiki@gmail.com<br>
+      お返事には数日いただくことがあります。</p>
+  </div>
+
+  <div class="card">
+    <h2>プライバシー</h2>
+    <p>このアプリは個人情報を集めません。くわしくは
+      <a href="../privacy/">プライバシーポリシー</a> をご覧ください。</p>
+  </div>
+
+  <p class="date">最終更新：2026年11月12日</p>
+
+</main>
+</body>
+</html>
