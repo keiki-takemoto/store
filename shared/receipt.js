@@ -24,7 +24,6 @@
 "use strict";
 
 var K_REGSET="storeregset.v1";
-var DOW=["日","月","火","水","木","金","土"];
 
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){
   return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c] }) }
@@ -35,10 +34,13 @@ function cfg(){
   var v=null; try{ v=JSON.parse(localStorage.getItem(K_REGSET)) }catch(e){}
   var rc=(v&&v.rc&&typeof v.rc==="object")?v.rc:{};
   return {
+    title:(rc.title==null?"領収書":String(rc.title)),      /* いちばん上の見出し */
     shop:String(rc.shop||"")||"ZIPANG",
     addr:String(rc.addr||""),                               /* 住所・電話。空なら出さない */
     inv :String(rc.inv||""),                                /* 登録番号。入れると消費税の行も出る */
-    foot:(rc.foot==null?"ありがとうございました":String(rc.foot)),
+    head:(rc.head==null?"ご利用ありがとうございます":String(rc.head)), /* 商品の前のあいさつ */
+    foot:(rc.foot==null?"上記正に領収いたしました":String(rc.foot)),
+    till:String(rc.till||""),                               /* レジ番号。空なら出さない */
     tax :(typeof rc.tax==="number"?rc.tax:10),              /* ふつうの消費税の率（％） */
     tax2:(typeof rc.tax2==="number"?rc.tax2:8),             /* 軽減税率（飲み物など） */
     w   :(String(rc.w)==="58"?"58":"80")                    /* 紙の幅 mm */
@@ -53,8 +55,9 @@ function payName(k){
 function when(sale){
   var d=(sale&&sale.at)?new Date(sale.at):new Date();
   if(isNaN(d.getTime())) d=new Date();
-  return d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日("+DOW[d.getDay()]+")　"+
-    ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+  function p(n){ return ("0"+n).slice(-2) }
+  return d.getFullYear()+"/"+p(d.getMonth()+1)+"/"+p(d.getDate())+" "+
+    p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds());
 }
 
 /* ---------- 消費税 ---------- */
@@ -92,12 +95,17 @@ function taxBreak(sale,c){
   return keys.map(function(k){ return by[k] });
 }
 
-/* 1行ぶん。名前が長くても折り返して、数量と金額は下の行の右に出す。 */
+/* 税率の呼び名。ふつうの率は「標準」、それ以外は「軽減」。 */
+function rateLabel(g,c){ return g.rate+"%"+(g.rate===c.tax?"標準":"軽減")+"対象" }
+/* 消費税の合計 */
+function taxTotal(gs){ var n=0; gs.forEach(function(g){ n+=g.tax }); return n }
+
+/* 1行ぶん。名前が長くても折り返して、単価・点数・金額は下の行の右に出す。 */
 function lineHtml(l,c){
   var q=Number(l&&l.qty)||0, p=Number(l&&l.price)||0;
   return '<div class="rl"><div class="rn">'+esc((l&&l.name)||"")+
     (isLow(l,c)?'<span class="mk">※</span>':"")+'</div>'+
-    '<div class="rq"><span>'+q+' × '+yen(p)+'</span><b>'+yen(p*q)+'</b></div></div>';
+    '<div class="rq"><span>'+yen(p)+'　'+q+'点</span><b>'+yen(p*q)+'</b></div></div>';
 }
 function tr(k,v,cls){
   return '<div class="rt'+(cls?" "+cls:"")+'"><span>'+esc(k)+'</span><b>'+esc(v)+'</b></div>';
@@ -112,46 +120,52 @@ function html(sale,c){
   var tot=Number(sale.total); if(isNaN(tot)) tot=sub-disc;
   var qty=Number(sale.qty); if(isNaN(qty)){ qty=0; lines.forEach(function(l){ qty+=Number(l.qty)||0 }) }
 
-  var h='<div class="rh"><div class="shop">'+esc(c.shop)+'</div>'+
+  var h=c.title?'<div class="ttl">['+esc(c.title)+']</div>':"";
+  h+='<div class="rh"><div class="shop">'+esc(c.shop)+'</div>'+
     (c.addr?'<div class="addr">'+esc(c.addr).replace(/\n/g,"<br>")+'</div>':"")+
-    (c.inv ?'<div class="addr">登録番号 '+esc(c.inv)+'</div>':"")+'</div>';
+    (c.inv ?'<div class="addr">登録番号:'+esc(c.inv)+'</div>':"")+'</div>';
 
   h+='<div class="hr"></div>';
   h+='<div class="meta">'+esc(when(sale))+'</div>';
   var who=[];
-  if(sale.staff) who.push("担当 "+sale.staff);
-  if(sale.guest) who.push(sale.guest);
+  if(c.till)     who.push("レジ:"+c.till);
+  if(sale.staff) who.push("担当:"+sale.staff);
   if(who.length) h+='<div class="meta">'+esc(who.join("　"))+'</div>';
+  if(sale.guest) h+='<div class="meta">区分:'+esc(sale.guest)+'</div>';
+  if(sale.id)    h+='<div class="meta">取引No:'+esc(sale.id)+'</div>';
+  if(c.head)     h+='<div class="head">'+esc(c.head)+'</div>';
 
   h+='<div class="hr"></div>';
   h+=lines.length?lines.map(function(l){ return lineHtml(l,c) }).join("")
                   :'<div class="rl"><div class="rn">—</div></div>';
   h+='<div class="hr"></div>';
 
-  if(disc){ h+=tr("小計",yen(sub)); h+=tr("値引き","-"+yen(disc)) }
-  h+=tr("合計（"+qty+"点）",yen(tot),"big");
+  h+=tr("小計　"+qty+"点",yen(sub));
+  if(disc) h+=tr("値引き","-"+yen(disc));
+  h+=tr("合計",yen(tot),"big");
 
-  /* 登録番号を入れているときだけ、税率ごとの内訳を出す（適格簡易請求書の形） */
+  /* 登録番号を入れているときだけ、消費税の内訳を出す（適格簡易請求書の形） */
   if(c.inv){
-    taxBreak(sale,c).forEach(function(g){
-      h+=tr(g.rate+"%対象",yen(g.total));
-      h+=tr("　内 消費税",yen(g.tax));
+    var gs=taxBreak(sale,c);
+    h+=tr("（内消費税等",yen(taxTotal(gs))+"）","sm");
+    gs.forEach(function(g){
+      h+=tr("（"+rateLabel(g,c),yen(g.total)+"）","sm");
+      h+=tr("（　内消費税等",yen(g.tax)+"）","sm");
     });
   }
 
-  h+='<div class="hr"></div>';
   var pn=payName(sale.pay);
-  if(pn) h+=tr("お支払い",pn);
-  if(typeof sale.cash==="number"&&sale.cash>0){
-    h+=tr("お預かり",yen(sale.cash));
-    h+=tr("お釣り",yen(sale.cash-tot));
+  var got=(typeof sale.cash==="number"&&sale.cash>0)?sale.cash:null;
+  if(pn) h+=tr("（"+pn,yen(got==null?tot:got)+"）","sm");
+  if(got!=null){
+    h+=tr("お預かり",yen(got));
+    h+=tr("お釣り",yen(got-tot),"big");
   }
 
   h+='<div class="hr"></div>';
   if(lines.some(function(l){ return isLow(l,c) }))
     h+='<div class="note">※ は軽減税率（'+c.tax2+'%）対象</div>';
   if(c.foot) h+='<div class="foot">'+esc(c.foot)+'</div>';
-  if(sale.id) h+='<div class="no">No. '+esc(sale.id)+'</div>';
   return h;
 }
 
@@ -172,15 +186,19 @@ function doc(sale,c){
   function lr(l,r,big,bold){ L.push({t:"lr", l:l, r:r, big:!!big, bold:!!bold}) }
   function rule(){ L.push({t:"rule"}) }
 
+  if(c.title) ct("["+c.title+"]",false,true);
   ct(c.shop,true,true);
   if(c.addr) c.addr.split("\n").forEach(function(x){ if(x) ct(x) });
-  if(c.inv) ct("登録番号 "+c.inv);
+  if(c.inv) ct("登録番号:"+c.inv);
   rule();
   tx(when(sale));
   var who=[];
-  if(sale.staff) who.push("担当 "+sale.staff);
-  if(sale.guest) who.push(sale.guest);
+  if(c.till)     who.push("レジ:"+c.till);
+  if(sale.staff) who.push("担当:"+sale.staff);
   if(who.length) tx(who.join("　"));
+  if(sale.guest) tx("区分:"+sale.guest);
+  if(sale.id)    tx("取引No:"+sale.id);
+  if(c.head){ L.push({t:"feed",n:1}); ct(c.head) }
   rule();
 
   var sub=Number(sale.subtotal);
@@ -193,28 +211,30 @@ function doc(sale,c){
   lines.forEach(function(l){
     var q=Number(l.qty)||0, pr=Number(l.price)||0;
     tx(String(l.name||"")+(isLow(l,c)?" ※":""));
-    lr("  "+q+" × "+yen(pr), yen(pr*q));
+    lr("  "+yen(pr)+"　"+q+"点", yen(pr*q));
   });
   rule();
-  if(disc){ lr("小計",yen(sub)); lr("値引き","-"+yen(disc)) }
-  lr("合計（"+qty+"点）",yen(tot),true,true);
+  lr("小計　"+qty+"点",yen(sub));
+  if(disc) lr("値引き","-"+yen(disc));
+  lr("合計",yen(tot),true,true);
   if(c.inv){
-    taxBreak(sale,c).forEach(function(g){
-      lr(g.rate+"%対象",yen(g.total));
-      lr("  内 消費税",yen(g.tax));
+    var gs=taxBreak(sale,c);
+    lr("（内消費税等",yen(taxTotal(gs))+"）");
+    gs.forEach(function(g){
+      lr("（"+rateLabel(g,c),yen(g.total)+"）");
+      lr("（　内消費税等",yen(g.tax)+"）");
     });
   }
-  rule();
   var pn=payName(sale.pay);
-  if(pn) lr("お支払い",pn);
-  if(typeof sale.cash==="number"&&sale.cash>0){
-    lr("お預かり",yen(sale.cash));
-    lr("お釣り",yen(sale.cash-tot));
+  var got=(typeof sale.cash==="number"&&sale.cash>0)?sale.cash:null;
+  if(pn) lr("（"+pn,yen(got==null?tot:got)+"）");
+  if(got!=null){
+    lr("お預かり",yen(got));
+    lr("お釣り",yen(got-tot),true,true);
   }
   rule();
   if(lines.some(function(l){ return isLow(l,c) })) tx("※ は軽減税率（"+c.tax2+"%）対象");
   if(c.foot) ct(c.foot);
-  if(sale.id) ct("No. "+sale.id);
   L.push({t:"feed", n:2});
   L.push({t:"cut"});
   return { w:cols(c), lines:L };
@@ -232,12 +252,14 @@ var CSS=
     'color:#000;font-size:10pt;line-height:1.45;'+
     '-webkit-print-color-adjust:exact;print-color-adjust:exact}'+
   'body>#__rcpt[data-w="58"]{width:48mm;font-size:9pt}'+
+  '#__rcpt .ttl{text-align:center;font-size:11pt;margin:0 0 4px}'+
   '#__rcpt .rh{text-align:center;margin:0 0 6px}'+
   '#__rcpt .shop{font-size:15pt;font-weight:700;letter-spacing:.06em}'+
   '#__rcpt[data-w="58"] .shop{font-size:13pt}'+
   '#__rcpt .addr{font-size:8pt;margin-top:2px}'+
   '#__rcpt .hr{border-top:1px dashed #000;margin:5px 0}'+
   '#__rcpt .meta{font-size:9pt}'+
+  '#__rcpt .head{text-align:center;margin:8px 0 0}'+
   '#__rcpt .rl{margin:0 0 3px}'+
   '#__rcpt .rn{word-break:break-all}'+
   '#__rcpt .rn .mk{margin-left:.3em;font-weight:700}'+
@@ -246,6 +268,7 @@ var CSS=
   '#__rcpt .rq span{font-size:9pt;padding-left:1em}'+
   '#__rcpt .rt{display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums}'+
   '#__rcpt .rt.big{font-size:13pt;font-weight:700;margin:3px 0}'+
+  '#__rcpt .rt.sm{font-size:9pt}'+
   '#__rcpt .foot{text-align:center;margin:7px 0 0}'+
   '#__rcpt .no{text-align:center;font-size:7.5pt;margin-top:4px}'+
   '@page{margin:4mm}'+
