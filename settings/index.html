@@ -390,6 +390,20 @@ details.cat .in{padding:2px 12px 10px}
       </div>
 
       <div class="sec">
+        <h3>お試しの中身</h3>
+        <div class="row">
+          <button class="btn sm" id="demoBtn">お試しの商品とスタッフを入れる</button>
+          <span class="lbl" id="demoState"></span>
+        </div>
+        <p class="note">まだ何も入っていない端末に、<b>見本の商品10点とスタッフ2人</b>を入れます。
+          入れたあとは、レジ・集計・在庫・シフトをひと通り試せます。<br>
+          <b>すでに商品かスタッフが入っている端末では使えません。</b>
+          <b>置き場所につないでいる端末でも使えません。</b>
+          見本がお店の本物の商品を上書きしてしまわないようにしてあります。<br>
+          いらなくなったら、上の<b>「全部消す」</b>と、商品のタブで消してください。</p>
+      </div>
+
+      <div class="sec">
         <h3>自動の控え</h3>
         <div class="snaps" id="snaps"></div>
         <p class="note">この画面を開いた日に1つ、<b>この端末の中に</b>自動で控えます（最大3日分）。
@@ -1800,6 +1814,62 @@ if("serviceWorker" in navigator){
   document.addEventListener("visibilitychange",swCheck);
   window.addEventListener("pageshow",swCheck);
 }
+/* ---------- お試しの中身 ----------
+   アプリを初めて開いた人（Appleの審査の人も含む）が、
+   商品を1つずつ入れなくても中を見られるようにするためのもの。
+
+   ここで入れるものには、送る印（d=1）を付けない。
+   置き場所につないでいる端末では、そもそも押せないようにしてある。
+   見本がお店の本物の商品を上書きする道は、作らないこと
+   （2026-11-07 に、それで794点が消えている）。 */
+var DEMO_ITEMS=[
+  {no:"101",name:"ブレンドコーヒー",      cat:"ドリンク",price:450,cost:120,stock:60},
+  {no:"102",name:"カフェラテ",            cat:"ドリンク",price:520,cost:160,stock:50},
+  {no:"103",name:"緑茶（ペットボトル）",  cat:"ドリンク",price:160,cost:90, stock:40,t8:1},
+  {no:"201",name:"ランチセットA",          cat:"フード",  price:1100,cost:420,stock:20},
+  {no:"202",name:"日替わりカレー",         cat:"フード",  price:980, cost:360,stock:20},
+  {no:"203",name:"チーズケーキ",           cat:"フード",  price:580, cost:190,stock:15},
+  {no:"301",name:"手ぬぐい　藍",           cat:"雑貨",    price:1200,cost:520,stock:25},
+  {no:"302",name:"桐の箸置き（五客組）",   cat:"雑貨",    price:3800,cost:1600,stock:8},
+  {no:"303",name:"豆皿　五枚組",           cat:"雑貨",    price:2400,cost:980, stock:10},
+  {no:"304",name:"ドリップバッグ　5袋",    cat:"雑貨",    price:900, cost:340, stock:30}
+];
+var DEMO_STAFF=[{name:"山田 花子",wage:1100},{name:"佐藤 太郎",wage:1050}];
+
+function demoReady(){
+  if(syncOn()) return "置き場所につないでいる端末では使えません";
+  if(live().length) return "すでに商品が入っています";
+  if((DB.staff||[]).length) return "すでにスタッフが入っています";
+  return "";
+}
+function renderDemo(){
+  var why=demoReady();
+  $("#demoBtn").disabled=!!why;
+  $("#demoState").textContent=why;
+}
+$("#demoBtn").addEventListener("click",function(){
+  var why=demoReady();
+  if(why){ toast(why); renderDemo(); return }
+  if(!confirm("見本の商品10点とスタッフ2人を入れます。\n\n"+
+              "お試し用の中身です。この端末の中だけに入ります。\nよろしいですか？")) return;
+  DEMO_ITEMS.forEach(function(d){
+    var it={id:uid(),no:d.no,name:d.name,cat:d.cat,
+            price:d.price,cost:d.cost,stock:d.stock,alert:5};
+    if(d.t8) it.t8=1;                       /* 送る印（d=1）は付けない */
+    IT.items.push(it);
+    if(IT.cats.indexOf(d.cat)<0) IT.cats.push(d.cat);
+  });
+  saveItems(IT);
+  DEMO_STAFF.forEach(function(d,i){
+    DB.staff.push({id:uid(),name:d.name,wage:d.wage,
+      color:COLORS[(DB.staff.length+i)%COLORS.length],tok:newTok()});
+  });
+  saveShift(DB);
+  renderStaff(); renderItems(); renderDemo();
+  toast("見本の商品10点とスタッフ2人を入れました");
+});
+renderDemo();
+
 /* ---------- 自動の控え ----------
    2026-11-07 に商品が消えたとき、手で取ったバックアップが無かった。
    忘れても残るように、この画面を開いた日に1回、端末の中に控える。
