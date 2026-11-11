@@ -9,7 +9,12 @@
 
    Sales.rows(from, to) … 会計そのものが要るとき（レジの控え・集計用）
      {connected:false} か {connected:true, rows:[…]}
-     打ち消した会計（voided）も入っているので、数えるときは外すこと。 */
+     打ち消した会計（voided）も入っているので、数えるときは外すこと。
+
+   つないでいないときは {connected:false, local:true, rows:[…]} を返す。
+   その端末のレジが打ったぶんだけ。使うかどうかは呼んだ側が決める
+   （何も知らずに使うと「お店ぜんぶの売上」に見えてしまうため、
+    connected は false のままにしてある）。 */
 (function (root) {
   "use strict";
 
@@ -24,8 +29,28 @@
     return !!(root.Sync && c && c.url && c.anon && c.key);
   }
 
+  /* ---- つないでいないときの、この端末のぶん ---- */
+
+  var K_REG = "storereg.v1";
+
+  /* レジ（./reg/）が localStorage に残している会計。
+     つないだあとは「送りおわったものは3日で捨てる」ので、ここが全部になるのは
+     まだつないでいない端末だけ。つないである端末では使わないこと。 */
+  function localRows(from, to) {
+    var v = null;
+    try { v = JSON.parse(localStorage.getItem(K_REG)) } catch (e) {}
+    var list = (v && Array.isArray(v.sales)) ? v.sales : [];
+    return list.filter(function (s) {
+      var d = String((s && s.day) || "");
+      return d && d >= from && d <= to;
+    }).slice().sort(function (a, b) {
+      return String(a.at || "") < String(b.at || "") ? -1 : 1;
+    });
+  }
+
   function rows(from, to) {
-    if (!on()) return Promise.resolve({ connected: false });
+    if (!on()) return Promise.resolve({ connected: false, local: true,
+                                        rows: localRows(from, to) });
     root.Sync.configure(cfg());
     return root.Sync.salesGet(from, to).then(function (r) {
       return { connected: true, rows: (r && r.items) || [] };
@@ -46,5 +71,5 @@
     });
   }
 
-  root.Sales = { get: get, rows: rows, on: on };
+  root.Sales = { get: get, rows: rows, on: on, localRows: localRows };
 })(typeof window !== "undefined" ? window : globalThis);

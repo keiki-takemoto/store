@@ -38,6 +38,8 @@ h3{font-size:13px;color:var(--ink-2);margin:0 0 10px}
   border:1px solid var(--line-2);border-radius:9px;padding:11px 12px;font-family:inherit}
 .target .go{width:100%;margin-top:10px;padding:13px 0;font-size:15.5px}
 .upd{font-size:12px;color:var(--ink-3);text-align:center;padding:11px 4px 3px}
+.mine{max-width:680px;margin:10px auto 0;background:#FFF6E5;border-radius:11px;
+  padding:11px 14px;font-size:13px;line-height:1.75}
 .upd b{font-family:var(--mono);font-weight:600;color:var(--ink-2)}
 .goana{font-size:12.5px;color:var(--ink-2);text-align:center;padding:2px 4px 10px;line-height:1.8}
 .goana a{color:var(--accent);font-weight:700}
@@ -142,6 +144,9 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
     <button class="btn primary go" id="go">表示する</button>
   </div>
   <div class="upd">更新日時：<b id="upd">—</b></div>
+  <!-- 置き場所につないでいないときだけ出す。ほかの端末のぶんは入っていないので、
+       「お店ぜんぶの売上」と勘違いされないように必ず出すこと。 -->
+  <div class="mine" id="mineNote" hidden></div>
   <p class="goana">お客さま・スタッフ・月をまたいだ移り変わりは
     <a href="../analyze/">分析</a> に移しました。</p>
 
@@ -238,6 +243,22 @@ function range(){
 
 /* ---------- 受け取る ---------- */
 var rows=[], busy=false;
+/* true … 置き場所につないでいないので、この端末のぶんだけを出している */
+var localOnly=false;
+
+function stamp(){
+  var d=new Date();
+  $("#upd").textContent=d.getFullYear()+"/"+pad2(d.getMonth()+1)+"/"+pad2(d.getDate())+" "+
+    pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());
+  $("#mineNote").hidden=!localOnly;
+  if(localOnly){
+    $("#mineNote").innerHTML=
+      "<b>この端末で打ったぶんだけを出しています。</b>"+
+      "まだ置き場所につないでいないので、ほかの端末のぶんは入っていません。<br>"+
+      "<a href=\"../settings/#conn\">設定 → 置き場所</a>でつなぐと、"+
+      "お店ぜんぶの売上がまとまり、どの端末からでも同じものが見られます。";
+  }
+}
 async function load(quiet){
   if(busy) return;
   busy=true;
@@ -245,16 +266,28 @@ async function load(quiet){
   try{
     var r=await Sales.rows(r0.from,r0.to);
     if(!r.connected){
-      rows=[]; $("#body").hidden=true; $("#noneCard").hidden=false;
-      $("#noneMsg").innerHTML='まだ置き場所につないでいません。<br>'+
+      /* つないでいないときは、この端末のレジが打ったぶんを出す。
+         置き場所につなぐまでは手元に全部残っているので、1台のお店ならこれで足りる。
+         （つないだあとは送りおわったぶんを3日で捨てるので、この道は使わない） */
+      var mine=(r.local&&r.rows)||[];
+      if(mine.length){
+        rows=mine; localOnly=true;
+        $("#noneCard").hidden=true;
+        stamp();
+        render();
+        busy=false; return;
+      }
+      rows=[]; localOnly=false;
+      $("#body").hidden=true; $("#noneCard").hidden=false;
+      $("#mineNote").hidden=true;
+      $("#noneMsg").innerHTML='この端末には、この期間の会計がまだありません。<br>'+
+        'ほかの端末のぶんも合わせて見るには、'+
         '<a href="../settings/#conn">設定 → 置き場所</a>でつないでください。';
       $("#upd").textContent="—";
       busy=false; return;
     }
-    rows=r.rows||[];
-    var d=new Date();
-    $("#upd").textContent=d.getFullYear()+"/"+pad2(d.getMonth()+1)+"/"+pad2(d.getDate())+" "+
-      pad2(d.getHours())+":"+pad2(d.getMinutes())+":"+pad2(d.getSeconds());
+    rows=r.rows||[]; localOnly=false;
+    stamp();
     render();
   }catch(e){
     $("#body").hidden=true; $("#noneCard").hidden=false;
@@ -489,7 +522,11 @@ function listHtml(list){
           '<div class="ln"><b>合計</b><span class="a"><b>'+yen(s.total)+'</b></span></div>'+
           '<div class="act">'+(s.voided
             ? '<span class="lbl">取り消しずみ</span>'
-            : '<button class="btn sm danger" data-void="'+esc(s.id)+'">この会計を取り消す</button>')+
+            : (localOnly
+               /* 取り消しは置き場所に書きに行く作りなので、つないでいないと使えない。
+                  レジの画面なら、会計した直後にその場で取り消せる。 */
+               ? '<span class="lbl">取り消しは、置き場所につないでから（レジの画面なら会計した直後に取り消せます）</span>'
+               : '<button class="btn sm danger" data-void="'+esc(s.id)+'">この会計を取り消す</button>'))+
           '</div></div>';
       }).join("")
     : '<div class="empty">この日に会計はありません。</div>';
