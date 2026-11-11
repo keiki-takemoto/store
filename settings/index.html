@@ -56,6 +56,26 @@ button.dot::after{content:"";position:absolute;left:-9px;top:-9px;right:-9px;bot
   border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;font-family:var(--mono)}
 .connfld .two{display:flex;gap:10px;flex-wrap:wrap}
 .connfld .two>div{flex:1;min-width:150px}
+/* つなぎコード（4つの貼りものを1本にまとめたもの）と、折りたたみの入れ物 */
+.bundle{width:100%;box-sizing:border-box;font-size:15px;line-height:1.6;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px 12px;
+  font-family:var(--mono);resize:vertical;min-height:78px;-webkit-appearance:none}
+details.plain{margin-top:13px;border-top:1px solid var(--line);padding-top:9px}
+details.plain>summary{list-style:none;cursor:pointer;font-size:13px;color:var(--ink-2);
+  padding:4px 0;display:flex;align-items:center;gap:6px}
+details.plain>summary::-webkit-details-marker{display:none}
+details.plain>summary::before{content:"\203A";font-size:16px;color:var(--ink-3);
+  display:inline-block;transition:transform .15s}
+details.plain[open]>summary::before{transform:rotate(90deg)}
+details.plain>.in{padding-top:11px}
+/* 自動の控え */
+.snaps{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.snap{display:flex;flex-direction:column;gap:8px;
+  background:var(--surface-2);border-radius:11px;padding:10px 11px}
+.snap .sb{display:flex;gap:8px;flex-wrap:wrap}
+.snap .sw{font-size:13.5px}
+.snap .sw b{font-family:var(--mono)}
+.snap .ss{font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
 .wage,.price{width:82px;text-align:right;font-family:var(--mono);padding:6px 8px}
 .num{width:62px;text-align:right;font-family:var(--mono);padding:6px 7px}
 .no{width:74px;font-family:var(--mono);padding:6px 8px}
@@ -267,25 +287,49 @@ details.cat .in{padding:2px 12px 10px}
     <div class="card">
       <div class="sec">
         <h3>スタッフから自動で受け取る</h3>
-        <div class="connfld">
-          <div><div class="lbl">Project URL</div>
-            <input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" spellcheck="false"></div>
-          <div><div class="lbl">anon public key</div>
-            <input type="text" id="cfgAnon" placeholder="sb_publishable_… / eyJhbGciOi…" spellcheck="false"></div>
-          <div class="two">
-            <div><div class="lbl">合言葉（スタッフ用）</div><input type="text" id="cfgCode" spellcheck="false"></div>
-            <div><div class="lbl">管理用キー（店長用）</div><input type="text" id="cfgKey" spellcheck="false"></div>
-          </div>
-        </div>
-        <div class="row" style="margin-top:11px">
-          <button class="btn sm" id="cfgSave">保存してつなぐ</button>
-          <button class="btn sm ghost" id="cfgTest">つながるか試す</button>
+        <!-- 貼るものは1つだけにした。4つ貼らせる形では、店長は自分で設定できない
+             （Supabaseの管理画面を開いて長い文字列を2つ写すことになる）。
+             つなぎコードは、すでにつないである端末の下のボタンで作れる。 -->
+        <div class="lbl">つなぎコード</div>
+        <textarea class="bundle" id="cfgBundle" rows="3" spellcheck="false"
+          autocomplete="off" autocapitalize="off"
+          placeholder="渡されたつなぎコードを、ここに貼ってください"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn sm" id="cfgPaste">貼ってつなぐ</button>
           <span class="lbl" id="cfgState"></span>
         </div>
-        <p class="note">ここでつなぐと、<b>シフト・ご意見箱・商品・レジ・集計</b>のすべてが、ほかの端末と同じ内容になります。<br>
-          まだ置き場所を作っていない場合は <a href="../shift/setup.html" target="_blank" rel="noopener">はじめの設定</a>（10分ほど）。<br>
-          Supabaseの <b>Project Settings → API</b> にある Project URL と anon public key を貼ってください。
-          合言葉の2つは、はじめの設定のページに書いてあります。</p>
+        <p class="note">つなぐと、<b>シフト・ご意見箱・商品・レジ・集計</b>のすべてが、
+          ほかの端末と同じ内容になります。</p>
+
+        <details class="plain" id="cfgManual">
+          <summary>ひとつずつ入れる／いまの中身を見る</summary>
+          <div class="in">
+            <div class="connfld">
+              <div><div class="lbl">Project URL</div>
+                <input type="text" id="cfgUrl" placeholder="https://xxxxxxxx.supabase.co" spellcheck="false"></div>
+              <div><div class="lbl">anon public key</div>
+                <input type="text" id="cfgAnon" placeholder="sb_publishable_… / eyJhbGciOi…" spellcheck="false"></div>
+              <div class="two">
+                <div><div class="lbl">合言葉（スタッフ用）</div><input type="text" id="cfgCode" spellcheck="false"></div>
+                <div><div class="lbl">管理用キー（店長用）</div><input type="text" id="cfgKey" spellcheck="false"></div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:11px">
+              <button class="btn sm" id="cfgSave">保存してつなぐ</button>
+              <button class="btn sm ghost" id="cfgTest">つながるか試す</button>
+            </div>
+            <div class="row" style="margin-top:11px">
+              <button class="btn sm ghost" id="cfgMake">この端末のつなぎコードを作る</button>
+            </div>
+            <p class="note">
+              まだ置き場所を作っていない場合は
+              <a href="../shift/setup.html" target="_blank" rel="noopener">はじめの設定</a>（10分ほど）。<br>
+              Supabaseの <b>Project Settings → API</b> にある Project URL と anon public key を貼ってください。
+              合言葉の2つは、はじめの設定のページに書いてあります。<br>
+              <b>つなぎコードには管理用キーが入っています。</b>
+              渡す相手を間違えないようにして、相手が貼り終えたらトークからは消してください。</p>
+          </div>
+        </details>
       </div>
 
       <div class="sec">
@@ -323,6 +367,15 @@ details.cat .in{padding:2px 12px 10px}
           <b>読み込む</b>と、この端末の中身が入れ替わります。そのとき
           「置き場所にも書き戻すか」を聞きます。<b>直すときだけ「OK」</b>にしてください。<br>
           <b>全部消す</b>は、この端末のスタッフ・希望・シフトを消します。取り消せません。</p>
+      </div>
+
+      <div class="sec">
+        <h3>自動の控え</h3>
+        <div class="snaps" id="snaps"></div>
+        <p class="note">この画面を開いた日に1つ、<b>この端末の中に</b>自動で控えます（最大3日分）。
+          手で取るのを忘れても、ここから戻せます。<br>
+          <b>端末そのものが壊れると、これも消えます。</b>
+          月に一度は上の「バックアップを保存」でファイルにも出してください。</p>
       </div>
       <div class="sec">
         <h3>困ったとき</h3>
@@ -1210,11 +1263,13 @@ function syncNow(quiet){
     .then(pullItems).then(pullRep).then(pullT8).then(pullVen).then(function(){
     syncBusy=false; syncErr=""; syncMsg="ほかの端末と同じです（"+hhmm()+" に確認）";
     renderItems(); renderVen();
+    return true;
   }).catch(function(e){
     syncBusy=false;
     syncErr=(e&&e.message)||"つながりませんでした";
     renderSync();
     if(!quiet) toast("合わせられませんでした："+syncErr);
+    return false;      /* 受け取れたかどうかを、呼んだ側が見られるようにする */
   });
 }
 function queueSync(){
@@ -1338,6 +1393,68 @@ $("#cfgTest").addEventListener("click",async function(){
   catch(e){ $("#cfgState").textContent=(e&&e.message)||"つながりませんでした"; if(window.Sync) Sync.configure(keep) }
 });
 
+/* ---- つなぎコード ----
+   4つ（URL・anonキー・合言葉・管理用キー）を1本の文字列にまとめたもの。
+   店長に4つ貼らせる形では、自分で設定できない。1回貼れば済むようにした。
+   公開リポジトリには何も置かない。コードは、すでにつないである端末で作る。
+   中に管理用キーが入っているので、渡したら相手のトークからは消してもらう。 */
+var BPFX="ZIPANG1:";
+function b64u(t){
+  return btoa(unescape(encodeURIComponent(t)))
+    .replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function unb64u(t){
+  t=String(t).replace(/-/g,"+").replace(/_/g,"/");
+  while(t.length%4) t+="=";
+  return decodeURIComponent(escape(atob(t)));
+}
+function makeBundle(c){
+  return BPFX+b64u(JSON.stringify({u:c.url||"",a:c.anon||"",c:c.code||"",k:c.key||""}));
+}
+/* 前後に文章が付いていても拾えるようにする（LINEから貼ると挨拶が混ざる） */
+function readBundle(txt){
+  var t=String(txt||"").replace(/\s+/g,"");
+  if(!t) return null;
+  var i=t.indexOf(BPFX);
+  if(i>=0) t=t.slice(i+BPFX.length);
+  t=t.replace(/[^A-Za-z0-9_=-]+$/,"");
+  var o=null;
+  try{ o=JSON.parse(unb64u(t)) }catch(e){ return null }
+  if(!o||typeof o!=="object"||!o.u||!o.a) return null;
+  return { url:String(o.u), anon:String(o.a), code:String(o.c||""), key:String(o.k||"") };
+}
+$("#cfgPaste").addEventListener("click",async function(){
+  var c=readBundle($("#cfgBundle").value);
+  if(!c){
+    $("#cfgState").textContent="つなぎコードが読めません";
+    toast("つなぎコードをもう一度貼ってください"); return;
+  }
+  var keep=DB.sync;
+  if(window.Sync) Sync.configure(c);
+  $("#cfgState").textContent="つないでいます…";
+  try{
+    await Sync.ping();
+    if(c.key) await Sync.listRequests("");      /* 管理用キーまで合っているか確かめる */
+    DB.cfgDraft=c; DB.sync=c; saveShift(DB);
+    $("#cfgBundle").value="";                   /* 貼ったものは画面に残さない */
+    fillCfg(); renderSyncUI(); renderGuests();
+    $("#cfgState").textContent="つながりました（保存しました）";
+    toast("つながりました");
+    syncNow(true); pullGuests();
+  }catch(e){
+    if(window.Sync) Sync.configure(keep);
+    $("#cfgState").textContent=(e&&e.message)||"つながりませんでした";
+  }
+});
+$("#cfgMake").addEventListener("click",function(){
+  var c=cfgFields();
+  if(!c.url||!c.anon){ toast("先に、この端末をつないでください"); return }
+  copyText(makeBundle(c),"つなぎコードをコピーしました");
+  alert("つなぎコードをコピーしました。\n\n"+
+    "中に管理用キーが入っています。渡す相手を間違えないようにしてください。\n"+
+    "相手が貼り終えたら、トークからは消してもらってください。");
+});
+
 /* スタッフに配るもの。文面は選んだ月のものになる */
 var annView=new Date(); annView.setMonth(annView.getMonth()+1); annView.setDate(1);
 function annYm(){ return annView.getFullYear()+"-"+String(annView.getMonth()+1).padStart(2,"0") }
@@ -1407,8 +1524,13 @@ $("#restoreFile").addEventListener("change",function(){
   var f=this.files&&this.files[0]; if(!f) return;
   var r=new FileReader();
   r.onload=function(){
+    try{ applyBackup(JSON.parse(r.result)) }catch(e){ toast("読み込めませんでした") }
+  };
+  r.readAsText(f); this.value="";
+});
+/* ファイルからでも、下の「自動の控え」からでも、入れ直しはここを通る。 */
+function applyBackup(d){
     try{
-      var d=JSON.parse(r.result);
       /* 新しい形（v2、商品も入っている）と、古い形（スタッフだけ）の両方を受ける */
       var isNew=(d&&d.shift&&Array.isArray(d.shift.staff));
       var sh=isNew?d.shift:d;
@@ -1419,6 +1541,7 @@ $("#restoreFile").addEventListener("change",function(){
       if(!confirm("この端末のデータを、読み込んだ内容で置き換えます。\n\n"+
         "スタッフ "+sh.staff.length+"人"+(nI?("・商品 "+nI+"点"):"（商品は入っていません）")+
         "\n\nよろしいですか？")) return;
+      snapTake(true);        /* 入れ替える前のいまの状態を、控えに1つ残しておく */
 
       DB=sh;
       if(!DB.months) DB.months={};
@@ -1462,10 +1585,10 @@ $("#restoreFile").addEventListener("change",function(){
       renderItems(); renderVen(); renderGuests();
       toast("読み込みました"+(back?"。置き場所にも送ります":""));
       if(back) queueSync();
-    }catch(e){ toast("読み込めませんでした") }
-  };
-  r.readAsText(f); this.value="";
-});
+      renderSnaps();
+      return true;
+    }catch(e){ toast("読み込めませんでした"); return false }
+}
 $("#wipe").addEventListener("click",function(){
   if(!confirm("スタッフも希望もシフトも、全部消します。取り消せません。よろしいですか？")) return;
   DB={staff:[],need:2,closedDow:[false,false,false,false,false,false,false],
@@ -1634,7 +1757,14 @@ function autoSeed(){
    あとから置き場所をつないだ瞬間に、それが本物の商品を上書きしてしまうため
    （初期リストは本物と同じidを持っている）。2026-11-07 にこれで事故を起こした。
    つないでいる端末では、受け取ったうえで本当に空のときだけ読み込む。 */
-if(syncOn()){ syncNow(true).then(autoSeed); pushStaff() }
+/* 2026-11-11 追記：受け取りに失敗したときも autoSeed が走っていた。
+   電波が悪いときに商品が1点も無い端末で開くと、カテゴリーの付いていない
+   794点が手元にできて、そのまま置き場所へ送られてしまう（11-07の事故と同じ）。
+   うまく受け取れたときだけ読み込む。 */
+if(syncOn()){
+  syncNow(true).then(function(ok){ if(ok) autoSeed() });
+  pushStaff();
+}
 
 /* 開きっぱなしでも、ほかの端末で登録・削除したものが入ってくるように
    1分おきに見に行く（画面を見ているときだけ）。 */
@@ -1659,6 +1789,84 @@ if("serviceWorker" in navigator){
   document.addEventListener("visibilitychange",swCheck);
   window.addEventListener("pageshow",swCheck);
 }
+/* ---------- 自動の控え ----------
+   2026-11-07 に商品が消えたとき、手で取ったバックアップが無かった。
+   忘れても残るように、この画面を開いた日に1回、端末の中に控える。
+   ファイルではないので、端末そのものが壊れたときは残らない。
+   月に一度は「バックアップを保存」でファイルにも出すこと。 */
+var K_SNAP="storesnap.v1", SNAP_KEEP=3, SNAP_MAX=900000;
+function snapLoad(){
+  var v=null;
+  try{ v=JSON.parse(localStorage.getItem(K_SNAP)) }catch(e){}
+  return (v&&Array.isArray(v.list))?v:{list:[]};
+}
+function snapWrite(v){
+  try{ localStorage.setItem(K_SNAP,JSON.stringify(v)); return true }catch(e){ return false }
+}
+function snapDay(d){
+  d=d||new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+
+    "-"+String(d.getDate()).padStart(2,"0");
+}
+function snapTake(force){
+  var S=snapLoad(), day=snapDay();
+  var b=backupAll(), txt=JSON.stringify(b);
+  var nS=((b.shift&&b.shift.staff)||[]).length;
+  var nI=((b.items&&b.items.items)||[]).filter(function(x){ return !x.del }).length;
+  if(!force){
+    /* その日の控えは1つだけ。ただし、あとから中身が増えたときは入れ替える。
+       朝いちばんに空っぽの状態で開くと、その日はずっと空の控えしか
+       残らなくなってしまうため。減ったときは入れ替えない（それが事故なら、
+       事故の前の状態こそ残しておきたいから）。 */
+    var cur=null;
+    S.list.forEach(function(x){ if(x.day===day) cur=x });
+    if(cur && nS<=cur.staff && nI<=cur.items) return false;
+  }
+  /* 大きすぎるものは入れない。端末の保存場所を食い潰して、
+     商品やシフトそのものが保存できなくなるほうが困る。 */
+  if(txt.length>SNAP_MAX) return false;
+  S.list=S.list.filter(function(x){ return x.day!==day });
+  S.list.unshift({ day:day, at:b.at, staff:nS, items:nI, data:txt });
+  while(S.list.length>SNAP_KEEP) S.list.pop();
+  /* 入りきらないときは、古いものから落として入れ直す */
+  while(S.list.length && !snapWrite(S)) S.list.pop();
+  renderSnaps();
+  return true;
+}
+function renderSnaps(){
+  var el=$("#snaps"); if(!el) return;
+  var L=snapLoad().list;
+  if(!L.length){
+    el.innerHTML='<p class="note" style="margin:0">まだありません。'+
+      'この画面を開いた日に1つ作られます。</p>';
+    return;
+  }
+  el.innerHTML=L.map(function(x,i){
+    return '<div class="snap"><div class="sw"><b>'+esc(x.day)+'</b>'+
+      (i===0?' <span class="ss">いちばん新しい</span>':'')+
+      '<div class="ss">スタッフ'+x.staff+'人・商品'+x.items+'点</div></div>'+
+      '<div class="sb">'+
+      '<button class="btn sm ghost" data-sdl="'+i+'">ファイルに保存</button>'+
+      '<button class="btn sm ghost" data-srs="'+i+'">これに戻す</button></div></div>';
+  }).join("");
+}
+$("#snaps").addEventListener("click",function(e){
+  var dl=e.target.closest("[data-sdl]"), rs=e.target.closest("[data-srs]");
+  if(!dl&&!rs) return;
+  var L=snapLoad().list;
+  var x=L[Number((dl||rs).getAttribute(dl?"data-sdl":"data-srs"))];
+  if(!x){ renderSnaps(); return }
+  if(dl){
+    downloadFile("店舗管理_バックアップ_"+x.day+".json",x.data,"application/json");
+    return;
+  }
+  var d=null;
+  try{ d=JSON.parse(x.data) }catch(err){ toast("控えが読めませんでした"); return }
+  applyBackup(d);
+});
+renderSnaps();
+snapTake(false);
+
 /* ピンチやダブルタップでの拡大を止める（iOSはviewportの指定を無視するので、
    指の動きそのものを受け止めて打ち消す） */
 ["gesturestart","gesturechange","gestureend"].forEach(function(ev){
