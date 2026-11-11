@@ -1589,8 +1589,13 @@ $("#backup").addEventListener("click",function(){
   var b=backupAll();
   downloadFile("店舗管理_バックアップ_"+new Date().toISOString().slice(0,10)+".json",
     JSON.stringify(b,null,1),"application/json");
-  toast("スタッフ "+((b.shift.staff||[]).length)+"人・商品 "+
-    (b.items.items.filter(function(x){ return !x.del }).length)+"点を保存しました");
+  /* 仕入れ値が何点ぶん入っているかも出す。
+     「公開ファイルを消すと原価が無くなるのでは」という不安に、
+     ファイルを見なくてもその場で答えられるように。 */
+  var alive=b.items.items.filter(function(x){ return !x.del });
+  var wc=alive.filter(function(x){ return typeof x.cost==="number" }).length;
+  toast("スタッフ "+((b.shift.staff||[]).length)+"人・商品 "+alive.length+"点"+
+    (wc?("（うち仕入れ値 "+wc+"点）"):"")+"を保存しました");
 });
 $("#restoreBtn").addEventListener("click",function(){ $("#restoreFile").click() });
 $("#restoreFile").addEventListener("change",function(){
