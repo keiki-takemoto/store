@@ -131,7 +131,6 @@ function html(sale,c){
   if(c.till)     who.push("レジ:"+c.till);
   if(sale.staff) who.push("担当:"+sale.staff);
   if(who.length) h+='<div class="meta">'+esc(who.join("　"))+'</div>';
-  if(sale.guest) h+='<div class="meta">区分:'+esc(sale.guest)+'</div>';
   if(sale.id)    h+='<div class="meta">取引No:'+esc(sale.id)+'</div>';
   if(c.head)     h+='<div class="head">'+esc(c.head)+'</div>';
 
@@ -196,7 +195,6 @@ function doc(sale,c){
   if(c.till)     who.push("レジ:"+c.till);
   if(sale.staff) who.push("担当:"+sale.staff);
   if(who.length) tx(who.join("　"));
-  if(sale.guest) tx("区分:"+sale.guest);
   if(sale.id)    tx("取引No:"+sale.id);
   if(c.head){ L.push({t:"feed",n:1}); ct(c.head) }
   rule();
