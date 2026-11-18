@@ -51,6 +51,15 @@ body{display:flex;flex-direction:column}
 .pick .sub{font-size:13px;color:var(--ink-2);text-align:center;line-height:1.8;max-width:640px}
 .pick .sub a{color:var(--accent)}
 
+/* ②お客様の区分の画面。左に区分、右に来店を数えるところ。
+   会計のたびに来店も数えるので、行き来させずその場で押せるようにした。
+   枠そのものは下の .col.visit を動かして使いまわしている（二重に作らない）。 */
+.guest{width:100%;gap:10px;min-height:0}
+.guest .gside{display:flex;flex:1 1 0;min-height:0}
+.guest .gvisit{flex:1 1 0;min-height:0;display:flex}
+.guest .gvisit .col.visit{display:flex;flex:1 1 auto}
+.guest .pick .opts{max-width:none}
+
 /* 打ち込み画面：左にかご、右にテンキー */
 .till{width:100%;gap:10px;min-height:0}
 .col{display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);
@@ -205,6 +214,10 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
   .wrap{display:block;flex:none;padding:10px}
   .pane[data-on]{display:flex;width:100%}
   .pick,.pay,.done{min-height:62vh}
+  /* 横に半分ずつ置くと狭すぎるので、ここでは上下にならべる */
+  .guest{flex-direction:column;min-height:0}
+  .guest .gside{min-height:auto}
+  .guest .gvisit{min-height:300px}
   .till{flex-direction:column;gap:10px;padding-bottom:168px}  /* 下の固定バーのぶん空ける */
   .col{min-height:0}
   .col.left,.col.right{flex:1 1 auto}
@@ -267,11 +280,15 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
   </div>
 
   <!-- ② お客様の区分を選ぶ -->
-  <div class="pane pick" id="p-guest">
-    <h2>お客様はどちらですか</h2>
-    <div class="opts" id="guestOpts"></div>
-    <div class="sub">来店を数えるときと同じ区分です。ここで選ぶと、
-      <b>区分ごとの販売力</b>が出せるようになります。</div>
+  <!-- 右半分には、来店を数える枠（#colVisit）をその場で移してきて置く。 -->
+  <div class="pane guest" id="p-guest">
+    <div class="pick gside">
+      <h2>お客様はどちらですか</h2>
+      <div class="opts" id="guestOpts"></div>
+      <div class="sub">来店を数えるときと同じ区分です。ここで選ぶと、
+        <b>区分ごとの販売力</b>が出せるようになります。</div>
+    </div>
+    <div class="gvisit" id="gVisitSlot"></div>
   </div>
 
   <!-- ③④ 打ち込み -->
@@ -398,8 +415,18 @@ function live(){ return IT.items.filter(function(x){ return !x.del }) }
 /* ---------- 画面の切り替え ---------- */
 /* staff → guest → till → pay → done の順に進む */
 var step="staff";
+/* 来店を数える枠は、ひとつだけ作って置き場所を動かす。
+   ②お客様の区分 の画面では右半分へ、打ち込みの画面では右端へ。
+   枠を2つ作ると、数の出しかえも押したときの受けも二重になって
+   端末のなかで食い違うため、こうしてある。2026-11-18 */
+function placeVisit(k){
+  var col=$("#colVisit"); if(!col) return;
+  var to=(k==="guest")?$("#gVisitSlot"):$("#p-till");
+  if(col.parentNode!==to) to.appendChild(col);
+}
 function show(k){
   step=k;
+  placeVisit(k);
   ["staff","guest","till","pay","done"].forEach(function(v){
     $("#p-"+v).toggleAttribute("data-on",v===k);
   });
