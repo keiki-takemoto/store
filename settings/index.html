@@ -422,6 +422,21 @@ details.cat .in{padding:2px 12px 10px}
           <b>ホーム画面のアプリと、ふつうのSafariは、別々に中身を持っています。</b>
           残っているほうから開いてください（この入り口から開けば、いま使っているほうのぶんが見られます）。</p>
       </div>
+
+      <div class="sec">
+        <h3>このアプリの版</h3>
+        <div class="row">
+          <b class="mono" id="appVer">&mdash;</b>
+          <button class="btn sm ghost" id="verFresh">最新にする</button>
+          <span class="lbl" id="verMsg"></span>
+        </div>
+        <p class="note">端末は、いちど読み込んだ画面をためこんで使います。
+          そのため、<b>端末ごとに持っている版が違うこと</b>があります。<br>
+          <b>ほかの端末とこの番号が違うときは、番号の小さいほうで「最新にする」を押してください。</b><br>
+          押すと、ためこんでいるぶんを捨てて、入れ直します。<b>中のデータは消えません</b>
+          ── 商品・スタッフ・つなぎ先は、そのまま残ります。<br>
+          電波のあるところで押してください。</p>
+      </div>
     </div>
   </section>
 
@@ -1947,6 +1962,33 @@ $("#snaps").addEventListener("click",function(e){
 });
 renderSnaps();
 snapTake(false);
+
+/* ---------- このアプリの版 ----------
+   sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
+   この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
+   それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
+var APPVER="v112";
+$("#appVer").textContent=APPVER;
+$("#verFresh").addEventListener("click",async function(){
+  var m=$("#verMsg");
+  m.textContent="入れ替えています…";
+  /* ためこみ（service worker と cache）だけを捨てる。
+     商品・スタッフ・つなぎ先は localStorage なので、ここでは触らない。 */
+  try{
+    if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+      var rs=await navigator.serviceWorker.getRegistrations();
+      for(var i=0;i<rs.length;i++){ try{ await rs[i].unregister() }catch(e){} }
+    }
+  }catch(e){}
+  try{
+    if(window.caches&&caches.keys){
+      var ks=await caches.keys();
+      for(var j=0;j<ks.length;j++){ try{ await caches.delete(ks[j]) }catch(e){} }
+    }
+  }catch(e){}
+  m.textContent="入れ直します…";
+  setTimeout(function(){ location.replace(location.pathname+"?v="+Date.now()+"#conn") },300);
+});
 
 /* ピンチやダブルタップでの拡大を止める（iOSはviewportの指定を無視するので、
    指の動きそのものを受け止めて打ち消す） */
