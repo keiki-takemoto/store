@@ -316,6 +316,17 @@ details.cat .in{padding:2px 12px 10px}
             <div class="row" style="margin-top:11px">
               <button class="btn sm ghost" id="cfgMake">この端末のつなぎコードを作る</button>
             </div>
+            <div id="cfgOutWrap" hidden style="margin-top:11px">
+              <div class="lbl">つなぎコード（この端末のもの）</div>
+              <textarea class="bundle" id="cfgOut" rows="3" readonly spellcheck="false"></textarea>
+              <div class="row" style="margin-top:8px">
+                <button class="btn sm" id="cfgOutCopy">もう一度コピー</button>
+                <span class="lbl" id="cfgOutMsg"></span>
+              </div>
+              <p class="note"><b>コピーできていないときは、この枠を長押しして「すべてを選択」→「コピー」</b>してください。<br>
+                相手の端末の<b>いちばん上の枠</b>に貼って、「貼ってつなぐ」を押してもらいます。<br>
+                <b>ZIPANG1: から最後まで</b>、ぜんぶ入っているか見てください。途中で切れていると読めません。</p>
+            </div>
             <p class="note">
               まだ置き場所を作っていない場合は
               <a href="../shift/setup.html" target="_blank" rel="noopener">はじめの設定</a>（10分ほど）。<br>
@@ -593,9 +604,14 @@ function staffUrl(st){
   try{ return base+"?c="+encodeURIComponent(btoa(JSON.stringify({u:c.url,a:c.anon,c:st.tok||""}))) }
   catch(e){ return "" }
 }
+/* ほんとうにコピーできたかを返す。
+   ガワのアプリ（WKWebView）では clipboard が黙って失敗することがあり、
+   それでも「コピーしました」と出していたため、
+   古い中身を貼って「つなぎコードが読めません」になっていた。2026-11-18。 */
 async function copyText(t,msg){
-  try{ await navigator.clipboard.writeText(t); toast(msg||"コピーしました"); return }catch(e){}
-  try{ prompt("コピーしてください",t) }catch(e){ toast("コピーできませんでした") }
+  try{ await navigator.clipboard.writeText(t); toast(msg||"コピーしました"); return true }catch(e){}
+  try{ prompt("コピーしてください",t) }catch(e){}
+  return false;
 }
 var staffT=null;
 function pushStaff(){
@@ -1450,14 +1466,20 @@ $("#cfgPaste").addEventListener("click",async function(){
     $("#cfgState").textContent=(e&&e.message)||"つながりませんでした";
   }
 });
-$("#cfgMake").addEventListener("click",function(){
+/* 作ったコードは、かならず画面にも出す。
+   コピーできたかどうかに関わらず、目で見て手で選べる逃げ道を残すため。 */
+async function showBundle(){
   var c=cfgFields();
   if(!c.url||!c.anon){ toast("先に、この端末をつないでください"); return }
-  copyText(makeBundle(c),"つなぎコードをコピーしました");
-  alert("つなぎコードをコピーしました。\n\n"+
-    "中に管理用キーが入っています。渡す相手を間違えないようにしてください。\n"+
-    "相手が貼り終えたら、トークからは消してもらってください。");
-});
+  var code=makeBundle(c);
+  $("#cfgOut").value=code;
+  $("#cfgOutWrap").hidden=false;
+  var ok=await copyText(code,"つなぎコードをコピーしました");
+  $("#cfgOutMsg").textContent = ok ? "コピーしました" : "コピーできませんでした。下の枠から手で選んでください";
+  $("#cfgOutWrap").scrollIntoView({block:"center"});
+}
+$("#cfgMake").addEventListener("click",showBundle);
+$("#cfgOutCopy").addEventListener("click",showBundle);
 
 /* スタッフに配るもの。文面は選んだ月のものになる */
 var annView=new Date(); annView.setMonth(annView.getMonth()+1); annView.setDate(1);
@@ -1967,7 +1989,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v112";
+var APPVER="v113";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
