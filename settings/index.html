@@ -616,6 +616,7 @@ async function copyText(t,msg){
 var staffT=null;
 function pushStaff(){
   if(!syncOn()) return;
+  DB.staffDirty=1;                /* 送り終えるまでは、受け取りを止める */
   clearTimeout(staffT);
   staffT=setTimeout(function(){
     ensureToks();
@@ -627,6 +628,11 @@ function pushStaff(){
        「送った名前に無い人を消す」作りなので、空で送ると全員消える。
        2026-11-07、空のまま開いた端末がこれで名簿を消してしまった。 */
     if(!rows.length) return;
+    /* staff_get にあたるSQLが無いので、受け取る用の控えを store_meta にも置く。
+       meta_get は管理用キーが要るので、時給が誰にでも見えることはない。 */
+    Sync.metaPut("staff",rows).then(function(){
+      delete DB.staffDirty; saveShift(DB);
+    }).catch(function(){});
     Sync.staffPut(rows).catch(function(){});
   },800);
 }
@@ -662,6 +668,47 @@ function renderHidden(){
     return '<span class="btn sm ghost" style="cursor:default">'+esc(n)+
       ' <button class="btn sm ghost" data-unhide="'+esc(n)+'" style="margin-left:4px">戻す</button></span>';
   }).join("");
+}
+/* スタッフを受け取る。
+   これまで「送るだけ」で受け取る口が無く、新しくつないだ端末に
+   名簿も時給も出てこなかった。2026-11-18。
+
+   ・自分がまだ送り終えていないとき（staffDirty）は、受け取らない。
+     打ったばかりの時給が、古い控えで上書きされないようにするため。
+   ・控えが空のときは、何もしない。空で上書きして全員消す事故を防ぐ。
+   ・リンク（tok）は置き場所のものに合わせる。
+     ここで作り直すと、配ってあるリンクが全部使えなくなるため。 */
+function pullStaff(){
+  if(!syncOn()) return Promise.resolve(0);
+  if(DB.staffDirty) return Promise.resolve(0);
+  return Sync.metaGet("staff").then(function(r){
+    var rows=r&&r.v;
+    if(!Array.isArray(rows)||!rows.length) return 0;
+    var keep={}, by={};
+    (DB.staff||[]).forEach(function(x){ by[normName(x.name)]=x });
+    var n=0;
+    rows.forEach(function(row){
+      var k=normName(row&&row.name); if(!k) return;
+      keep[k]=1;
+      var x=by[k];
+      if(!x){
+        x={id:uid(), name:String(row.disp||row.name||k),
+           color:COLORS[DB.staff.length%COLORS.length]};
+        DB.staff.push(x); by[k]=x; n++;
+      }
+      if(row.tok && x.tok!==row.tok){ x.tok=row.tok; n++ }
+      var w=(typeof row.wage==="number")?row.wage:null;
+      if(w===null){ if(typeof x.wage==="number"){ delete x.wage; n++ } }
+      else if(x.wage!==w){ x.wage=w; n++ }
+    });
+    /* 置き場所に居ない人は、ここでも消す。送る側（staff_put）が
+       同じ考え方なので、そろえておかないと端末ごとに食い違う。 */
+    var before=DB.staff.length;
+    DB.staff=DB.staff.filter(function(x){ return keep[normName(x.name)] });
+    n+=before-DB.staff.length;
+    if(n){ saveShift(DB); renderStaff() }
+    return n;
+  }).catch(function(){ return 0 });
 }
 function staffByName(n){
   var k=normName(n);
@@ -1334,7 +1381,7 @@ function syncNow(quiet){
   clearTimeout(syncT);
   syncBusy=true; renderSync();
   return pushDirty().then(pushVen).then(pushRep).then(pushT8)
-    .then(pullItems).then(pullRep).then(pullT8).then(pullVen).then(function(){
+    .then(pullItems).then(pullRep).then(pullT8).then(pullVen).then(pullStaff).then(function(){
     syncBusy=false; syncErr=""; syncMsg="ほかの端末と同じです（"+hhmm()+" に確認）";
     renderItems(); renderVen();
     return true;
@@ -1989,7 +2036,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v113";
+var APPVER="v114";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
