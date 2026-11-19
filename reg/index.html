@@ -148,6 +148,24 @@ body{display:flex;flex-direction:column}
 .hits button .p{float:right;font-family:var(--mono);font-weight:700}
 .hits .none{font-size:13.5px;color:var(--ink-3);text-align:center;padding:28px 10px;line-height:2}
 
+/* 上の「お持ち帰り袋」。番号を打たずに、ここから選んで入れられる。 */
+.col.right > h3{flex-wrap:wrap;row-gap:7px}
+.bagb{margin-left:auto;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+  border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:inherit;white-space:nowrap;min-height:32px;line-height:1.2}
+.bagb:active{transform:translateY(1px)}
+.bagb[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.bagbox{flex:0 0 auto;border-bottom:1px solid var(--line);background:var(--surface-2);padding:10px 11px}
+.bagbox .bg{display:flex;flex-wrap:wrap;gap:8px}
+.bagbox .bg button{flex:1 1 150px;border:1px solid var(--line-2);background:var(--surface);
+  border-radius:12px;padding:12px 13px;font-size:15px;font-weight:700;cursor:pointer;
+  font-family:inherit;color:var(--ink);text-align:left;line-height:1.4;min-height:54px}
+.bagbox .bg button:active{transform:translateY(1px)}
+.bagbox .bg button .p{display:block;font-family:var(--mono);font-size:13.5px;color:var(--ink-2);
+  font-weight:700;margin-top:3px}
+.bagbox .none{font-size:13px;color:var(--ink-3);line-height:1.9}
+.bagbox .none a{color:var(--accent)}
+
 /* 来店の9つ */
 .col.visit{flex:0 0 230px;display:none}
 .vgrid{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:52px repeat(3,1fr);
@@ -336,8 +354,9 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
           <button type="button" data-f="cat" aria-pressed="false">カテゴリー</button>
           <button type="button" data-f="name" aria-pressed="false">名前</button>
         </div>
-        <span class="n" id="itemN"></span>
+        <button type="button" class="bagb" id="bagBtn" aria-pressed="false">お持ち帰り袋</button>
       </h3>
+      <div class="bagbox" id="bagBox" hidden></div>
 
       <!-- 番号で打つ（ふだんはこれ） -->
       <div class="fpane" id="f-no" data-on>
@@ -771,7 +790,6 @@ function renderPad(){
     : it ? "<b>"+esc(it.name||"（名前なし）")+"</b>　"+yen(it.price)
          : '<span style="color:var(--ng)">その番号の商品はありません</span>';
   $("#addBtn").disabled=!it;
-  $("#itemN").textContent=live().length?live().length+"点":"";
 }
 $("#pad").addEventListener("click",function(e){
   var b=e.target.closest("[data-k]"); if(!b) return;
@@ -840,6 +858,37 @@ function hitsClick(e){
 }
 $("#catHits").addEventListener("click",hitsClick);
 $("#nameHits").addEventListener("click",hitsClick);
+
+/* ---------- お持ち帰り袋 ---------- */
+/* レジでいちばんよく足すものなので、番号を打たずに上から選べるようにした。
+   中身は「商品」のうち、カテゴリーが BAGCAT のものをそのまま出す。
+   設定で足したり値段を直したりすれば、ここにも出る。
+   名前が1字でも違うと拾えないので、設定の側でこの名前のカテゴリーを
+   いちど作るようにしてある。2026-11-19 */
+var BAGCAT="お持ち帰り袋";
+function bags(){
+  return live().filter(function(x){ return String(x.cat||"")===BAGCAT }).sort(noOrder);
+}
+function renderBags(){
+  var on=$("#bagBtn").getAttribute("aria-pressed")==="true";
+  $("#bagBox").hidden=!on;
+  if(!on) return;
+  var list=bags();
+  $("#bagBox").innerHTML = list.length
+    ? '<div class="bg">'+list.map(function(x){
+        return '<button type="button" data-id="'+esc(x.id)+'">'+esc(x.name||"（名前なし）")+
+          '<span class="p">'+yen(x.price)+'</span></button>';
+      }).join("")+'</div>'
+    : '<div class="none">お持ち帰り袋が、まだ登録されていません。<br>'+
+      '<a href="../settings/">設定 → 商品</a>で登録して、'+
+      'カテゴリーを <b>「'+esc(BAGCAT)+'」</b> にしてください。ここに出ます。</div>';
+}
+$("#bagBtn").addEventListener("click",function(){
+  this.setAttribute("aria-pressed",String(this.getAttribute("aria-pressed")!=="true"));
+  renderBags();
+});
+/* 袋を2つ入れることもあるので、選んでも閉じない */
+$("#bagBox").addEventListener("click",hitsClick);
 
 /* ---------- カテゴリーから選ぶ ---------- */
 var catSel=null;                       /* null … まだ選んでいない */
@@ -1183,7 +1232,7 @@ async function pullItems(){
   IT.items=IT.items.filter(function(x){ return !(x.del&&!x.d) });
   if(r.now) IT.pulledAt=r.now;
   saveItems();
-  if(step==="till"){ renderPad(); renderFound(); if(find==="cat") renderCats() }
+  if(step==="till"){ renderPad(); renderFound(); renderBags(); if(find==="cat") renderCats() }
 }
 
 /* 「軽減税率 8%」の印。商品の表ではなく、置き場所の "tax8" に入っている。

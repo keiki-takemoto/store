@@ -581,6 +581,17 @@ function loadItems(){
 function saveItems(v){ try{ localStorage.setItem(K_ITEM,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
 
 var DB=loadShift(), IT=loadItems();
+/* レジの上には「お持ち帰り袋」のボタンがあり、
+   カテゴリーの名前が ちょうど これと同じ商品を拾って出している。
+   1字でも違うと出てこないので、打ち間違いを防ぐため、
+   いちどだけこちらで作っておく。
+   いらないと言って消したあとに、作り直すことはしない（bagcat の印で見分ける）。
+   2026-11-19 */
+if(!IT.bagcat){
+  IT.bagcat=1;
+  if(IT.cats.indexOf("お持ち帰り袋")<0){ IT.cats.push("お持ち帰り袋"); IT.cats.sort(); IT.catsDirty=1 }
+  saveItems(IT);
+}
 if(window.Sync) Sync.configure(DB.sync&&DB.sync.url?DB.sync:null);
 /* 消した印（del）が付いたものは、まだ送っていないだけなので画面には出さない */
 function live(){ return IT.items.filter(function(x){ return !x.del }) }
@@ -2047,7 +2058,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v117";
+var APPVER="v118";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
