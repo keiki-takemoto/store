@@ -111,16 +111,42 @@ body{display:flex;flex-direction:column}
 .pad button.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);
   font-family:inherit;font-size:17px;font-weight:700}
 .pad button:disabled{opacity:.4}
-.findbar{flex:0 0 auto;padding:0 11px 10px;display:flex;gap:8px;align-items:center}
+.findbar{flex:0 0 auto;padding:10px 11px;display:flex;gap:8px;align-items:center}
 .findbar input{flex:1;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);
-  border-radius:10px;padding:10px 12px;font-family:inherit}
-.found{position:absolute;left:11px;right:11px;bottom:58px;background:var(--surface);border:1px solid var(--line-2);
-  border-radius:11px;box-shadow:var(--shadow);max-height:46%;overflow-y:auto;z-index:5}
-.found button{display:block;width:100%;text-align:left;border:none;border-bottom:1px solid var(--line);
-  background:transparent;padding:11px 12px;cursor:pointer;font-family:inherit;font-size:15px;line-height:1.5}
-.found button .no{font-family:var(--mono);color:var(--ink-3);font-size:12px;margin-right:9px}
-.found button .p{float:right;font-family:var(--mono);font-weight:700}
+  border-radius:10px;padding:11px 12px;font-family:inherit}
 .col.right{position:relative}
+
+/* ---- 商品の探しかた（番号／カテゴリー／名前）---- */
+/* 右の列の見出しにタブを置いて、中身だけ入れかえる。
+   ふだんは「番号」。値札が読めないときや、番号を知らない人のために
+   カテゴリーと名前も用意した。2026-11-19 */
+.ftabs{display:flex;gap:3px;background:var(--surface-2);border-radius:999px;padding:3px}
+.ftabs button{border:none;background:transparent;color:var(--ink-2);border-radius:999px;
+  padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
+  white-space:nowrap;min-height:32px;line-height:1.2}
+.ftabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.fpane{display:none;flex:1 1 auto;min-height:0;flex-direction:column}
+.fpane[data-on]{display:flex}
+
+/* カテゴリーの並び */
+.cats{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:7px;padding:10px 11px;
+  max-height:38%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.cats button{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;
+  padding:9px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  color:var(--ink-2);min-height:40px;line-height:1.2}
+.cats button:active{transform:translateY(1px)}
+.cats button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.cats button .n{font-family:var(--mono);font-weight:600;opacity:.65;margin-left:6px;font-size:12px}
+
+/* 探した結果の一覧。カテゴリーでも名前でも同じ形で出す。 */
+.hits{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 11px 9px}
+.hits button{display:block;width:100%;text-align:left;border:none;border-bottom:1px solid var(--line);
+  background:transparent;padding:13px 3px;cursor:pointer;font-family:inherit;font-size:15.5px;
+  line-height:1.5;color:var(--ink)}
+.hits button:active{background:var(--surface-2)}
+.hits button .no{font-family:var(--mono);color:var(--ink-3);font-size:12px;margin-right:9px}
+.hits button .p{float:right;font-family:var(--mono);font-weight:700}
+.hits .none{font-size:13.5px;color:var(--ink-3);text-align:center;padding:28px 10px;line-height:2}
 
 /* 来店の9つ */
 .col.visit{flex:0 0 230px;display:none}
@@ -223,12 +249,13 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
   .col.left,.col.right{flex:1 1 auto}
   .col.right{order:-1}            /* 打つところを上に。かごはその下に伸びる */
   .scroll{overflow:visible;max-height:none}
+  /* 高さが決まらないので、はみ出させずにページごと下へ伸ばす */
+  .cats{max-height:none;overflow:visible}
+  .hits{overflow:visible;max-height:none}
   .pad{grid-auto-rows:minmax(54px,auto)}
   .pad button{font-size:24px}
   .disp{font-size:32px}
   .none{padding:22px 10px}
-  /* 名前の候補は、かぶせずにそのまま下に出す */
-  .found{position:static;max-height:none;margin:0 11px 10px;box-shadow:none}
   /* 合計とお会計は、いつでも押せるように画面の下へ */
   .foot{position:fixed;left:0;right:0;bottom:0;z-index:7;background:var(--surface);
     border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(40,34,20,.10);
@@ -303,28 +330,49 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
       </div>
     </div>
     <div class="col right">
-      <h3>商品番号<span class="n" id="itemN"></span></h3>
-      <div class="disp empty" id="disp">番号を打つ</div>
-      <div class="hit" id="hit"></div>
-      <div class="pad" id="pad">
-        <button type="button" data-k="1">1</button>
-        <button type="button" data-k="2">2</button>
-        <button type="button" data-k="3">3</button>
-        <button type="button" data-k="4">4</button>
-        <button type="button" data-k="5">5</button>
-        <button type="button" data-k="6">6</button>
-        <button type="button" data-k="7">7</button>
-        <button type="button" data-k="8">8</button>
-        <button type="button" data-k="9">9</button>
-        <button type="button" class="fn" data-k="c">ぜんぶ消す</button>
-        <button type="button" data-k="0">0</button>
-        <button type="button" class="fn" data-k="b">← 1字消す</button>
-        <button type="button" class="go" data-k="add" id="addBtn" disabled style="grid-column:1/-1">かごに入れる</button>
+      <h3>
+        <div class="ftabs" id="ftabs">
+          <button type="button" data-f="no" aria-pressed="true">番号</button>
+          <button type="button" data-f="cat" aria-pressed="false">カテゴリー</button>
+          <button type="button" data-f="name" aria-pressed="false">名前</button>
+        </div>
+        <span class="n" id="itemN"></span>
+      </h3>
+
+      <!-- 番号で打つ（ふだんはこれ） -->
+      <div class="fpane" id="f-no" data-on>
+        <div class="disp empty" id="disp">番号を打つ</div>
+        <div class="hit" id="hit"></div>
+        <div class="pad" id="pad">
+          <button type="button" data-k="1">1</button>
+          <button type="button" data-k="2">2</button>
+          <button type="button" data-k="3">3</button>
+          <button type="button" data-k="4">4</button>
+          <button type="button" data-k="5">5</button>
+          <button type="button" data-k="6">6</button>
+          <button type="button" data-k="7">7</button>
+          <button type="button" data-k="8">8</button>
+          <button type="button" data-k="9">9</button>
+          <button type="button" class="fn" data-k="c">ぜんぶ消す</button>
+          <button type="button" data-k="0">0</button>
+          <button type="button" class="fn" data-k="b">← 1字消す</button>
+          <button type="button" class="go" data-k="add" id="addBtn" disabled style="grid-column:1/-1">かごに入れる</button>
+        </div>
       </div>
-      <div class="findbar">
-        <input type="text" id="q" placeholder="番号が分からないとき　名前で探す" autocomplete="off">
+
+      <!-- カテゴリーから選ぶ -->
+      <div class="fpane" id="f-cat">
+        <div class="cats" id="catList"></div>
+        <div class="hits" id="catHits"></div>
       </div>
-      <div class="found" id="found" hidden></div>
+
+      <!-- 名前で探す -->
+      <div class="fpane" id="f-name">
+        <div class="findbar">
+          <input type="text" id="q" placeholder="名前の一部でさがす" autocomplete="off">
+        </div>
+        <div class="hits" id="nameHits"></div>
+      </div>
     </div>
 
     <div class="col visit" id="colVisit">
@@ -736,33 +784,124 @@ $("#pad").addEventListener("click",function(e){
 });
 /* パソコンのキーボードでも打てるようにしておく */
 document.addEventListener("keydown",function(e){
-  if(step!=="till") return;
+  if(step!=="till"||find!=="no") return;
   if(e.target&&/^(INPUT|TEXTAREA|BUTTON|SELECT)$/.test(e.target.tagName)) return;
   if(/^[0-9]$/.test(e.key)){ if(buf.length<6) buf+=e.key; renderPad(); e.preventDefault() }
   else if(e.key==="Backspace"){ buf=buf.slice(0,-1); renderPad(); e.preventDefault() }
   else if(e.key==="Enter"){ var it=byNo(buf); if(it){ addToCart(it); buf=""; renderPad() } e.preventDefault() }
 });
 
-/* 名前で探す */
-function renderFound(){
-  var q=$("#q").value.trim(), box=$("#found");
-  if(!q){ box.hidden=true; box.innerHTML=""; return }
-  var hit=live().filter(function(x){ return String(x.name||"").indexOf(q)>=0 }).slice(0,12);
-  box.hidden=false;
-  box.innerHTML=hit.length
-    ? hit.map(function(x){
-        return '<button type="button" data-id="'+esc(x.id)+'">'+
-          '<span class="p">'+yen(x.price)+'</span>'+
-          '<span class="no">'+esc(x.no||"-")+'</span>'+esc(x.name||"（名前なし）")+'</button>';
-      }).join("")
-    : '<button type="button" disabled style="color:var(--ink-3)">見つかりません</button>';
+/* ---------- 探しかたのタブ（番号／カテゴリー／名前） ---------- */
+/* 値札の番号を打つのがいちばん速いので、ふだんは「番号」。
+   値札が読めないときや、入ったばかりの人のために、ほかの2つを用意した。
+   かごに入れる先はどれも同じ addToCart。2026-11-19 */
+var find="no";
+function setFind(k){
+  find=k;
+  $("#ftabs").querySelectorAll("[data-f]").forEach(function(b){
+    b.setAttribute("aria-pressed",String(b.dataset.f===k));
+  });
+  ["no","cat","name"].forEach(function(v){ $("#f-"+v).toggleAttribute("data-on",v===k) });
+  if(k==="cat") renderCats();
+  if(k==="name"){ renderFound(); try{ $("#q").focus() }catch(e){} }
 }
-$("#q").addEventListener("input",renderFound);
-$("#found").addEventListener("click",function(e){
+$("#ftabs").addEventListener("click",function(e){
+  var b=e.target.closest("[data-f]"); if(!b) return;
+  setFind(b.dataset.f);
+});
+
+/* 番号の若い順にならべる。数字でないものは最後。 */
+function noOrder(a,b){
+  function v(x){ var n=parseInt(String(x.no||"").replace(/[^0-9]/g,""),10); return isNaN(n)?1e12:n }
+  return v(a)-v(b);
+}
+/* 一度に出すのはここまで。800点あるので、ぜんぶ出すと重い。 */
+var HITMAX=150;
+function hitHtml(list,more){
+  if(!list.length) return '<div class="none">見つかりません。</div>';
+  var cut=list.slice(0,HITMAX);
+  return cut.map(function(x){
+    return '<button type="button" data-id="'+esc(x.id)+'">'+
+      '<span class="p">'+yen(x.price)+'</span>'+
+      '<span class="no">'+esc(x.no||"-")+'</span>'+esc(x.name||"（名前なし）")+'</button>';
+  }).join("")+
+  (list.length>cut.length
+    ? '<div class="none">ほかに '+(list.length-cut.length)+'点あります。<br>'+(more||"もう少ししぼってください。")+'</div>'
+    : "");
+}
+/* 一覧から押したとき。かごは下（狭い画面では別のところ）にあって
+   目に入らないことがあるので、何を入れたかを言葉でも出す。 */
+function hitsClick(e){
   var b=e.target.closest("[data-id]"); if(!b) return;
   var it=live().filter(function(x){ return x.id===b.dataset.id })[0];
-  if(it){ addToCart(it); $("#q").value=""; renderFound(); $("#q").blur() }
+  if(!it) return;
+  addToCart(it);
+  toast((it.name||"商品")+" を入れました");
+}
+$("#catHits").addEventListener("click",hitsClick);
+$("#nameHits").addEventListener("click",hitsClick);
+
+/* ---------- カテゴリーから選ぶ ---------- */
+var catSel=null;                       /* null … まだ選んでいない */
+/* 設定で作ったカテゴリーと、商品に実際に付いているものを合わせる。
+   控え（cats）に無い名前が商品に付いていることがあるため。 */
+function catsOf(){
+  var out=[], seen={};
+  (IT.cats||[]).forEach(function(c){ c=String(c||""); if(c&&!seen[c]){ seen[c]=1; out.push(c) } });
+  live().forEach(function(x){
+    var c=String(x.cat||""); if(c&&!seen[c]){ seen[c]=1; out.push(c) }
+  });
+  out.sort();
+  return out;
+}
+function renderCats(){
+  var cs=catsOf(), n={}, none=0;
+  live().forEach(function(x){
+    var c=String(x.cat||"");
+    if(c) n[c]=(n[c]||0)+1; else none++;
+  });
+  var h=cs.map(function(c){
+    return '<button type="button" data-c="'+esc(c)+'" aria-pressed="'+(catSel===c)+'">'+
+      esc(c)+'<span class="n">'+(n[c]||0)+'</span></button>';
+  }).join("");
+  if(none) h+='<button type="button" data-c="__none__" aria-pressed="'+(catSel==="__none__")+'">'+
+    'カテゴリーなし<span class="n">'+none+'</span></button>';
+  $("#catList").innerHTML=h;
+  renderCatHits();
+}
+function renderCatHits(){
+  var box=$("#catHits");
+  if(!$("#catList").children.length){
+    box.innerHTML='<div class="none">カテゴリーがまだ付いていません。<br>'+
+      '<a href="../settings/" style="color:var(--accent)">設定 → 商品</a>で付けられます。</div>';
+    return;
+  }
+  if(catSel==null){ box.innerHTML='<div class="none">上からカテゴリーを選んでください。</div>'; return }
+  var hit=live().filter(function(x){
+    var c=String(x.cat||"");
+    return (catSel==="__none__") ? !c : (c===catSel);
+  }).sort(noOrder);
+  box.innerHTML=hitHtml(hit,"番号か名前のタブでさがしてください。");
+}
+$("#catList").addEventListener("click",function(e){
+  var b=e.target.closest("[data-c]"); if(!b) return;
+  catSel=(catSel===b.dataset.c)?null:b.dataset.c;   /* もう一度押すと選び直し */
+  renderCats();
+  $("#catHits").scrollTop=0;
 });
+
+/* ---------- 名前で探す ---------- */
+function renderFound(){
+  var q=$("#q").value.trim(), box=$("#nameHits");
+  if(!q){ box.innerHTML='<div class="none">名前の一部を打ってください。<br>ひらがなでも漢字でも、入っていれば出ます。</div>'; return }
+  var k=q.toLowerCase();
+  var hit=live().filter(function(x){
+    return String(x.name||"").toLowerCase().indexOf(k)>=0
+        || String(x.no||"").indexOf(q)>=0;
+  }).sort(noOrder);
+  box.innerHTML=hitHtml(hit);
+}
+$("#q").addEventListener("input",renderFound);
 
 /* ---------- ④ かご ---------- */
 function addToCart(it){
@@ -1044,7 +1183,7 @@ async function pullItems(){
   IT.items=IT.items.filter(function(x){ return !(x.del&&!x.d) });
   if(r.now) IT.pulledAt=r.now;
   saveItems();
-  if(step==="till"){ renderPad(); renderFound() }
+  if(step==="till"){ renderPad(); renderFound(); if(find==="cat") renderCats() }
 }
 
 /* 「軽減税率 8%」の印。商品の表ではなく、置き場所の "tax8" に入っている。
@@ -1111,7 +1250,7 @@ function openFor(m){
   if(m==="visit"){ show("till"); return }
   show((!guest&&AREAS.length)?"guest":"till");
 }
-buildVisit(); renderVisit(); renderFix(); renderPays();
+buildVisit(); renderVisit(); renderFix(); renderPays(); renderFound();
 renderBar();
 /* 担当がもう決まっていて、さっきまで使っていたなら、①はとばす */
 openFor(document.body.dataset.mode);
