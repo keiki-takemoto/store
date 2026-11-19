@@ -902,23 +902,40 @@ $("#payBtn").addEventListener("click",function(){
     .filter(Boolean).join("　")+(s.disc?"（値引き "+yen(s.disc)+"）":"");
   show("done"); renderBar();
   flush();
+  /* そのままレシートを出す。押し忘れをなくすため。
+     出したくないときは 設定 → レジ → レシート で切れる。
+     印刷が失敗しても会計はもう終わっているので、ここでは止めない。2026-11-19 */
+  if(window.Receipt&&Receipt.auto()) printSale(sale,{btn:$("#rcptBtn")});
 });
 /* ---------- レシート ---------- */
 /* Bluetoothのプリンタはブラウザからは繋げない（iPadはAppleが禁止している）ので、
    端末の「プリント」に渡す。Wi-Fiで繋がっているAirPrint対応のレシートプリンタなら、
    ここから出る。店名などは 設定 → レジ → レシート。 */
-$("#rcptBtn").addEventListener("click",function(){
-  if(!lastSale||!window.Receipt) return;
-  var b=this, note=$("#rcptNote");
-  b.disabled=true; note.hidden=false;
-  note.textContent=Receipt.inShell()
-    ? "印刷しています…"
+
+/* 1か所にまとめてある。ボタンから押したときも、会計のあと勝手に出すときも、
+   取り消しの控えを出すときも、ここを通る。
+   btn を渡すと、そのボタンが出ているあいだだけ押せなくする。 */
+function printSale(sale,opt){
+  opt=opt||{};
+  if(!sale||!window.Receipt) return Promise.resolve();
+  var note=$("#rcptNote"), b=opt.btn||null;
+  if(b) b.disabled=true;
+  note.hidden=false;
+  note.textContent = opt.voided ? "取り消しの控えを印刷しています…"
+    : Receipt.inShell() ? "印刷しています…"
     : "プリンタが出てこないときは、設定 → レジ → レシート を見てください。";
-  Promise.resolve(Receipt.print(lastSale)).then(function(){
-    if(Receipt.inShell()) note.textContent="印刷しました";
+  return Promise.resolve(Receipt.print(sale,!!opt.voided)).then(function(){
+    if(Receipt.inShell()) note.textContent=opt.voided?"取り消しの控えを印刷しました":"印刷しました";
   }).catch(function(e){
-    note.textContent=(e&&e.message)||"印刷できませんでした";
-  }).then(function(){ b.disabled=false });
+    var m=(e&&e.message)||"印刷できませんでした";
+    note.textContent=m;
+    /* 会計のあと勝手に出したときは、この帯が見えない画面に移っていることがある。
+       紙が出なかったことに気づけるよう、toast でも出す。 */
+    toast(m);
+  }).then(function(){ if(b) b.disabled=false });
+}
+$("#rcptBtn").addEventListener("click",function(){
+  printSale(lastSale,{btn:this});
 });
 
 $("#nextBtn").addEventListener("click",function(){
@@ -940,7 +957,11 @@ $("#voidBtn").addEventListener("click",async function(){
     catch(e){ lastSale.v=1; saveReg() }      /* v=1 … 取り消しをまだ伝えていない */
   }
   toast("取り消しました");
+  /* 取り消しの控えを出す。次のお会計に進むと lastSale が消えるので、
+     ここで控えを取ってから渡す。 */
+  var voided=lastSale;
   b.disabled=false; renderBar(); $("#nextBtn").click();
+  if(window.Receipt&&Receipt.auto()) printSale(voided,{voided:true});
 });
 
 /* ---------- 置き場所に送る ---------- */

@@ -492,8 +492,17 @@ details.cat .in{padding:2px 12px 10px}
     <div class="card rc">
       <div class="card-h"><h2>レシート</h2><span class="hint" id="rcState"></span></div>
       <div class="sec">
-        <p class="note" style="margin-top:0">レジで会計したあとの画面に出る
-          「<b>レシートを印刷</b>」で、紙に出す中身です。</p>
+        <p class="note" style="margin-top:0">レジで<b>会計するを押したとき</b>と、
+          会計のあとの「<b>レシートを印刷</b>」で、紙に出す中身です。</p>
+        <div class="vrow"><label>自動で出す</label>
+          <span class="fg"><label style="display:flex;align-items:center;gap:7px;cursor:pointer">
+            <input type="checkbox" id="rcAuto" checked>
+            会計したら、押さなくてもレシートを出す</label></span></div>
+        <p class="note" style="margin-top:0">
+          <b>会計を取り消したときは、「取 消」と書いた控えが出ます。</b>
+          レジの画面でも、集計の画面から取り消したときでも出ます。<br>
+          ブラウザで開いているときは、そのたびに端末の「プリント」がひらきます。
+          それが邪魔なときは、ここを外してください。</p>
         <div class="vrow"><label>いちばん上</label>
           <input type="text" id="rcTitle" placeholder="領収書（空のままなら出ません）"></div>
         <div class="vrow"><label>店名</label>
@@ -1734,6 +1743,7 @@ function renderRcpt(){
   $("#rcTax2").value=(typeof rc.tax2==="number")?rc.tax2:"";
   $("#rcW").value=(String(rc.w)==="58")?"58":"80";
   $("#rcFoot").value=(rc.foot==null)?"":rc.foot;
+  $("#rcAuto").checked=(rc.auto!==false);        /* 決めていなければ出す */
   $("#rcState").textContent = syncOn() ? "" : "この端末だけに入っています";
   /* 繋ぎ方の説明は、いまどこで開いているかで変わる */
   $("#rcHow").innerHTML = (window.Receipt&&Receipt.inShell())
@@ -1759,7 +1769,8 @@ function rcLocal(){
     inv:$("#rcInv").value.trim(), head:$("#rcHead").value.trim(), foot:$("#rcFoot").value.trim(),
     tax:(isNaN(t)||t<0||t>20)?10:t,
     tax2:(isNaN(t2)||t2<0||t2>20)?8:t2,
-    w:($("#rcW").value==="58")?"58":"80" };
+    w:($("#rcW").value==="58")?"58":"80",
+    auto:!!$("#rcAuto").checked };
   $("#rcTax").value=REGSET.rc.tax;
   $("#rcTax2").value=REGSET.rc.tax2;
   try{ localStorage.setItem(K_REGSET,JSON.stringify(REGSET)) }catch(e){}
@@ -2036,7 +2047,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v115";
+var APPVER="v116";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");

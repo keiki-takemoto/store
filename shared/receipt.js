@@ -14,6 +14,8 @@
 
    使い方
      Receipt.print(sale)   … 会計1件を印刷する（Promiseを返す）
+     Receipt.printVoid(s)  … 取り消しの控えを印刷する
+     Receipt.auto()        … 会計のあと自動で印刷する決めになっているか
      Receipt.sample()      … 見本を印刷する（設定の確認用）
      Receipt.cfg()         … いまの決めごとを読む
 
@@ -43,7 +45,11 @@ function cfg(){
     till:String(rc.till||""),                               /* レジ番号。空なら出さない */
     tax :(typeof rc.tax==="number"?rc.tax:10),              /* ふつうの消費税の率（％） */
     tax2:(typeof rc.tax2==="number"?rc.tax2:8),             /* 軽減税率（飲み物など） */
-    w   :(String(rc.w)==="58"?"58":"80")                    /* 紙の幅 mm */
+    w   :(String(rc.w)==="58"?"58":"80"),                  /* 紙の幅 mm */
+    /* 会計したあと、押さなくても勝手に出すか。ふつうは出す。
+       ブラウザで開いているときは端末の「プリント」が毎回ひらくので、
+       そこが邪魔なときだけ 設定 → レジ → レシート で切れるようにしてある。 */
+    auto:(rc.auto===false?false:true)
   };
 }
 
@@ -107,11 +113,15 @@ function lineHtml(l,c){
     (isLow(l,c)?'<span class="mk">※</span>':"")+'</div>'+
     '<div class="rq"><span>'+yen(p)+'　'+q+'点</span><b>'+yen(p*q)+'</b></div></div>';
 }
+/* 取り消しの控えでは、売上から引かれたことが紙の上で分かるように − を付ける。
+   品物の明細はそのまま（何を戻したかを見るところなので）。2026-11-19 */
+function sign(n,v){ return (v&&Number(n)?"-":"")+yen(n) }
+
 function tr(k,v,cls){
   return '<div class="rt'+(cls?" "+cls:"")+'"><span>'+esc(k)+'</span><b>'+esc(v)+'</b></div>';
 }
 
-function html(sale,c){
+function html(sale,c,v){
   sale=sale||{};
   var lines=sale.lines||[];
   var sub=Number(sale.subtotal);
@@ -120,7 +130,8 @@ function html(sale,c){
   var tot=Number(sale.total); if(isNaN(tot)) tot=sub-disc;
   var qty=Number(sale.qty); if(isNaN(qty)){ qty=0; lines.forEach(function(l){ qty+=Number(l.qty)||0 }) }
 
-  var h=c.title?'<div class="ttl">['+esc(c.title)+']</div>':"";
+  var ttl=v?"取 消":c.title;
+  var h=ttl?'<div class="ttl">['+esc(ttl)+']</div>':"";
   h+='<div class="rh"><div class="shop">'+esc(c.shop)+'</div>'+
     (c.addr?'<div class="addr">'+esc(c.addr).replace(/\n/g,"<br>")+'</div>':"")+
     (c.inv ?'<div class="addr">登録番号:'+esc(c.inv)+'</div>':"")+'</div>';
@@ -132,31 +143,35 @@ function html(sale,c){
   if(sale.staff) who.push("担当:"+sale.staff);
   if(who.length) h+='<div class="meta">'+esc(who.join("　"))+'</div>';
   if(sale.id)    h+='<div class="meta">取引No:'+esc(sale.id)+'</div>';
-  if(c.head)     h+='<div class="head">'+esc(c.head)+'</div>';
+  if(v)          h+='<div class="head"><b>この会計を取り消しました</b></div>';
+  else if(c.head)h+='<div class="head">'+esc(c.head)+'</div>';
 
   h+='<div class="hr"></div>';
   h+=lines.length?lines.map(function(l){ return lineHtml(l,c) }).join("")
                   :'<div class="rl"><div class="rn">—</div></div>';
   h+='<div class="hr"></div>';
 
-  h+=tr("小計　"+qty+"点",yen(sub));
+  h+=tr("小計　"+qty+"点",sign(sub,v));
   if(disc) h+=tr("値引き","-"+yen(disc));
-  h+=tr("合計",yen(tot),"big");
+  h+=tr(v?"取消合計":"合計",sign(tot,v),"big");
 
   /* 登録番号を入れているときだけ、消費税の内訳を出す（適格簡易請求書の形） */
   if(c.inv){
     var gs=taxBreak(sale,c);
-    h+=tr("（内消費税等",yen(taxTotal(gs))+"）","sm");
+    h+=tr("（内消費税等",sign(taxTotal(gs),v)+"）","sm");
     gs.forEach(function(g){
-      h+=tr("（"+rateLabel(g,c),yen(g.total)+"）","sm");
-      h+=tr("（　内消費税等",yen(g.tax)+"）","sm");
+      h+=tr("（"+rateLabel(g,c),sign(g.total,v)+"）","sm");
+      h+=tr("（　内消費税等",sign(g.tax,v)+"）","sm");
     });
   }
 
   var pn=payName(sale.pay);
   var got=(typeof sale.cash==="number"&&sale.cash>0)?sale.cash:null;
-  if(pn) h+=tr("（"+pn,yen(got==null?tot:got)+"）","sm");
-  if(got!=null){
+  if(pn) h+=tr("（"+pn,sign((v||got==null)?tot:got,v)+"）","sm");
+  /* 取り消しでは お預かり・お釣り を出さない。
+     お金を数えて渡すのは人なので、ここに数字が出ていると
+     二重に渡す事故のもとになる。 */
+  if(!v&&got!=null){
     h+=tr("お預かり",yen(got));
     h+=tr("お釣り",yen(got-tot),"big");
   }
@@ -164,7 +179,8 @@ function html(sale,c){
   h+='<div class="hr"></div>';
   if(lines.some(function(l){ return isLow(l,c) }))
     h+='<div class="note">※ は軽減税率（'+c.tax2+'%）対象</div>';
-  if(c.foot) h+='<div class="foot">'+esc(c.foot)+'</div>';
+  var ft=v?"取り消しの控えです":c.foot;
+  if(ft) h+='<div class="foot">'+esc(ft)+'</div>';
   return h;
 }
 
@@ -177,7 +193,7 @@ function inShell(){ return !!(window.ZipangShell && window.ZipangShell.print) }
 function cols(c){ return c.w==="58" ? 32 : 48 }
 
 /* 紙に並べる行。見た目はHTMLのレシートと同じにしてある。 */
-function doc(sale,c){
+function doc(sale,c,v){
   sale=sale||{};
   var lines=sale.lines||[], L=[];
   function tx(v,big,bold){ L.push({t:"l", v:v, big:!!big, bold:!!bold}) }
@@ -185,7 +201,8 @@ function doc(sale,c){
   function lr(l,r,big,bold){ L.push({t:"lr", l:l, r:r, big:!!big, bold:!!bold}) }
   function rule(){ L.push({t:"rule"}) }
 
-  if(c.title) ct("["+c.title+"]",false,true);
+  var ttl=v?"取 消":c.title;
+  if(ttl) ct("["+ttl+"]",false,true);
   ct(c.shop,true,true);
   if(c.addr) c.addr.split("\n").forEach(function(x){ if(x) ct(x) });
   if(c.inv) ct("登録番号:"+c.inv);
@@ -196,7 +213,8 @@ function doc(sale,c){
   if(sale.staff) who.push("担当:"+sale.staff);
   if(who.length) tx(who.join("　"));
   if(sale.id)    tx("取引No:"+sale.id);
-  if(c.head){ L.push({t:"feed",n:1}); ct(c.head) }
+  if(v){ L.push({t:"feed",n:1}); ct("この会計を取り消しました",true,true) }
+  else if(c.head){ L.push({t:"feed",n:1}); ct(c.head) }
   rule();
 
   var sub=Number(sale.subtotal);
@@ -212,27 +230,28 @@ function doc(sale,c){
     lr("  "+yen(pr)+"　"+q+"点", yen(pr*q));
   });
   rule();
-  lr("小計　"+qty+"点",yen(sub));
+  lr("小計　"+qty+"点",sign(sub,v));
   if(disc) lr("値引き","-"+yen(disc));
-  lr("合計",yen(tot),true,true);
+  lr(v?"取消合計":"合計",sign(tot,v),true,true);
   if(c.inv){
     var gs=taxBreak(sale,c);
-    lr("（内消費税等",yen(taxTotal(gs))+"）");
+    lr("（内消費税等",sign(taxTotal(gs),v)+"）");
     gs.forEach(function(g){
-      lr("（"+rateLabel(g,c),yen(g.total)+"）");
-      lr("（　内消費税等",yen(g.tax)+"）");
+      lr("（"+rateLabel(g,c),sign(g.total,v)+"）");
+      lr("（　内消費税等",sign(g.tax,v)+"）");
     });
   }
   var pn=payName(sale.pay);
   var got=(typeof sale.cash==="number"&&sale.cash>0)?sale.cash:null;
-  if(pn) lr("（"+pn,yen(got==null?tot:got)+"）");
-  if(got!=null){
+  if(pn) lr("（"+pn,sign((v||got==null)?tot:got,v)+"）");
+  if(!v&&got!=null){
     lr("お預かり",yen(got));
     lr("お釣り",yen(got-tot),true,true);
   }
   rule();
   if(lines.some(function(l){ return isLow(l,c) })) tx("※ は軽減税率（"+c.tax2+"%）対象");
-  if(c.foot) ct(c.foot);
+  var ft=v?"取り消しの控えです":c.foot;
+  if(ft) ct(ft);
   L.push({t:"feed", n:2});
   L.push({t:"cut"});
   return { w:cols(c), lines:L };
@@ -287,17 +306,21 @@ function mount(){
   return box;
 }
 
-function print(sale){
+/* v を true にすると、取り消しの控えになる。 */
+function print(sale,v){
   var c=cfg();
   /* ガワの中なら、Bluetoothのプリンタへ。失敗の文句はそのまま呼び元に返す。 */
-  if(inShell()) return window.ZipangShell.print(doc(sale,c));
+  if(inShell()) return window.ZipangShell.print(doc(sale,c,v));
   /* ふつうのSafariなら、これまで通り端末の「プリント」へ */
   var box=mount();
   box.setAttribute("data-w",c.w);
-  box.innerHTML=html(sale,c);
+  box.innerHTML=html(sale,c,v);
   window.print();
   return Promise.resolve();
 }
+function printVoid(sale){ return print(sale,true) }
+/* 会計のあと、押さなくても出す決めになっているか */
+function auto(){ return cfg().auto }
 
 /* 設定の見本。実際の会計とは関係ない中身で、紙の出かただけ確かめる。 */
 function sample(){
@@ -308,5 +331,6 @@ function sample(){
     subtotal:6520, discount:200, total:6320, qty:5, cash:10000 });
 }
 
-window.Receipt={ cfg:cfg, html:html, doc:doc, print:print, sample:sample, inShell:inShell };
+window.Receipt={ cfg:cfg, html:html, doc:doc, print:print, printVoid:printVoid,
+  auto:auto, sample:sample, inShell:inShell };
 })();

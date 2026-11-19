@@ -192,6 +192,7 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
 <script src="../shared/sync.js"></script>
 <script src="../shared/sales.js"></script>
 <script src="../shared/lock.js"></script>
+<script src="../shared/receipt.js"></script>
 <script>
 (function(){
 "use strict";
@@ -537,7 +538,16 @@ $("#byUnit").addEventListener("click",async function(e){
     var s=rows.filter(function(x){ return x.id===v.dataset.void })[0]; if(!s) return;
     if(!confirm("この会計（"+yen(s.total)+"）を取り消します。\n売上から外れ、在庫も戻ります。よろしいですか？")) return;
     v.disabled=true; v.textContent="取り消しています…";
-    try{ await Sync.saleVoid(s.id); s.voided=true; render(); toast("取り消しました") }
+    try{
+      await Sync.saleVoid(s.id); s.voided=true; render(); toast("取り消しました");
+      /* 取り消しの控えを紙でも出す。レジの画面で取り消したときと同じ紙。
+         置き場所から戻ってきた行をそのまま渡している。
+         印刷でつまずいても、取り消しそのものはもう終わっているので止めない。 */
+      if(window.Receipt&&Receipt.auto()){
+        try{ await Receipt.printVoid(s) }
+        catch(e2){ toast((e2&&e2.message)||"取り消しの控えが印刷できませんでした") }
+      }
+    }
     catch(err){ v.disabled=false; v.textContent="この会計を取り消す"; toast((err&&err.message)||"取り消せませんでした") }
     return;
   }
