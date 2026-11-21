@@ -62,10 +62,13 @@ body{display:flex;flex-direction:column}
 
 /* 打ち込み画面：左にかご、右にテンキー */
 .till{width:100%;gap:10px;min-height:0}
-.col{display:flex;flex-direction:column;min-height:0;background:var(--surface);border:1px solid var(--line);
+.col{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--surface);border:1px solid var(--line);
   border-radius:13px;box-shadow:var(--shadow);overflow:hidden}
-.col.left{flex:1.15 1 0}
-.col.right{flex:1 1 0}
+/* かごは品名と値段が読めればよいので細く、打つところを広くとる。
+   番号のキーは指で押すところなので、ここが広いほど押し間違いが減る。
+   カテゴリー・名前でさがす一覧も、この幅をそのまま使う。2026-11-21 */
+.col.left{flex:0.9 1 0}
+.col.right{flex:1.4 1 0}
 .col > h3{flex:0 0 auto;font-size:13px;color:var(--ink-2);padding:9px 13px;border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:8px}
 .col > h3 .n{margin-left:auto;font-family:var(--mono);color:var(--ink-3);font-size:12px}
