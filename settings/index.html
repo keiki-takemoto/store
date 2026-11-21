@@ -226,7 +226,9 @@ details.cat .in{padding:2px 12px 10px}
           </div>
           <div class="nf-row end"><button class="btn primary" id="addItem">保存</button></div>
         </div>
-        <p class="note">商品名だけ入れれば登録できます。ほかは空のままでも構いません。<br>
+        <p class="note"><b>商品No</b>は、<b>いまある中でいちばん大きい番号の次</b>を自動で入れてあります。
+          そのまま保存すれば、番号が重なりません。別の番号にしたいときは打ち直せます。<br>
+          商品名だけ入れれば登録できます。ほかは空のままでも構いません。<br>
           <b>月次の報告が必要</b>に印を付けると、
           <a href="../stock/">在庫管理</a>の<b>月次の販売報告</b>に、
           カテゴリーがちがってもまとめて出ます。委託でお預かりしている商品に付けてください。
@@ -1047,6 +1049,31 @@ function itemByNo(no){
   if(!k) return null;
   return live().filter(function(x){ return String(x.no||"").trim()===k })[0]||null;
 }
+/* ---------- 次の商品No ---------- */
+/* 店を開けてから 1, 2, 3 … と順に付けてきた番号。
+   登録のたびに一覧をさかのぼって数えると、どこかで必ず重なる。
+   いちばん大きい番号の次を、はじめから入れておく。
+
+   消した商品の番号も数に入れている（IT.items は消した印の付いたものも持っている）。
+   昔の会計の記録にはその番号が残っているので、
+   別の商品に付け直すと、あとから記録を見たときに取り違える。2026-11-21 */
+function nextNo(){
+  var max=0, width=0;
+  (IT.items||[]).forEach(function(x){
+    var t=String(x.no||"").trim();
+    if(!/^[0-9]+$/.test(t)) return;        /* A-12 のような番号は数えない */
+    var n=parseInt(t,10);
+    if(n>max){ max=n; width=t.length }
+  });
+  var next=String(max+1);
+  while(width>next.length) next="0"+next;  /* 001 のように0を付けていたら桁をそろえる */
+  return next;
+}
+/* 空のときだけ入れる。打ちかけの番号は消さない。 */
+function fillNextNo(){
+  var el=$("#nNo");
+  if(el && !el.value.trim()) el.value=nextNo();
+}
 $("#addItem").addEventListener("click",function(){
   var name=$("#nName").value.trim();
   if(!name){ toast("商品名を入れてください"); $("#nName").focus(); return }
@@ -1068,8 +1095,9 @@ $("#addItem").addEventListener("click",function(){
   justAdded=it.id;
   openCat[it.cat||""]=true;                /* 入れたカテゴリーを開いて見せる */
   ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
-  renderItems(); $("#nNo").focus();      /* カテゴリーは続けて登録しやすいよう残す */
-  toast(name+" を登録しました");
+  fillNextNo();                          /* 続けて登録できるよう、次の番号を入れておく */
+  renderItems(); $("#nName").focus();    /* カテゴリーは続けて登録しやすいよう残す */
+  toast(name+" を登録しました（No "+(it.no||"—")+"）");
 });
 ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){
   $(sel).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
@@ -1716,7 +1744,7 @@ function applyBackup(d){
       }
 
       fillCfg(); renderStaff(); renderSyncUI(); renderAnn();
-      renderItems(); renderVen(); renderGuests();
+      renderItems(); renderVen(); renderGuests(); fillNextNo();
       toast("読み込みました"+(back?"。置き場所にも送ります":""));
       if(back) queueSync();
       renderSnaps();
@@ -1849,6 +1877,7 @@ document.querySelector(".tabs").addEventListener("click",function(e){
   ["staff","item","ven","reg","conn"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   if(b.dataset.v==="conn"){ fillCfg(); renderSyncUI(); renderAnn() }
   if(b.dataset.v==="ven") renderVen();
+  if(b.dataset.v==="item") fillNextNo();
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   window.scrollTo({top:0});
 });
@@ -1866,9 +1895,11 @@ document.addEventListener("visibilitychange",function(){
   VEN=(function(){ var v=null; try{ v=JSON.parse(localStorage.getItem(K_VEN)) }catch(e){}
     if(!v||typeof v!=="object") v={}; if(!Array.isArray(v.list)) v.list=[]; return v })();
   renderStaff(); renderItems(); renderVen(); renderGuests();
+  fillNextNo();   /* ほかの端末で登録されていたら、その次の番号にする */
   if(syncOn()){ syncNow(true); pullGuests() }
 });
 renderStaff(); renderItems(); renderVen(); renderGuests(); pullGuests();
+fillNextNo();   /* 開いた時点で次の番号を入れておく */
 fillCfg(); renderSyncUI(); renderAnn();
 
 /* ほかの画面から #conn のように指定して開けるようにする（案内用） */
@@ -1971,7 +2002,7 @@ $("#demoBtn").addEventListener("click",function(){
       color:COLORS[(DB.staff.length+i)%COLORS.length],tok:newTok()});
   });
   saveShift(DB);
-  renderStaff(); renderItems(); renderDemo();
+  renderStaff(); renderItems(); renderDemo(); fillNextNo();
   toast("見本の商品10点とスタッフ2人を入れました");
 });
 renderDemo();
@@ -2058,7 +2089,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v119";
+var APPVER="v120";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
