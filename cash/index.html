@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>レジ金</title>
+<meta name="description" content="レジの中の現金を、お札と硬貨の枚数で数えて合計を出す画面。記録は1週間だけ残る。">
+<meta name="theme-color" content="#2BA55F">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+html,body{touch-action:pan-x pan-y}
+
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+.top{position:sticky;top:0;z-index:30;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 14px 0}
+.top-in{max-width:620px;margin:0 auto}
+.tabs{display:flex;gap:4px}
+.tab{flex:1;border:none;background:transparent;border-bottom:3px solid transparent;padding:9px 4px 10px;
+  cursor:pointer;font-size:14px;color:var(--ink-3);font-weight:500;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:#2BA55F;font-weight:700}
+main{max-width:620px;margin:0 auto;padding:14px 14px calc(120px + env(safe-area-inset-bottom,0px))}
+[data-off]{display:none!important}
+.note{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin:10px 2px 0}
+
+/* ---- 数える ---- */
+.kind{display:flex;gap:6px;margin-bottom:12px}
+.kind .chip{flex:1;justify-content:center;padding:9px 6px;font-size:14px}
+
+.sec{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em;margin:14px 2px 6px}
+.rows{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.r{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.r:last-child{border-bottom:none}
+.r .fc{width:76px;font-weight:700;font-size:16px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.r .mi,.r .pl{width:42px;height:42px;flex:0 0 42px;border:1px solid var(--line-2);background:var(--surface-2);
+  border-radius:9px;font-size:20px;line-height:1;cursor:pointer;color:var(--ink)}
+.r .mi:active,.r .pl:active{transform:translateY(1px)}
+.r input{width:62px;text-align:center;font-family:var(--mono);font-variant-numeric:tabular-nums;padding:9px 4px}
+.r .mai{font-size:12px;color:var(--ink-3)}
+.r .sub{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14.5px;
+  color:var(--ink-2);min-width:84px;text-align:right}
+.r.has .sub{color:var(--ink);font-weight:700}
+/* iPhoneの幅（375px）では、そのままだと小計が右にはみ出して読めない。
+   「枚」の字を省いて、欄を少しずつ細くして収める。2026-11-25 */
+@media (max-width:420px){
+  .r{gap:6px;padding:8px 8px}
+  .r .fc{width:64px;font-size:15px}
+  .r input{width:52px}
+  .r .mai{display:none}
+  .r .sub{min-width:72px}
+}
+
+/* ---- 下にはりつく合計 ---- */
+.foot{position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);
+  border-top:1px solid var(--line);box-shadow:0 -2px 14px rgba(0,0,0,.08);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+.foot-in{max-width:620px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.foot .ttl{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+.foot .amt{font-size:27px;font-weight:800;font-family:var(--mono);font-variant-numeric:tabular-nums;line-height:1.15}
+.foot .df{font-size:12px;color:var(--ink-2);font-family:var(--mono)}
+.foot .btn{margin-left:auto;padding:13px 18px;font-size:16px}
+
+/* ---- 準備金 ---- */
+.prep{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--ink-2)}
+.prep input{width:112px;text-align:right;font-family:var(--mono)}
+
+/* ---- 記録 ---- */
+.log{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+  margin-bottom:9px;overflow:hidden}
+.log>summary{list-style:none;display:flex;align-items:center;gap:9px;padding:12px 14px;cursor:pointer}
+.log>summary::-webkit-details-marker{display:none}
+.log .when{font-size:13px;color:var(--ink-2);min-width:0}
+.log .when b{display:block;color:var(--ink);font-size:14px}
+.log .tag{font-size:11.5px;border-radius:999px;padding:2px 9px;white-space:nowrap}
+.log .tot{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17px;font-weight:700;white-space:nowrap}
+.log .in{border-top:1px solid var(--line);padding:4px 14px 12px}
+.log .ln{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
+.log .ln:last-of-type{border-bottom:none}
+.log .ln b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.log .del{margin-top:9px}
+.empty{color:var(--ink-3);font-size:13.5px;text-align:center;padding:26px 10px}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
+<header class="top"><div class="top-in"><div class="tabs" id="tabs">
+  <button class="tab" data-v="count" aria-selected="true">🧮 数える</button>
+  <button class="tab" data-v="log" aria-selected="false">📋 記録</button>
+</div></div></header>
+
+<main>
+  <!-- ========== 数える ========== -->
+  <div id="v-count">
+    <div class="kind" id="kind">
+      <button class="chip" data-k="open"  aria-pressed="true">開店前</button>
+      <button class="chip" data-k="mid"   aria-pressed="false">途中</button>
+      <button class="chip" data-k="close" aria-pressed="false">閉店後</button>
+    </div>
+
+    <div class="sec">お札</div>
+    <div class="rows" id="bills"></div>
+
+    <div class="sec">硬貨</div>
+    <div class="rows" id="coins"></div>
+
+    <div class="prep">
+      <span>つり銭の準備金</span>
+      <input type="text" id="prep" inputmode="numeric" placeholder="0">
+      <span>円</span>
+      <span id="prepNote" style="flex-basis:100%;font-size:12px;color:var(--ink-3)"></span>
+    </div>
+
+    <p class="note">
+      お札と硬貨の<b>枚数</b>を入れると、合計が下に出ます。枚数は空のままで構いません。<br>
+      <b>記録は1週間だけ残ります。</b>それより古いものは、この画面を開いたときに自動で消えます。<br>
+      記録はこの端末の中だけにあります。ほかの端末とは合わせていません。
+    </p>
+  </div>
+
+  <!-- ========== 記録 ========== -->
+  <div id="v-log" data-off>
+    <div id="logs"></div>
+    <p class="note" id="logNote"></p>
+  </div>
+</main>
+
+<div class="foot" id="foot">
+  <div class="foot-in">
+    <div>
+      <div class="ttl">レジ金の合計</div>
+      <div class="amt" id="total">¥0</div>
+      <div class="df" id="diff"></div>
+    </div>
+    <button class="btn primary" id="save">保存する</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function yen(n){ n=Math.round(Number(n)||0); return (n<0?"▲¥":"¥")+Math.abs(n).toLocaleString() }
+function pad(n){ return ("0"+n).slice(-2) }
+
+/* お札と硬貨。数える順は、手で数えるときと同じ「大きいほうから」。 */
+var BILLS=[10000,5000,2000,1000];
+var COINS=[500,100,50,10,5,1];
+var KINDS={open:{nm:"開店前",cls:"c-am"},mid:{nm:"途中",cls:"c-pm"},close:{nm:"閉店後",cls:"c-ok"}};
+
+var K="storecash.v1";
+/* 置き場所の中身
+   { prep: つり銭の準備金(円), logs:[ {id, at:"2026-11-25T10:41", kind, counts:{"10000":3,…}, total, prep} ] }
+   記録はこの端末だけ。ほかの端末とは合わせていない（レジ金は端末ごとに違うため）。 */
+var KEEP_DAYS=7;
+
+function load(){
+  var v=null;
+  try{ v=JSON.parse(localStorage.getItem(K)) }catch(e){}
+  if(!v||typeof v!=="object") v={};
+  if(!Array.isArray(v.logs)) v.logs=[];
+  v.prep=Number(v.prep)||0;
+  return v;
+}
+var DB=load();
+function save(){ try{ localStorage.setItem(K,JSON.stringify(DB)) }catch(e){} }
+
+/* 1週間より古い記録を捨てる。開くたびに1回。
+   お金の記録をいつまでも端末に残さない、という竹本さんの決め。 */
+function sweep(){
+  var limit=Date.now()-KEEP_DAYS*24*60*60*1000;
+  var before=DB.logs.length;
+  DB.logs=DB.logs.filter(function(x){
+    var t=Date.parse(x&&x.at);
+    return isFinite(t) ? t>=limit : false;     /* 日付が読めないものも捨てる */
+  });
+  if(DB.logs.length!==before) save();
+}
+sweep();
+
+/* ---------- 数える ---------- */
+var kind="open";
+var cnt={};                                    /* {"10000":3, …} いま打っている枚数 */
+
+function rowHtml(f){
+  var n=Number(cnt[f])||0;
+  return '<div class="r'+(n?" has":"")+'" data-f="'+f+'">'+
+    '<span class="fc">'+yen(f)+'</span>'+
+    '<button class="mi" data-d="-1" aria-label="'+yen(f)+' を1枚へらす">−</button>'+
+    '<input type="text" inputmode="numeric" value="'+(n?n:"")+'" placeholder="0" aria-label="'+yen(f)+' の枚数">'+
+    '<button class="pl" data-d="1" aria-label="'+yen(f)+' を1枚ふやす">＋</button>'+
+    '<span class="mai">枚</span>'+
+    '<span class="sub">'+(n?yen(f*n):"—")+'</span>'+
+  '</div>';
+}
+function renderRows(){
+  $("#bills").innerHTML=BILLS.map(rowHtml).join("");
+  $("#coins").innerHTML=COINS.map(rowHtml).join("");
+}
+function total(){
+  var t=0;
+  BILLS.concat(COINS).forEach(function(f){ t+=f*(Number(cnt[f])||0) });
+  return t;
+}
+function renderTotal(){
+  var t=total();
+  $("#total").textContent=yen(t);
+  var p=Number(DB.prep)||0;
+  /* 準備金を入れてあれば、そのぶんを引いた「売上として残る現金」も出す。
+     入れていなければ何も出さない（よけいな数字を増やさない）。 */
+  /* まだ1枚も入れていないうちから「▲¥30,000」と出ると驚くので、
+     数え始めてから出す。2026-11-25 */
+  $("#diff").textContent = (p && t) ? "準備金 "+yen(p)+" を引くと "+yen(t-p) : "";
+  $("#prepNote").textContent = p ? "" : "入れておくと、合計から引いた金額も出ます。空でも構いません。";
+}
+/* 1か所さわったら、その行と合計だけ直す（全部描き直すと、打っている途中の欄が飛ぶ） */
+function touchRow(f){
+  var r=document.querySelector('.r[data-f="'+f+'"]'); if(!r) return;
+  var n=Number(cnt[f])||0;
+  r.classList.toggle("has",!!n);
+  r.querySelector(".sub").textContent = n?yen(f*n):"—";
+  renderTotal();
+}
+function setCount(f,n){
+  n=Math.max(0,Math.min(9999,Math.floor(Number(n)||0)));   /* 1万枚は数えない */
+  if(n) cnt[f]=n; else delete cnt[f];
+  touchRow(f);
+}
+
+document.addEventListener("click",function(e){
+  var b=e.target.closest(".r .mi,.r .pl"); if(!b) return;
+  var r=b.closest(".r"), f=Number(r.dataset.f);
+  var n=(Number(cnt[f])||0)+Number(b.dataset.d);
+  setCount(f,n);
+  var el=r.querySelector("input");
+  el.value=(Number(cnt[f])||0)||"";
+});
+document.addEventListener("input",function(e){
+  var el=e.target;
+  if(!el.matches(".r input")) return;
+  var f=Number(el.closest(".r").dataset.f);
+  var t=el.value.replace(/[^0-9]/g,"");
+  if(t!==el.value) el.value=t;                 /* 数字以外は受けない */
+  setCount(f,t);
+});
+$("#prep").addEventListener("input",function(){
+  var t=this.value.replace(/[^0-9]/g,"");
+  if(t!==this.value) this.value=t;
+  DB.prep=Number(t)||0; save(); renderTotal();
+});
+$("#kind").addEventListener("click",function(e){
+  var b=e.target.closest(".chip[data-k]"); if(!b) return;
+  kind=b.dataset.k;
+  this.querySelectorAll(".chip").forEach(function(c){ c.setAttribute("aria-pressed",String(c===b)) });
+});
+
+$("#save").addEventListener("click",function(){
+  var t=total();
+  if(!t){ toast("枚数がまだ入っていません"); return }
+  var d=new Date();
+  DB.logs.unshift({
+    id:String(d.getTime()),
+    at:d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes()),
+    kind:kind, counts:JSON.parse(JSON.stringify(cnt)), total:t, prep:Number(DB.prep)||0
+  });
+  sweep(); save(); renderLogs();
+  cnt={}; renderRows(); renderTotal();         /* 次の人がそのまま数えられるよう、空に戻す */
+  toast(KINDS[kind].nm+"　"+yen(t)+" を記録しました");
+});
+
+/* ---------- 記録 ---------- */
+function renderLogs(){
+  if(!DB.logs.length){
+    $("#logs").innerHTML='<div class="empty">まだ記録がありません。<br>「数える」で枚数を入れて保存してください。</div>';
+    $("#logNote").textContent="";
+    return;
+  }
+  $("#logs").innerHTML=DB.logs.map(function(x){
+    var k=KINDS[x.kind]||{nm:"—",cls:""};
+    var p=x.at.split("T"), ymd=p[0].split("-");
+    var w=["日","月","火","水","木","金","土"][new Date(p[0]+"T00:00").getDay()];
+    var lines=BILLS.concat(COINS).filter(function(f){ return Number(x.counts&&x.counts[f])>0 })
+      .map(function(f){
+        var n=Number(x.counts[f]);
+        return '<div class="ln"><span>'+yen(f)+' × '+n+'枚</span><b>'+yen(f*n)+'</b></div>';
+      }).join("");
+    if(x.prep) lines+='<div class="ln"><span>準備金を引くと</span><b>'+yen(x.total-x.prep)+'</b></div>';
+    return '<details class="log">'+
+      '<summary>'+
+        '<span class="when"><b>'+(+ymd[1])+'月'+(+ymd[2])+'日（'+w+'）</b>'+p[1]+'</span>'+
+        '<span class="tag '+k.cls+'">'+k.nm+'</span>'+
+        '<span class="tot">'+yen(x.total)+'</span>'+
+      '</summary>'+
+      '<div class="in">'+lines+
+        '<button class="btn sm danger del" data-id="'+esc(x.id)+'">この記録を消す</button>'+
+      '</div></details>';
+  }).join("");
+  $("#logNote").textContent="1週間より古い記録は自動で消えます。いま "+DB.logs.length+"件。";
+}
+$("#logs").addEventListener("click",function(e){
+  var b=e.target.closest(".del"); if(!b) return;
+  if(!confirm("この記録を消します。よろしいですか。")) return;
+  DB.logs=DB.logs.filter(function(x){ return String(x.id)!==b.dataset.id });
+  save(); renderLogs(); toast("消しました");
+});
+
+/* ---------- 共通 ---------- */
+$("#tabs").addEventListener("click",function(e){
+  var b=e.target.closest(".tab[data-v]"); if(!b) return;
+  ["count","log"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
+  $("#foot").hidden = b.dataset.v!=="count";   /* 記録を見ているときは、合計の帯を出さない */
+  window.scrollTo({top:0});
+});
+var toastEl=null,tt=null;
+function toast(m){
+  if(!toastEl){ toastEl=document.createElement("div"); toastEl.className="toast"; document.body.appendChild(toastEl) }
+  toastEl.textContent=m; toastEl.hidden=false;
+  clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3000);
+}
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible"){ sweep(); renderLogs() }
+});
+
+$("#prep").value = DB.prep ? String(DB.prep) : "";
+renderRows(); renderTotal(); renderLogs();
+
+/* ピンチやダブルタップでの拡大を止める */
+["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+  document.addEventListener(ev,function(e){ e.preventDefault() },{passive:false});
+});
+document.addEventListener("dblclick",function(e){ e.preventDefault() },{passive:false});
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+}
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 /* オフラインでも開けるようにする。直したら番号を1つ上げること。 */
-const CACHE = "store-v120";
+const CACHE = "store-v121";
 const SHELL = ["./","./index.html","./manifest.webmanifest","./icons/icon-192.png","./icons/icon-512.png",
   "./icons/apple-touch-icon.png","./icons/favicon-32.png",
   "./shift/","./shift/index.html","./shift/setup.html",
@@ -7,6 +7,7 @@ const SHELL = ["./","./index.html","./manifest.webmanifest","./icons/icon-192.pn
   "./box/","./box/index.html",
   "./reg/","./reg/index.html",
   "./sum/","./sum/index.html","./analyze/","./analyze/index.html",
+  "./cash/","./cash/index.html",
   "./order/","./order/index.html",
   "./stock/","./stock/index.html",
   "./visit/","./visit/index.html",
