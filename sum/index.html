@@ -60,6 +60,14 @@ h3{font-size:13px;color:var(--ink-2);margin:0 0 10px}
   margin-right:5px;vertical-align:-1px}
 .legend .ln i{height:3px;border-radius:2px;background:var(--ink-3);vertical-align:3px}
 
+/* 来場数 */
+.vsum{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:12px}
+.vsum span{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);
+  border-radius:999px;padding:6px 12px}
+.vsum span b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);margin-left:6px;font-size:14px}
+.vbig{font-size:27px;font-weight:800;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.vbig small{font-size:13px;font-weight:500;color:var(--ink-2);margin-left:5px;font-family:var(--ui)}
+
 /* 表 */
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th,td{padding:9px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
@@ -128,6 +136,7 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
 <header class="top"><div class="top-in"><div class="tabs" id="tabs">
   <button class="tab" data-v="day" aria-selected="true">日別売上</button>
   <button class="tab" data-v="item" aria-selected="false">商品別売上</button>
+  <button class="tab" data-v="visit" aria-selected="false">来場数</button>
 </div></div></header>
 
 <main>
@@ -183,6 +192,30 @@ table.grid tfoot td{background:var(--surface-2);font-weight:800}
         <h3>商品ごと<span class="lbl" style="margin-left:8px" id="itemN"></span></h3>
         <div id="byItem"></div>
         <p class="note">売れた数の多い順です。<b>金額</b>は売価×数（値引き前）<span class="cnote">、<b>粗利</b>は 金額 − 仕入れ値</span>。</p>
+      </div></div>
+    </section>
+
+    <!-- 来場数 -->
+    <!-- レジの画面で数えた来店（欧米・アジア・日本人 × 男・女・子供）を、
+         日ごと・月ごとに並べる。上の「集計対象」で日別と月別を切り替える。2026-11-25 -->
+    <section class="view" id="v-visit" data-off>
+      <div class="card"><div class="sec">
+        <div class="ghead"><h3>来場数の推移</h3>
+          <span class="sw">グラフ表示<button type="button" id="vSw" aria-pressed="true" aria-label="グラフ表示"></button></span>
+        </div>
+        <div id="vgBox">
+          <div class="gwrap"><div id="vchart"></div></div>
+          <div class="legend"><span><i style="background:var(--ok)"></i>来場数（人）</span></div>
+        </div>
+      </div></div>
+
+      <div class="card"><div class="sec">
+        <h3>この期間の来場数</h3>
+        <div class="vbig" id="vTotal">0<small>人</small></div>
+        <div class="vsum" id="vBreak" style="margin-top:11px"></div>
+        <div id="byVisit"></div>
+        <p class="note">レジの画面の<b>来店</b>で押したぶんです。会計をしていないお客さまも入ります。<br>
+          日にちごとの内訳は、欧米・アジア・日本人の人数です。男女・子供の内訳は、上の丸い印に出しています。</p>
       </div></div>
     </section>
 
@@ -243,7 +276,7 @@ function range(){
 }
 
 /* ---------- 受け取る ---------- */
-var rows=[], busy=false;
+var rows=[], visits=[], busy=false;
 /* true … 置き場所につないでいないので、この端末のぶんだけを出している */
 var localOnly=false;
 
@@ -260,11 +293,34 @@ function stamp(){
       "お店ぜんぶの売上がまとまり、どの端末からでも同じものが見られます。";
   }
 }
+/* 置き場所につないでいないときの、この端末ぶんの来店。
+   レジの画面が localStorage に残しているものをそのまま読む（書きかえない）。 */
+function localVisits(from,to){
+  var v=null; try{ v=JSON.parse(localStorage.getItem("storevisit.v1")) }catch(e){}
+  return (((v||{}).rows)||[]).filter(function(x){
+    var d=String((x&&x.day)||""); return d&&d>=from&&d<=to;
+  });
+}
+/* 来店は、まだ使っていない店もあるので、取れなくても売上の表示は止めない */
+async function loadVisits(from,to){
+  if(window.Sync&&window.Sales&&Sales.on()){
+    var c=null;
+    try{ c=(JSON.parse(localStorage.getItem("shiftadmin.v1"))||{}).sync }catch(e){}
+    try{
+      if(c) Sync.configure(c);
+      var rv=await Sync.visitsGet(from,to);
+      return (rv&&rv.items)||[];
+    }catch(e2){ return [] }          /* つないであるのに取れないときは、手元のぶんを混ぜない */
+  }
+  return localVisits(from,to);
+}
+
 async function load(quiet){
   if(busy) return;
   busy=true;
   var r0=range();
   try{
+    visits=await loadVisits(r0.from,r0.to);
     var r=await Sales.rows(r0.from,r0.to);
     if(!r.connected){
       /* つないでいないときは、この端末のレジが打ったぶんを出す。
@@ -279,6 +335,9 @@ async function load(quiet){
         busy=false; return;
       }
       rows=[]; localOnly=false;
+      if(visits.length){                     /* 会計は無いが来店は数えてある日もある */
+        $("#noneCard").hidden=true; stamp(); render(); busy=false; return;
+      }
       $("#body").hidden=true; $("#noneCard").hidden=false;
       $("#mineNote").hidden=true;
       $("#noneMsg").innerHTML='この端末には、この期間の会計がまだありません。<br>'+
@@ -391,6 +450,123 @@ function chart(bs){
     'aria-label="売上と客数の推移">'+g+'</svg>';
 }
 
+/* ---------- 来場数 ---------- */
+/* 区分の名前は shared/sync.js が持っている。ここで言葉を足さないこと。 */
+var AREAS=(window.Sync&&Sync.AREAS)||[];
+var VKINDS=(window.Sync&&Sync.KINDS)||[];
+
+/* 売上と同じ並び（日別なら月の全部の日、月別なら12か月）に、来店の人数を入れる */
+function bucketsV(){
+  var m={}, out=[];
+  if(unit==="day"){
+    var last=new Date(year,month,0).getDate();
+    for(var d=1;d<=last;d++){
+      var key=year+"-"+pad2(month)+"-"+pad2(d);
+      var w=new Date(year,month-1,d).getDay();
+      out.push(m[key]={key:key, label:String(d), sub:DOW[w], dow:w, n:0, area:{}, kind:{}});
+    }
+  }else{
+    for(var k=1;k<=12;k++){
+      var key2=year+"-"+pad2(k);
+      out.push(m[key2]={key:key2, label:String(k), sub:"月", dow:-1, n:0, area:{}, kind:{}});
+    }
+  }
+  visits.forEach(function(v){
+    var day=String((v&&v.day)||"");
+    var b=m[(unit==="day")?day:day.slice(0,7)];
+    if(!b) return;
+    var n=Number(v.n)||0;
+    b.n+=n;
+    b.area[v.area]=(b.area[v.area]||0)+n;
+    b.kind[v.kind]=(b.kind[v.kind]||0)+n;
+  });
+  return out;
+}
+
+/* 棒グラフ。売上のグラフと同じ形にしてある（軸は人数ひとつだけ）。 */
+function vchart(bs){
+  var step=(unit==="day")?34:54, padL=42, padR=14, padT=14, padB=34, h=210;
+  var w=Math.max(padL+padR+bs.length*step, 320);
+  var maxN=niceMax(Math.max.apply(null,bs.map(function(b){ return b.n }).concat([0])));
+  var gh=h-padT-padB;
+  var y=function(v){ return padT+gh-(v/maxN)*gh };
+  var x=function(i){ return padL+step*i+step/2 };
+  var g="";
+  for(var t=0;t<=4;t++){
+    var v=maxN*t/4, yy=y(v);
+    g+='<line x1="'+padL+'" y1="'+yy+'" x2="'+(w-padR)+'" y2="'+yy+'" stroke="var(--line)" stroke-width="1"/>'+
+       '<text x="'+(padL-6)+'" y="'+(yy+4)+'" text-anchor="end" font-size="10" fill="var(--ink-3)">'+
+       Math.round(v)+'</text>';
+  }
+  var bw=Math.min(step-10,26);
+  bs.forEach(function(b,i){
+    if(b.n<=0) return;
+    var y1=y(b.n);
+    g+='<rect x="'+(x(i)-bw/2)+'" y="'+y1+'" width="'+bw+'" height="'+(padT+gh-y1)+'" rx="3" '+
+       'fill="var(--ok)"><title>'+esc(b.label+b.sub+"　"+b.n+"人")+'</title></rect>';
+    /* 棒の上に人数を出す。目盛りを読まなくても分かるように。 */
+    if(maxN<=0||(padT+gh-y1)>=14){
+      g+='<text x="'+x(i)+'" y="'+(y1-4)+'" text-anchor="middle" font-size="10" fill="var(--ink-2)">'+b.n+'</text>';
+    }
+  });
+  bs.forEach(function(b,i){
+    var col=(b.dow===0)?"var(--sun)":(b.dow===6)?"var(--sat)":"var(--ink-2)";
+    g+='<text x="'+x(i)+'" y="'+(h-18)+'" text-anchor="middle" font-size="11" fill="'+col+'">'+esc(b.label)+'</text>'+
+       '<text x="'+x(i)+'" y="'+(h-5)+'" text-anchor="middle" font-size="10" fill="'+col+'">'+esc(b.sub)+'</text>';
+  });
+  return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" role="img" '+
+    'aria-label="来場数の推移">'+g+'</svg>';
+}
+
+var showVGraph=true;
+$("#vSw").addEventListener("click",function(){
+  showVGraph=!showVGraph;
+  this.setAttribute("aria-pressed",String(showVGraph));
+  $("#vgBox").hidden=!showVGraph;
+});
+
+function renderVisits(){
+  var bs=bucketsV(), tot=0, byArea={}, byKind={};
+  bs.forEach(function(b){
+    tot+=b.n;
+    AREAS.forEach(function(a){ byArea[a.k]=(byArea[a.k]||0)+(b.area[a.k]||0) });
+    VKINDS.forEach(function(k){ byKind[k.k]=(byKind[k.k]||0)+(b.kind[k.k]||0) });
+  });
+
+  $("#vchart").innerHTML=vchart(bs);
+  $("#vgBox").hidden=!showVGraph;
+  $("#vTotal").innerHTML=tot.toLocaleString("ja-JP")+'<small>人</small>';
+
+  $("#vBreak").innerHTML=
+    AREAS.map(function(a){ return '<span>'+esc(a.nm)+'<b>'+(byArea[a.k]||0)+'</b></span>' }).join("")+
+    VKINDS.map(function(k){ return '<span>'+esc(k.nm)+'<b>'+(byKind[k.k]||0)+'</b></span>' }).join("");
+
+  var used=bs.filter(function(b){ return b.n });
+  if(!used.length){
+    $("#byVisit").innerHTML='<div class="empty">この期間に来店の記録はありません。<br>'+
+      'レジの画面の<b>来店</b>で押したぶんが、ここに出ます。</div>';
+    return;
+  }
+  $("#byVisit").innerHTML=
+    '<table class="grid" style="margin-top:12px"><thead><tr>'+
+      '<th style="width:30%">集計<br>期間</th><th style="width:22%">来場数</th>'+
+      AREAS.map(function(a){ return '<th>'+esc(a.nm)+'</th>' }).join("")+
+    '</tr></thead><tbody>'+
+    used.map(function(b){
+      var cls=(b.dow===0)?"sun":(b.dow===6)?"sat":"";
+      var when=(unit==="day")
+        ? '<span class="'+cls+'">'+month+"/"+esc(b.label)+"("+esc(b.sub)+")"+'</span>'
+        : esc(b.label)+"月";
+      return '<tr><td class="day">'+when+'</td>'+
+        '<td class="v">'+b.n+'</td>'+
+        AREAS.map(function(a){ return '<td class="v">'+(b.area[a.k]||0)+'</td>' }).join("")+
+        '</tr>';
+    }).join("")+
+    '</tbody><tfoot><tr><td class="day">合計</td><td class="v">'+tot+'</td>'+
+      AREAS.map(function(a){ return '<td class="v">'+(byArea[a.k]||0)+'</td>' }).join("")+
+    '</tr></tfoot></table>';
+}
+
 /* ---------- 描く ---------- */
 function render(){
   applyCostVis();
@@ -405,6 +581,7 @@ function render(){
   $("#gBox").hidden=!showGraph;
 
   renderUnit(bs,amt,list.length);
+  renderVisits();
 
   /* 商品ごと */
   var im={}, io=[];
@@ -560,7 +737,7 @@ $("#byUnit").addEventListener("click",async function(e){
 /* ---------- 共通 ---------- */
 $("#tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
-  ["day","item"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
+  ["day","item","visit"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
   this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
   window.scrollTo({top:0});
 });
