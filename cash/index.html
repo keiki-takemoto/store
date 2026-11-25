@@ -25,9 +25,6 @@ main{max-width:620px;margin:0 auto;padding:14px 14px calc(120px + env(safe-area-
 .note{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin:10px 2px 0}
 
 /* ---- 数える ---- */
-.kind{display:flex;gap:6px;margin-bottom:12px}
-.kind .chip{flex:1;justify-content:center;padding:9px 6px;font-size:14px}
-
 .sec{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em;margin:14px 2px 6px}
 .rows{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .r{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
@@ -73,7 +70,6 @@ main{max-width:620px;margin:0 auto;padding:14px 14px calc(120px + env(safe-area-
 .log>summary::-webkit-details-marker{display:none}
 .log .when{font-size:13px;color:var(--ink-2);min-width:0}
 .log .when b{display:block;color:var(--ink);font-size:14px}
-.log .tag{font-size:11.5px;border-radius:999px;padding:2px 9px;white-space:nowrap}
 .log .tot{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17px;font-weight:700;white-space:nowrap}
 .log .in{border-top:1px solid var(--line);padding:4px 14px 12px}
 .log .ln{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
@@ -93,12 +89,6 @@ main{max-width:620px;margin:0 auto;padding:14px 14px calc(120px + env(safe-area-
 <main>
   <!-- ========== 数える ========== -->
   <div id="v-count">
-    <div class="kind" id="kind">
-      <button class="chip" data-k="open"  aria-pressed="true">開店前</button>
-      <button class="chip" data-k="mid"   aria-pressed="false">途中</button>
-      <button class="chip" data-k="close" aria-pressed="false">閉店後</button>
-    </div>
-
     <div class="sec">お札</div>
     <div class="rows" id="bills"></div>
 
@@ -148,11 +138,10 @@ function pad(n){ return ("0"+n).slice(-2) }
 /* お札と硬貨。数える順は、手で数えるときと同じ「大きいほうから」。 */
 var BILLS=[10000,5000,2000,1000];
 var COINS=[500,100,50,10,5,1];
-var KINDS={open:{nm:"開店前",cls:"c-am"},mid:{nm:"途中",cls:"c-pm"},close:{nm:"閉店後",cls:"c-ok"}};
 
 var K="storecash.v1";
 /* 置き場所の中身
-   { prep: つり銭の準備金(円), logs:[ {id, at:"2026-11-25T10:41", kind, counts:{"10000":3,…}, total, prep} ] }
+   { prep: つり銭の準備金(円), logs:[ {id, at:"2026-11-25T10:41", counts:{"10000":3,…}, total, prep} ] }
    記録はこの端末だけ。ほかの端末とは合わせていない（レジ金は端末ごとに違うため）。 */
 var KEEP_DAYS=7;
 
@@ -181,7 +170,6 @@ function sweep(){
 sweep();
 
 /* ---------- 数える ---------- */
-var kind="open";
 var cnt={};                                    /* {"10000":3, …} いま打っている枚数 */
 
 function rowHtml(f){
@@ -250,12 +238,6 @@ $("#prep").addEventListener("input",function(){
   if(t!==this.value) this.value=t;
   DB.prep=Number(t)||0; save(); renderTotal();
 });
-$("#kind").addEventListener("click",function(e){
-  var b=e.target.closest(".chip[data-k]"); if(!b) return;
-  kind=b.dataset.k;
-  this.querySelectorAll(".chip").forEach(function(c){ c.setAttribute("aria-pressed",String(c===b)) });
-});
-
 $("#save").addEventListener("click",function(){
   var t=total();
   if(!t){ toast("枚数がまだ入っていません"); return }
@@ -263,11 +245,11 @@ $("#save").addEventListener("click",function(){
   DB.logs.unshift({
     id:String(d.getTime()),
     at:d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes()),
-    kind:kind, counts:JSON.parse(JSON.stringify(cnt)), total:t, prep:Number(DB.prep)||0
+    counts:JSON.parse(JSON.stringify(cnt)), total:t, prep:Number(DB.prep)||0
   });
   sweep(); save(); renderLogs();
   cnt={}; renderRows(); renderTotal();         /* 次の人がそのまま数えられるよう、空に戻す */
-  toast(KINDS[kind].nm+"　"+yen(t)+" を記録しました");
+  toast(yen(t)+" を記録しました");
 });
 
 /* ---------- 記録 ---------- */
@@ -278,7 +260,6 @@ function renderLogs(){
     return;
   }
   $("#logs").innerHTML=DB.logs.map(function(x){
-    var k=KINDS[x.kind]||{nm:"—",cls:""};
     var p=x.at.split("T"), ymd=p[0].split("-");
     var w=["日","月","火","水","木","金","土"][new Date(p[0]+"T00:00").getDay()];
     var lines=BILLS.concat(COINS).filter(function(f){ return Number(x.counts&&x.counts[f])>0 })
@@ -290,7 +271,6 @@ function renderLogs(){
     return '<details class="log">'+
       '<summary>'+
         '<span class="when"><b>'+(+ymd[1])+'月'+(+ymd[2])+'日（'+w+'）</b>'+p[1]+'</span>'+
-        '<span class="tag '+k.cls+'">'+k.nm+'</span>'+
         '<span class="tot">'+yen(x.total)+'</span>'+
       '</summary>'+
       '<div class="in">'+lines+
