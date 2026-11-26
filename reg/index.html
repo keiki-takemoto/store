@@ -358,6 +358,7 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
           <button type="button" data-f="no" aria-pressed="true">番号</button>
           <button type="button" data-f="cat" aria-pressed="false">カテゴリー</button>
           <button type="button" data-f="name" aria-pressed="false">名前</button>
+          <button type="button" data-f="amt"  aria-pressed="false">金額</button>
         </div>
         <div class="qbs" id="qbs">
           <button type="button" class="bagb" data-q="bag"   aria-pressed="false">お持ち帰り袋</button>
@@ -399,6 +400,27 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
           <input type="text" id="q" placeholder="名前の一部でさがす" autocomplete="off">
         </div>
         <div class="hits" id="nameHits"></div>
+      </div>
+
+      <!-- 金額を直接打つ（商品に登録していないもの） -->
+      <div class="fpane" id="f-amt">
+        <div class="disp empty" id="aDisp">金額を打つ</div>
+        <div class="hit" id="aHit">登録していないものを入れられます。</div>
+        <div class="pad" id="apad">
+          <button type="button" data-k="1">1</button>
+          <button type="button" data-k="2">2</button>
+          <button type="button" data-k="3">3</button>
+          <button type="button" data-k="4">4</button>
+          <button type="button" data-k="5">5</button>
+          <button type="button" data-k="6">6</button>
+          <button type="button" data-k="7">7</button>
+          <button type="button" data-k="8">8</button>
+          <button type="button" data-k="9">9</button>
+          <button type="button" class="fn" data-k="c">ぜんぶ消す</button>
+          <button type="button" data-k="0">0</button>
+          <button type="button" class="fn" data-k="b">← 1字消す</button>
+          <button type="button" class="go" data-k="add" id="aAddBtn" disabled style="grid-column:1/-1">かごに入れる</button>
+        </div>
       </div>
     </div>
 
@@ -827,9 +849,10 @@ function setFind(k){
   $("#ftabs").querySelectorAll("[data-f]").forEach(function(b){
     b.setAttribute("aria-pressed",String(b.dataset.f===k));
   });
-  ["no","cat","name"].forEach(function(v){ $("#f-"+v).toggleAttribute("data-on",v===k) });
+  ["no","cat","name","amt"].forEach(function(v){ $("#f-"+v).toggleAttribute("data-on",v===k) });
   if(k==="cat") renderCats();
   if(k==="name"){ renderFound(); try{ $("#q").focus() }catch(e){} }
+  if(k==="amt") renderAmt();
 }
 $("#ftabs").addEventListener("click",function(e){
   var b=e.target.closest("[data-f]"); if(!b) return;
@@ -884,31 +907,73 @@ function quickItems(kind){
     return kind==="drink" ? isDrinkCat(x.cat) : String(x.cat||"")===BAGCAT;
   }).sort(noOrder);
 }
-var quick=null;                        /* null … どちらも閉じている */
+var qopen=null;                        /* null … どちらも閉じている */
 function renderBags(){
   $("#qbs").querySelectorAll("[data-q]").forEach(function(b){
-    b.setAttribute("aria-pressed",String(b.dataset.q===quick));
+    b.setAttribute("aria-pressed",String(b.dataset.q===qopen));
   });
-  $("#bagBox").hidden=(quick==null);
-  if(quick==null) return;
-  var list=quickItems(quick);
+  $("#bagBox").hidden=(qopen==null);
+  if(qopen==null) return;
+  var list=quickItems(qopen);
   $("#bagBox").innerHTML = list.length
     ? '<div class="bg">'+list.map(function(x){
         return '<button type="button" data-id="'+esc(x.id)+'">'+esc(x.name||"（名前なし）")+
           '<span class="p">'+yen(x.price)+'</span></button>';
       }).join("")+'</div>'
-    : '<div class="none">'+(quick==="drink"?"飲み物":"お持ち帰り袋")+'が、まだ登録されていません。<br>'+
+    : '<div class="none">'+(qopen==="drink"?"飲み物":"お持ち帰り袋")+'が、まだ登録されていません。<br>'+
       '<a href="../settings/">設定 → 商品</a>で登録して、'+
-      'カテゴリーを <b>「'+(quick==="drink"?"ドリンク":esc(BAGCAT))+'」</b> にしてください。ここに出ます。</div>';
+      'カテゴリーを <b>「'+(qopen==="drink"?"ドリンク":esc(BAGCAT))+'」</b> にしてください。ここに出ます。</div>';
   $("#bagBox").scrollTop=0;
 }
 $("#qbs").addEventListener("click",function(e){
   var b=e.target.closest("[data-q]"); if(!b) return;
-  quick=(quick===b.dataset.q)?null:b.dataset.q;   /* もう一度押すと閉じる */
+  qopen=(qopen===b.dataset.q)?null:b.dataset.q;   /* もう一度押すと閉じる */
   renderBags();
 });
 /* 2つ3つ入れることもあるので、選んでも閉じない */
 $("#bagBox").addEventListener("click",hitsClick);
+
+/* ---------- 金額を直接打つ ---------- */
+/* 商品に登録していないものを、その場で会計するためのもの。
+   値段だけを打って入れる。名前は「その他 ¥450」になるので、
+   集計の「商品別」では金額ごとにまとまる。2026-11-26
+
+   かごの中では id で見分けているので、id を「free-値段」にしてある。
+   おなじ値段のものを2つ入れたら、ひとつの行の2点になる。
+   消費税は、ふつうの率（設定 → レジ）を使う。軽減税率にしたいものは
+   商品として登録して「8%」の印を付けてください。 */
+var amtKeys="";
+var AMTMAX=7;                          /* 7桁（999万）まで。打ち間違いよけ */
+function renderAmt(){
+  var n=parseInt(amtKeys||"0",10)||0;
+  var d=$("#aDisp");
+  d.classList.toggle("empty",!amtKeys);
+  d.textContent = amtKeys ? yen(n) : "金額を打つ";
+  $("#aAddBtn").disabled = !n;
+  $("#aHit").innerHTML = n
+    ? "<b>その他 "+yen(n)+"</b> として入ります。"
+    : "登録していないものを入れられます。";
+}
+function addFree(n){
+  n=Math.floor(Number(n)||0);
+  if(n<=0) return;
+  addToCart({id:"free-"+n, no:"", name:"その他 "+yen(n), price:n, cost:0});
+  toast("その他 "+yen(n)+" を入れました");
+  amtKeys=""; renderAmt();
+}
+$("#apad").addEventListener("click",function(e){
+  var b=e.target.closest("[data-k]"); if(!b||b.disabled) return;
+  var k=b.dataset.k;
+  if(k==="c") amtKeys="";
+  else if(k==="b") amtKeys=amtKeys.slice(0,-1);
+  else if(k==="add"){ addFree(parseInt(amtKeys||"0",10)); return }
+  else{
+    if(amtKeys.length>=AMTMAX) return;
+    if(!amtKeys&&k==="0") return;      /* 先頭の 0 は打たせない */
+    amtKeys+=k;
+  }
+  renderAmt();
+});
 
 /* ---------- カテゴリーから選ぶ ---------- */
 var catSel=null;                       /* null … まだ選んでいない */
@@ -1255,7 +1320,7 @@ async function pullItems(){
   IT.items=IT.items.filter(function(x){ return !(x.del&&!x.d) });
   if(r.now) IT.pulledAt=r.now;
   saveItems();
-  if(step==="till"){ renderPad(); renderFound(); renderBags(); if(find==="cat") renderCats() }
+  if(step==="till"){ renderPad(); renderFound(); renderBags(); renderAmt(); if(find==="cat") renderCats() }
 }
 
 /* 「軽減税率 8%」の印。商品の表ではなく、置き場所の "tax8" に入っている。
