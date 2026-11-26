@@ -153,12 +153,14 @@ body{display:flex;flex-direction:column}
 
 /* 上の「お持ち帰り袋」。番号を打たずに、ここから選んで入れられる。 */
 .col.right > h3{flex-wrap:wrap;row-gap:7px}
-.bagb{margin-left:auto;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+.qbs{margin-left:auto;display:flex;gap:6px}
+.bagb{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
   border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;
   font-family:inherit;white-space:nowrap;min-height:32px;line-height:1.2}
 .bagb:active{transform:translateY(1px)}
 .bagb[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
-.bagbox{flex:0 0 auto;border-bottom:1px solid var(--line);background:var(--surface-2);padding:10px 11px}
+.bagbox{flex:0 0 auto;border-bottom:1px solid var(--line);background:var(--surface-2);padding:10px 11px;
+  max-height:46vh;overflow:auto;-webkit-overflow-scrolling:touch}
 .bagbox .bg{display:flex;flex-wrap:wrap;gap:8px}
 .bagbox .bg button{flex:1 1 150px;border:1px solid var(--line-2);background:var(--surface);
   border-radius:12px;padding:12px 13px;font-size:15px;font-weight:700;cursor:pointer;
@@ -357,7 +359,10 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
           <button type="button" data-f="cat" aria-pressed="false">カテゴリー</button>
           <button type="button" data-f="name" aria-pressed="false">名前</button>
         </div>
-        <button type="button" class="bagb" id="bagBtn" aria-pressed="false">お持ち帰り袋</button>
+        <div class="qbs" id="qbs">
+          <button type="button" class="bagb" data-q="bag"   aria-pressed="false">お持ち帰り袋</button>
+          <button type="button" class="bagb" data-q="drink" aria-pressed="false">飲み物</button>
+        </div>
       </h3>
       <div class="bagbox" id="bagBox" hidden></div>
 
@@ -862,35 +867,47 @@ function hitsClick(e){
 $("#catHits").addEventListener("click",hitsClick);
 $("#nameHits").addEventListener("click",hitsClick);
 
-/* ---------- お持ち帰り袋 ---------- */
+/* ---------- お持ち帰り袋・飲み物（上から選ぶ） ---------- */
 /* レジでいちばんよく足すものなので、番号を打たずに上から選べるようにした。
-   中身は「商品」のうち、カテゴリーが BAGCAT のものをそのまま出す。
+   中身は「商品」のうち、カテゴリーが合うものをそのまま出す。
    設定で足したり値段を直したりすれば、ここにも出る。
    名前が1字でも違うと拾えないので、設定の側でこの名前のカテゴリーを
-   いちど作るようにしてある。2026-11-19 */
+   いちど作るようにしてある。2026-11-19
+   飲み物もよく売れるので、となりにならべた。お店によって「ドリンク」だったり
+   「飲み物」だったりするので、どの名前でも拾うようにしてある。
+   飲み物は「カテゴリー」のタブからは外した（ここに移したため）。2026-11-26 */
 var BAGCAT="お持ち帰り袋";
-function bags(){
-  return live().filter(function(x){ return String(x.cat||"")===BAGCAT }).sort(noOrder);
+var DRINKCATS=["ドリンク","飲み物","飲料","ソフトドリンク","お飲み物","ドリンク類"];
+function isDrinkCat(c){ return DRINKCATS.indexOf(String(c||""))>=0 }
+function quickItems(kind){
+  return live().filter(function(x){
+    return kind==="drink" ? isDrinkCat(x.cat) : String(x.cat||"")===BAGCAT;
+  }).sort(noOrder);
 }
+var quick=null;                        /* null … どちらも閉じている */
 function renderBags(){
-  var on=$("#bagBtn").getAttribute("aria-pressed")==="true";
-  $("#bagBox").hidden=!on;
-  if(!on) return;
-  var list=bags();
+  $("#qbs").querySelectorAll("[data-q]").forEach(function(b){
+    b.setAttribute("aria-pressed",String(b.dataset.q===quick));
+  });
+  $("#bagBox").hidden=(quick==null);
+  if(quick==null) return;
+  var list=quickItems(quick);
   $("#bagBox").innerHTML = list.length
     ? '<div class="bg">'+list.map(function(x){
         return '<button type="button" data-id="'+esc(x.id)+'">'+esc(x.name||"（名前なし）")+
           '<span class="p">'+yen(x.price)+'</span></button>';
       }).join("")+'</div>'
-    : '<div class="none">お持ち帰り袋が、まだ登録されていません。<br>'+
+    : '<div class="none">'+(quick==="drink"?"飲み物":"お持ち帰り袋")+'が、まだ登録されていません。<br>'+
       '<a href="../settings/">設定 → 商品</a>で登録して、'+
-      'カテゴリーを <b>「'+esc(BAGCAT)+'」</b> にしてください。ここに出ます。</div>';
+      'カテゴリーを <b>「'+(quick==="drink"?"ドリンク":esc(BAGCAT))+'」</b> にしてください。ここに出ます。</div>';
+  $("#bagBox").scrollTop=0;
 }
-$("#bagBtn").addEventListener("click",function(){
-  this.setAttribute("aria-pressed",String(this.getAttribute("aria-pressed")!=="true"));
+$("#qbs").addEventListener("click",function(e){
+  var b=e.target.closest("[data-q]"); if(!b) return;
+  quick=(quick===b.dataset.q)?null:b.dataset.q;   /* もう一度押すと閉じる */
   renderBags();
 });
-/* 袋を2つ入れることもあるので、選んでも閉じない */
+/* 2つ3つ入れることもあるので、選んでも閉じない */
 $("#bagBox").addEventListener("click",hitsClick);
 
 /* ---------- カテゴリーから選ぶ ---------- */
@@ -903,6 +920,7 @@ function catsOf(){
   live().forEach(function(x){
     var c=String(x.cat||""); if(c&&!seen[c]){ seen[c]=1; out.push(c) }
   });
+  out=out.filter(function(c){ return !isDrinkCat(c) });   /* 飲み物は上のボタンへ移した */
   out.sort();
   return out;
 }
@@ -910,6 +928,7 @@ function renderCats(){
   var cs=catsOf(), n={}, none=0;
   live().forEach(function(x){
     var c=String(x.cat||"");
+    if(isDrinkCat(c)) return;                             /* 飲み物は上のボタンへ移した */
     if(c) n[c]=(n[c]||0)+1; else none++;
   });
   var h=cs.map(function(c){
@@ -931,6 +950,7 @@ function renderCatHits(){
   if(catSel==null){ box.innerHTML='<div class="none">上からカテゴリーを選んでください。</div>'; return }
   var hit=live().filter(function(x){
     var c=String(x.cat||"");
+    if(isDrinkCat(c)) return false;
     return (catSel==="__none__") ? !c : (c===catSel);
   }).sort(noOrder);
   box.innerHTML=hitHtml(hit,"番号か名前のタブでさがしてください。");
