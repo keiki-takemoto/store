@@ -81,15 +81,15 @@ table.gu td.z{color:var(--ink-3)}
 .wk .wr .s0{color:var(--sun)} .wk .wr .s6{color:var(--sat)}
 .wk .wd{margin-left:auto;font-size:11.5px;color:var(--ink-3);font-family:var(--mono);white-space:nowrap}
 .wk .wg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.wk .wg>div{background:var(--surface-2);border-radius:9px;padding:8px 10px}
-.wk.tot .wg>div{background:var(--surface)}
+.wk .wg>div,.wk .wg>button{background:var(--surface-2);border-radius:9px;padding:8px 10px}
+.wk.tot .wg>div,.wk.tot .wg>button{background:var(--surface)}
 .wk .wg .k{font-size:11px;color:var(--ink-3)}
 .wk .wg .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:17.5px;
   font-weight:800;line-height:1.4}
-.wk .wg>div.con{background:var(--am-bg)}
-.wk.tot .wg>div.con{background:var(--am-bg)}
-.wk .wg>div.con .k{color:var(--am)}
-.wk .wg>div.con .v{color:var(--am)}
+.wk .wg>div.con,.wk .wg>button.con{background:var(--am-bg)}
+.wk.tot .wg>div.con,.wk.tot .wg>button.con{background:var(--am-bg)}
+.wk .wg>div.con .k,.wk .wg>button.con .k{color:var(--am)}
+.wk .wg>div.con .v,.wk .wg>button.con .v{color:var(--am)}
 .wk .wsub{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:9px;font-size:12px;
   color:var(--ink-2);line-height:1.9}
 .wk .wsub span{white-space:nowrap}
@@ -127,6 +127,22 @@ table.gu td.z{color:var(--ink-3)}
 .dtbl td.z{color:var(--ink-3)}
 .dtbl .sum{font-weight:800}
 .dtbl tr.tot td{background:var(--surface-2);border-bottom:none;font-weight:800}
+.wk .wg>button{display:block;width:100%;text-align:left;border:none;font-family:inherit;
+  cursor:pointer}
+.wk .wg>button .k{display:flex;align-items:center;gap:5px}
+.wk .wg>button .k .ar{font-size:9px;transition:transform .15s}
+.wk .wg>button[aria-expanded="true"] .k .ar{transform:rotate(90deg)}
+.dsold{margin-top:9px;border-top:1px solid var(--line);padding-top:4px}
+.dsold .r{display:flex;align-items:baseline;gap:9px;padding:7px 0;font-size:13px;
+  border-bottom:1px solid var(--line)}
+.dsold .r:last-child{border-bottom:none}
+.dsold .r .no{font-family:var(--mono);font-size:11px;color:var(--ink-3);min-width:2.2em}
+.dsold .r .name{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.dsold .r .q{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink-2);
+  font-size:12px;white-space:nowrap}
+.dsold .r .a{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:800;
+  min-width:5.2em;text-align:right;white-space:nowrap}
+.dsold .r.tot{border-top:1px solid var(--line-2);border-bottom:none;font-weight:800}
 
 /* 表 */
 table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -320,7 +336,8 @@ h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;lette
           <b>種類</b>を「歴博委託商品」にした商品の売上です。<b>売上</b>はそれ以外ぜんぶです。<br>
           値引きをしたお会計は、明細の金額の割合で2つに分けています。
           足すとかならず会計の合計と同じになります。<br>
-          打ち消した会計は入っていません。</p>
+          打ち消した会計は入っていません。<br>
+          <b>歴博委託商品</b>の金額を<b>押すと</b>、その日に売れた商品が出ます。</p>
       </div></div>
 
       <div class="card"><div class="sec">
@@ -1089,6 +1106,52 @@ function stepDay(n){
 $("#dayPrev").addEventListener("click",function(){ stepDay(-1) });
 $("#dayNext").addEventListener("click",function(){ stepDay(1) });
 
+/* 歴博委託商品の金額を押すと、その日に売れた中身が出る。
+   開いているかどうかは覚えておく（日を送っても開いたまま）。 */
+var conOpen=false;
+document.addEventListener("click",function(e){
+  var b=e.target.closest("#dConBtn"); if(!b) return;
+  conOpen=!conOpen;
+  renderDay();
+});
+
+/* その日に売れた歴博委託商品を、商品ごとにまとめる。
+   値引きのあった会計は、明細の金額の割合でへらす（上の合計と同じ出し方）ので、
+   ここに出る金額を足すと、かならず歴博委託商品の合計と同じになる。 */
+function soldList(list){
+  var m={}, order=[], tq=0, ta=0;
+  list.forEach(function(s){
+    var tot=Number(s.total)||0, sum=0;
+    (s.lines||[]).forEach(function(l){ sum+=(Number(l.price)||0)*(Number(l.qty)||0) });
+    var rate=(sum>0)?(tot/sum):1;
+    (s.lines||[]).forEach(function(l){
+      if(catOf(l.id)!==CONSIGN) return;
+      var q=Number(l.qty)||0, a=(Number(l.price)||0)*q*rate;
+      var k=l.id||l.name;
+      if(!m[k]){ m[k]={no:l.no||"", name:l.name||"（名前なし）", q:0, a:0}; order.push(k) }
+      m[k].q+=q; m[k].a+=a;
+      tq+=q; ta+=a;
+    });
+  });
+  if(!order.length)
+    return '<div class="dsold"><div class="r"><span class="name">'+
+      'この日は'+esc(CONSIGN)+'の売上がありません。</span></div></div>';
+  order.sort(function(x,y){ return m[y].a-m[x].a });
+  return '<div class="dsold">'+
+    order.map(function(k){
+      var it=m[k];
+      return '<div class="r">'+
+        (it.no?'<span class="no">'+esc(it.no)+'</span>':"")+
+        '<span class="name">'+esc(it.name)+'</span>'+
+        '<span class="q">'+it.q+'点</span>'+
+        '<span class="a">'+yen(it.a)+'</span></div>';
+    }).join("")+
+    '<div class="r tot"><span class="name">合計</span>'+
+      '<span class="q">'+tq+'点</span>'+
+      '<span class="a">'+yen(ta)+'</span></div>'+
+    '</div>';
+}
+
 function renderDay(){
   syncDay();
   var AR=(window.Sync&&Sync.AREAS)||[];
@@ -1105,8 +1168,12 @@ function renderDay(){
   $("#dSales").innerHTML=
     '<div class="wk tot"><div class="wg">'+
       '<div><div class="k">売上</div><div class="v">'+yen(own)+'</div></div>'+
-      '<div class="con"><div class="k">'+esc(CONSIGN)+'</div><div class="v">'+yen(con)+'</div></div>'+
-    '</div><div class="wsub">'+
+      '<button type="button" class="con" id="dConBtn" aria-expanded="'+(conOpen?"true":"false")+'">'+
+        '<div class="k"><span class="ar">▶</span>'+esc(CONSIGN)+'</div>'+
+        '<div class="v">'+yen(con)+'</div></button>'+
+    '</div>'+
+    (conOpen?soldList(list):"")+
+    '<div class="wsub">'+
       '<span>合計<b>'+yen(amt)+'</b></span>'+
       '<span>購買数<b>'+n+'件</b></span>'+
       '<span>客単価<b>'+(n?yen(amt/n):"—")+'</b></span>'+
