@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script src="../shared/nozoom.js"></script>
 <title>設定</title>
 <meta name="description" content="アルバイトスタッフの名簿と時給、お店の商品リストをまとめて管理する画面。">
 <meta name="theme-color" content="#2BA55F">
@@ -2692,7 +2693,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v147";
+var APPVER="v148";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
