@@ -32,6 +32,21 @@ main{max-width:760px;margin:0 auto;padding:14px 14px calc(28px + env(safe-area-i
 .empty{font-size:12.5px;color:var(--ink-3);padding:6px 0;line-height:1.9}
 .lbl{font-size:11.5px;color:var(--ink-3);font-weight:600}
 
+/* カテゴリーごとのまとまり（2026-11-28 から。前は仕入先ごと） */
+details.vbox>summary{list-style:none;cursor:pointer}
+details.vbox>summary::-webkit-details-marker{display:none}
+.vhd .mk{font-size:13px;color:var(--ink-3);transition:transform .15s}
+details.vbox[open] .vhd .mk{transform:rotate(90deg)}
+details.vbox:not([open]) .vhd{border-bottom:none}
+.vhd .sm{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.oline .nm .no{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);font-weight:600;margin-right:6px}
+.oline .sub b{color:var(--warn)}
+.oline .sub{display:flex;flex-wrap:wrap;gap:0 10px}
+.oline .sub span{white-space:nowrap}
+.needtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;
+  font-size:12.5px;color:var(--ink-2)}
+.needtop b{font-family:var(--mono);color:var(--ink)}
+.needtop .sp{flex:1}
 /* 仕入先ごとのまとまり */
 .vbox{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .vbox+.vbox{margin-top:12px}
@@ -253,51 +268,81 @@ function renderNeed(){
       '<a href="../settings/#item">設定 → 商品</a> の「いつもの数」より少なくなったものが出ます。</div>';
     return;
   }
-  /* 仕入先ごとにまとめる */
+  /* カテゴリーごとにまとめる。竹本さんの指示（2026-11-28）。
+     このお店はカテゴリーが仕入先の名前になっているものが多いので、こちらのほうが探しやすい。
+     ここから注文までの流れは、このあと作る。 */
   var g={}, order=[];
   list.forEach(function(x){
-    var k=x.it.vendor||"";
+    var k=String(x.it.cat||"");
     if(!g[k]){ g[k]=[]; order.push(k) }
     g[k].push(x);
   });
   order.sort(function(a,b){
-    if(!a) return 1; if(!b) return -1;
-    return (venById(a)?venById(a).name||"":"").localeCompare((venById(b)?venById(b).name||"":""),"ja");
+    if(!a) return 1; if(!b) return -1;           /* 未分類はいちばん下 */
+    return a.localeCompare(b,"ja");
   });
+  order.forEach(function(k){ g[k].sort(byNo) });
 
-  $("#needBody").innerHTML=order.map(function(k){
-    var v=venById(k), lines=g[k];
-    var nm=v?(v.name||"（名前なし）"):"仕入先が決まっていない";
-    var how=v?(v.how==="web"?"ホームページ":"メール"):"";
+  var allN=0, allAmt=0;
+  var body=order.map(function(k){
+    var lines=g[k];
     var amt=0, cnt=0;
     lines.forEach(function(x){
       if(skip[x.it.id]) return;
       var q=(edit[x.it.id]!=null)?edit[x.it.id]:x.qty;
       if(q>0){ cnt++; amt+=(numOf(x.it.cost)||0)*q }
     });
-    return '<div class="vbox" data-v="'+esc(k)+'">'+
-      '<div class="vhd"><span class="nm">'+esc(nm)+'</span>'+
-      (how?'<span class="how">'+esc(how)+'</span>':'')+
-      '<span class="n">'+lines.length+'点</span></div>'+
+    allN+=cnt; allAmt+=amt;
+    /* 仕入先がひとつにそろっているカテゴリーだけ、今までどおりその仕入先に注文できる */
+    var vs={};
+    lines.forEach(function(x){ if(!skip[x.it.id]) vs[x.it.vendor||""]=1 });
+    var vk=Object.keys(vs), one=(vk.length===1&&vk[0])?venById(vk[0]):null;
+    return '<details class="vbox" data-c="'+esc(k)+'"'+(openC[k]?" open":"")+'>'+
+      '<summary class="vhd"><span class="mk">›</span>'+
+      '<span class="nm">'+esc(k||"（未分類）")+'</span>'+
+      '<span class="sm">'+(amt?yen(amt):"")+'</span>'+
+      '<span class="n">'+lines.length+'点</span></summary>'+
       lines.map(function(x){
         var id=x.it.id, q=(edit[id]!=null)?edit[id]:x.qty, off=!!skip[id];
+        var short=Math.max(0,(x.par||0)-x.stock);
         return '<div class="oline'+(off?" off":"")+'">'+
           '<input class="chk" type="checkbox" data-skip="'+esc(id)+'"'+(off?"":" checked")+'>'+
-          '<div class="in"><div class="nm">'+esc(x.it.name||"（名前なし）")+'</div>'+
-          '<div class="sub">'+(x.it.vno?"先方No "+esc(x.it.vno)+"　":"")+
-            'いま '+x.stock+'　'+(x.par!=null?'いつも '+x.par+'　':'')+
-            (x.pend?'発注中 '+x.pend+'　':'')+
-            (x.lot>1?x.boxes+'箱×'+x.lot:'')+'</div></div>'+
+          '<div class="in"><div class="nm">'+
+            (x.it.no?'<span class="no">'+esc(x.it.no)+'</span>':"")+
+            esc(x.it.name||"（名前なし）")+'</div>'+
+          '<div class="sub">'+
+            ['いま '+x.stock, 'いつも '+x.par, '<b>足りない '+short+'</b>',
+             x.pend?'発注中 '+x.pend:'', x.lot>1?x.boxes+'箱×'+x.lot:'',
+             x.it.vno?'先方No '+esc(x.it.vno):'']
+            .filter(Boolean).map(function(t){ return '<span>'+t+'</span>' }).join("")+
+          '</div></div>'+
           '<div class="qty"><input type="number" min="0" step="'+x.lot+'" inputmode="numeric" '+
           'data-q="'+esc(id)+'" value="'+q+'"><span class="u">個</span></div>'+
           '</div>';
       }).join("")+
       '<div class="vft"><span class="amt">'+cnt+'点　仕入れ '+yen(amt)+'</span>'+
-      (k&&v
-        ? '<button class="btn primary sm" data-go="'+esc(k)+'">この仕入先に注文する</button>'
-        : '<a class="btn sm" href="../settings/#item">仕入先を決める</a>')+
-      '</div></div>';
+      (one?'<button class="btn primary sm" data-go="'+esc(vk[0])+'" data-gc="'+esc(k)+'">'+
+             esc(one.name||"仕入先")+' に注文する</button>':'')+
+      '</div></details>';
   }).join("");
+
+  $("#needBody").innerHTML=
+    '<div class="needtop"><span>ぜんぶで <b>'+list.length+'点</b>（'+order.length+'カテゴリー）</span>'+
+    '<span class="sp"></span>'+
+    '<button class="btn sm ghost" id="openAll">'+(order.every(function(k){ return openC[k] })?"ぜんぶ閉じる":"ぜんぶ開く")+'</button></div>'+
+    body;
+}
+/* 開いているカテゴリーを覚えておく（数を直すたびに描き直しても、閉じないように） */
+var openC={};
+$("#needBody").addEventListener("toggle",function(e){
+  var d=e.target; if(!d.matches||!d.matches("details.vbox")) return;
+  if(d.open) openC[d.dataset.c]=1; else delete openC[d.dataset.c];
+},true);
+function byNo(a,b){
+  var na=parseInt(a.it.no,10), nb=parseInt(b.it.no,10);
+  if(!isNaN(na)&&!isNaN(nb)&&na!==nb) return na-nb;
+  if(isNaN(na)!==isNaN(nb)) return isNaN(na)?1:-1;
+  return String(a.it.name||"").localeCompare(String(b.it.name||""),"ja");
 }
 
 $("#needBody").addEventListener("change",function(e){
@@ -311,16 +356,24 @@ $("#needBody").addEventListener("change",function(e){
   }
 });
 $("#needBody").addEventListener("click",function(e){
+  if(e.target.closest("#openAll")){
+    var ds=document.querySelectorAll("#needBody details.vbox");
+    var all=Array.prototype.every.call(ds,function(d){ return d.open });
+    openC={};
+    ds.forEach(function(d){ if(!all) openC[d.dataset.c]=1 });
+    renderNeed(); return;
+  }
   var b=e.target.closest("[data-go]"); if(!b) return;
-  openSheet(b.dataset.go);
+  openSheet(b.dataset.go, b.dataset.gc);
 });
 
 /* ---------- 注文を作る ---------- */
 var draft=null;
-function linesFor(vid){
+function linesFor(vid,cat){
   var out=[];
   needList().forEach(function(x){
     if((x.it.vendor||"")!==vid) return;
+    if(cat!=null&&String(x.it.cat||"")!==cat) return;   /* 押したカテゴリーのぶんだけ */
     var id=x.it.id;
     if(skip[id]) return;
     var q=(edit[id]!=null)?edit[id]:x.qty;
@@ -344,9 +397,9 @@ function mailBody(v,lines){
   if(t.indexOf("{明細}")<0) t=t+"\n\n{明細}";
   return t.replace("{明細}",listText(lines));
 }
-function openSheet(vid){
+function openSheet(vid,cat){
   var v=venById(vid); if(!v) return;
-  var lines=linesFor(vid);
+  var lines=linesFor(vid,cat);
   if(!lines.length){ toast("注文するものがありません"); return }
   draft={vendor:vid, vname:v.name||"", how:(v.how==="web"?"web":"mail"), lines:lines};
 
