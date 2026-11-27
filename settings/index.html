@@ -290,7 +290,10 @@ details.cat .in{padding:2px 12px 10px}
         <p class="note" style="margin-top:12px">
           エアレジの <b>在庫一覧のCSV</b>（<span class="mono">stock.csv</span>）をえらんでください。
           文字コードは自動で見分けます。<br>
-          <b>商品名で突き合わせます。</b>合わなかったものは一覧に出すので、名前を直してからもう一度読ませてください。<br>
+          <b>商品番号で突き合わせます。</b>エアレジの商品名のはじめに付いている数字
+          （<span class="mono">1 羽織</span> の <span class="mono">1</span>）を、アプリの
+          <b>商品No</b>と合わせます。番号が無い行だけ、名前で合わせます。<br>
+          合わなかったものは一覧に出すので、商品Noを直してからもう一度読ませてください。<br>
           <b>この読み込みで商品が消えることはありません。</b>
           CSVに入っていない商品は、そのままにします。<br>
           値段と仕入れ値は触りません（エアレジの在庫CSVに入っていないため）。
@@ -2003,15 +2006,28 @@ function csvDecode(buf){
 function csvHead(rows){
   for(var i=0;i<Math.min(rows.length,10);i++){
     var r=rows[i].map(function(x){ return String(x||"").replace(/\s|　/g,"") });
-    var nm=-1, st=-1, al=-1;
+    var nm=-1, st=-1, al=-1, no=-1;
     r.forEach(function(c,k){
       if(nm<0&&(c==="商品名"||c==="item_name"||c==="名前")) nm=k;
       if(st<0&&(c==="現在在庫数"||c==="在庫数"||c==="stock_qty"||c==="在庫")) st=k;
       if(al<0&&(c==="在庫通知数"||c==="notice_threshold"||c==="通知数")) al=k;
+      if(no<0&&(c==="商品番号"||c==="商品No"||c==="商品no"||c==="No"||c==="no"||
+                c==="番号"||c==="item_no"||c==="商品コード")) no=k;
     });
-    if(nm>=0&&st>=0) return {i:i, nm:nm, st:st, al:al};
+    if(nm>=0&&st>=0) return {i:i, nm:nm, st:st, al:al, no:no};
   }
   return null;
+}
+/* エアレジの「商品名」は <1 羽織> のように、はじめに商品番号が付いている。
+   アプリは番号（no）と名前を別の欄に持っているので、名前そのものでは合わない。
+   番号で突き合わせる。番号が取れないときだけ、今までどおり名前で合わせる。
+   2026-11-28 */
+function csvNo(v){
+  var m=String(v==null?"":v).match(/^\s*([0-9]+)/);
+  return m?String(parseInt(m[1],10)):"";
+}
+function csvNameOnly(v){
+  return String(v==null?"":v).replace(/^\s*[0-9]+[\s　]*/,"").trim();
 }
 function csvNum(v){
   var n=parseInt(String(v==null?"":v).replace(/[^0-9\-]/g,""),10);
@@ -2021,7 +2037,7 @@ function csvRead(text){
   var rows=csvRows(text);
   var h=csvHead(rows);
   if(!h) return {err:"「商品名」と「現在在庫数」の欄が見つかりませんでした。エアレジの在庫一覧のCSVか、確かめてください。"};
-  var hit=[], miss=[], seen={}, dup=0, neg=0;
+  var hit=[], miss=[], seen={}, dup=0, neg=0, byNo=0, byNm=0;
   for(var i=h.i+1;i<rows.length;i++){
     var r=rows[i];
     var name=String(r[h.nm]||"").trim();
@@ -2032,14 +2048,23 @@ function csvRead(text){
        アプリ側はマイナスを想定していないので 0 にそろえる。2026-11-27 */
     if(st<0){ st=0; neg++ }
     var al=(h.al>=0)?csvNum(r[h.al]):null;
-    var key=normName(name);
-    if(seen[key]){ dup++; continue }              /* 同じ名前が2行あるときは、はじめのほうを採る */
+    /* 番号の欄があればそれを使い、無ければ商品名のはじめの数字を使う */
+    var no=(h.no>=0)?String(r[h.no]||"").replace(/[^0-9]/g,""):"";
+    no=no?String(parseInt(no,10)):csvNo(name);
+    var bare=no?csvNameOnly(name):name;           /* 番号をはずした名前 */
+    var key=no?("#"+no):("@"+normName(name));
+    if(seen[key]){ dup++; continue }              /* 同じものが2行あるときは、はじめのほうを採る */
     seen[key]=1;
-    var it=itemByName(name);
-    if(it) hit.push({it:it, name:name, stock:st, alert:al});
-    else miss.push({name:name, stock:st});
+    var it=no?itemByNo(no):null;
+    if(it) byNo++;
+    else {
+      it=itemByName(name)||(bare?itemByName(bare):null);
+      if(it) byNm++;
+    }
+    if(it) hit.push({it:it, name:name, no:no, stock:st, alert:al});
+    else miss.push({name:name, no:no, stock:st});
   }
-  return {hit:hit, miss:miss, dup:dup, neg:neg, hasAlert:h.al>=0};
+  return {hit:hit, miss:miss, dup:dup, neg:neg, byNo:byNo, byNm:byNm, hasAlert:h.al>=0};
 }
 function renderCsvPlan(){
   var box=$("#csvRes"), p=csvPlan;
@@ -2051,9 +2076,10 @@ function renderCsvPlan(){
     '<b style="font-size:15px">読みこみました</b>'+
     '<span class="hint mono">'+(p.hit.length+p.miss.length)+'行</span></div>'+
     '<div style="margin-top:9px;font-size:14px;line-height:2">'+
-      '・商品名が合った　<b class="mono">'+p.hit.length+'件</b>'+
+      '・アプリの商品と合った　<b class="mono">'+p.hit.length+'件</b>'+
         '（うち数が変わるもの <b class="mono">'+ch+'件</b>）<br>'+
-      '・アプリに無い名前　<b class="mono">'+p.miss.length+'件</b>'+
+      '　　<span class="hint">商品番号で '+p.byNo+'件／名前で '+p.byNm+'件</span><br>'+
+      '・アプリに無い商品　<b class="mono">'+p.miss.length+'件</b>'+
         '（<b>入れません</b>。下に出します）'+
       (p.dup?'<br>・CSVの中で名前が重なっていた　<b class="mono">'+p.dup+'件</b>（はじめの行を使います）':"")+
       (p.neg?'<br>・エアレジでマイナスだったもの　<b class="mono">'+p.neg+'件</b>（<b>0として入れます</b>）':"")+
@@ -2067,16 +2093,20 @@ function renderCsvPlan(){
       'この内容で入れる</button></div>';
   }
   if(p.miss.length){
-    h+='<h3 style="margin-top:16px">アプリに無い名前（'+p.miss.length+'件）</h3>'+
+    h+='<h3 style="margin-top:16px">アプリに無い商品（'+p.miss.length+'件）</h3>'+
       '<div style="font-size:13.5px;line-height:2;color:var(--ink-2);max-height:260px;overflow:auto">'+
       p.miss.slice(0,200).map(function(x){
-        return '<div>'+esc(x.name)+' <span class="hint mono">在庫 '+x.stock+'</span></div>';
+        return '<div>'+(x.no?'<span class="hint mono">'+esc(x.no)+'</span> ':"")+
+          esc(x.name)+' <span class="hint mono">在庫 '+x.stock+'</span></div>';
       }).join("")+
       (p.miss.length>200?'<div class="hint">ほか '+(p.miss.length-200)+'件</div>':"")+
       '</div>'+
-      '<p class="note">エアレジ側とアプリ側で、名前が1字でも違うと合いません。'+
-      '（全角と半角の空白、カッコのちがいなど）<br>'+
-      '合わせたいものは、上の一覧で<b>アプリ側の商品名を直して</b>から、もう一度読ませてください。</p>';
+      '<p class="note">まず<b>商品番号</b>で合わせています。エアレジの商品名のはじめに付いている'+
+      '数字（<span class="mono">1 羽織</span> の <span class="mono">1</span>）が、'+
+      'アプリの<b>商品No</b>と同じものを探します。<br>'+
+      '番号で見つからないときだけ、名前で合わせます（名前は1字でも違うと合いません）。<br>'+
+      '合わせたいものは、<a href="#item">設定 → 商品</a>でその商品の'+
+      '<b>商品No</b>を直してから、もう一度読ませてください。</p>';
   }
   box.innerHTML=h;
 }
@@ -2572,7 +2602,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v141";
+var APPVER="v142";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
