@@ -34,7 +34,6 @@ main{max-width:620px;margin:0 auto;padding:14px 14px calc(120px + env(safe-area-
   box-shadow:var(--shadow);min-width:118px}
 .pick .opts button:active{transform:translateY(1px)}
 .pick .opts button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
-.pick .opts button.sk{font-size:14px;padding:14px 18px;min-width:0;color:var(--ink-2);box-shadow:none;font-weight:600}
 .pick .sub{font-size:13px;color:var(--ink-2);line-height:1.8}
 .pick .sub a{color:var(--accent)}
 
@@ -356,10 +355,11 @@ function renderStaffOpts(){
   var list=staffList(), t=today();
   $("#staffOpts").innerHTML=list.map(function(n){
     return '<button type="button" data-s="'+esc(n)+'" aria-pressed="'+(t.staff===n)+'">'+esc(n)+'</button>';
-  }).join("")+'<button type="button" data-s="" class="sk">名前を出さずに進む</button>';
+  }).join("");
   $("#staffSub").innerHTML=list.length
     ? "だれが開けたか、1週間だけ残ります。"
-    : '名簿がありません。<a href="../settings/">設定 → スタッフ</a>で登録すると、ここに出ます。';
+    : '名簿がありません。<a href="../settings/">設定 → スタッフ</a>で登録すると、'+
+      'ここに名前が出て、先に進めるようになります。';
 }
 $("#staffOpts").addEventListener("click",function(e){
   var b=e.target.closest("[data-s]"); if(!b) return;
