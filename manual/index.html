@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>マニュアル</title>
+<meta name="description" content="このアプリの使い方。朝の日課・レジ・来店・集計の手順と、こまったときの直し方。">
+<meta name="theme-color" content="#2BA55F">
+<link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+.homebar{background:#2BA55F;color:#fff;display:flex;align-items:center;gap:8px;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 10px;text-decoration:none;font-weight:700;font-size:15px}
+.homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
+main{max-width:720px;margin:0 auto;padding:14px 14px calc(30px + env(safe-area-inset-bottom,0px))}
+
+.lead{font-size:13.5px;color:var(--ink-2);line-height:1.9;margin:2px 2px 14px}
+
+/* 目次 */
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.toc a{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;
+  padding:9px 14px;font-size:13.5px;font-weight:700;color:var(--ink-2);text-decoration:none}
+.toc a:active{transform:translateY(1px)}
+
+/* ひとまとまり */
+.sect{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;scroll-margin-top:12px}
+.sect>summary{list-style:none;display:flex;align-items:center;gap:11px;padding:15px 16px;cursor:pointer}
+.sect>summary::-webkit-details-marker{display:none}
+.sect>summary .ic{font-size:22px;line-height:1}
+.sect>summary .ti{font-size:17px;font-weight:700}
+.sect>summary .ti i{display:block;font-style:normal;font-size:12.5px;color:var(--ink-3);
+  font-weight:500;margin-top:2px}
+.sect>summary .ar{margin-left:auto;color:var(--ink-3);font-size:13px}
+.sect[open]>summary{border-bottom:1px solid var(--line)}
+.sect[open]>summary .ar{transform:rotate(90deg)}
+.body{padding:4px 16px 16px}
+
+/* 手順 */
+.steps{list-style:none;counter-reset:st;margin:8px 0 0;padding:0}
+.steps>li{counter-increment:st;position:relative;padding:0 0 14px 38px;font-size:14.5px;line-height:1.85}
+.steps>li::before{content:counter(st);position:absolute;left:0;top:1px;width:26px;height:26px;
+  border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:var(--mono);
+  font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.steps>li:last-child{padding-bottom:2px}
+.steps b{font-weight:700}
+.steps .sm{display:block;font-size:13px;color:var(--ink-2);line-height:1.8;margin-top:3px}
+
+.h4{font-size:13.5px;font-weight:700;margin:16px 0 6px;color:var(--ink)}
+.ul{margin:0;padding-left:20px;font-size:14px;line-height:1.95;color:var(--ink)}
+.ul li{margin-bottom:5px}
+.ul .sm{color:var(--ink-2);font-size:13px}
+.tip{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+  padding:11px 13px;font-size:13.5px;line-height:1.85;margin-top:13px;color:var(--ink-2)}
+.tip b{color:var(--ink)}
+.warn{border-color:var(--ng);color:var(--ng)}
+.warn b{color:var(--ng)}
+.key{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:6px;padding:1px 6px;white-space:nowrap}
+a.go{color:var(--accent);font-weight:700;text-decoration:none}
+.foot{font-size:12.5px;color:var(--ink-3);line-height:1.9;margin:18px 2px 0;text-align:center}
+</style>
+</head>
+<body>
+<a class="homebar" href="../">← ホーム<span>マニュアル</span></a>
+
+<main>
+  <p class="lead">
+    このアプリの使い方です。わからなくなったら、ここを開いてください。<br>
+    知りたいところを押すと開きます。
+  </p>
+
+  <nav class="toc">
+    <a href="#s-asa">朝の日課</a>
+    <a href="#s-reg">レジ</a>
+    <a href="#s-visit">来店を数える</a>
+    <a href="#s-sum">集計</a>
+    <a href="#s-help">こまったとき</a>
+  </nav>
+
+  <!-- ========== 朝の日課 ========== -->
+  <details class="sect" id="s-asa" open>
+    <summary><span class="ic">🪙</span>
+      <span class="ti">朝の日課<i>お店を開けるとき</i></span><span class="ar">›</span></summary>
+    <div class="body">
+      <ol class="steps">
+        <li><b>担当をえらぶ</b>
+          <span class="sm">開けた人の名前を押します。名前が出ないときは、設定のスタッフ名簿に入っていません。</span></li>
+        <li><b>電気をつける</b>
+          <span class="sm">押すとチェックが付きます。<b>商品棚のスイッチも忘れずに！</b></span></li>
+        <li><b>音楽をかける</b></li>
+        <li><b>レジ金を計算する</b>
+          <span class="sm">押すと、お札と硬貨を数える画面になります。</span></li>
+      </ol>
+
+      <div class="h4">レジ金の数えかた</div>
+      <ol class="steps">
+        <li><b>段を押す</b>
+          <span class="sm">「¥10,000」などを押すと、その段が青くなります。</span></li>
+        <li><b>テンキーで枚数を打つ</b>
+          <span class="sm">打ち間違えたら <span class="key">← 1字消す</span>。その段をやり直すなら <span class="key">ぜんぶ消す</span>。</span></li>
+        <li><b>「次の段へ ↓」で下の段に移る</b>
+          <span class="sm">1万 → 5千 → 2千 → 千 → 500 → … の順に進みます。0枚の段はとばして構いません。</span></li>
+        <li><b>「保存する」を押す</b>
+          <span class="sm">チェックが付いて、日課の画面にもどります。</span></li>
+      </ol>
+
+      <div class="tip"><b>レジ金は、いつも ¥50,000 で合わせます。</b><br>
+        数えた合計のすぐ下に、5万円とのちがいが出ます。
+        合わないときは、もう一度数えてから、店長に伝えてください。</div>
+
+      <div class="tip">画面のいちばん上に <b>前日の現金売上</b> が出ます。
+        昨日の現金のお会計の合計です。レジ金が合っているかを見るときの手がかりにしてください。</div>
+
+      <div class="tip"><b>チェックとレジ金の記録は、1週間だけ残ります。</b>
+        それより古いものは自動で消えます。この iPad の中だけの記録です。</div>
+    </div>
+  </details>
+
+  <!-- ========== レジ ========== -->
+  <details class="sect" id="s-reg">
+    <summary><span class="ic">🧾</span>
+      <span class="ti">レジ<i>お会計のしかた</i></span><span class="ar">›</span></summary>
+    <div class="body">
+      <ol class="steps">
+        <li><b>担当とお客様の区分をえらぶ</b>
+          <span class="sm">区分は 欧米／アジア／日本人。交代したら、上の「担当」から変えてください。</span></li>
+        <li><b>商品をかごに入れる</b>
+          <span class="sm">入れかたは5とおりあります（下を見てください）。</span></li>
+        <li><b>「お会計」を押す</b></li>
+        <li><b>支払い方法をえらぶ</b>
+          <span class="sm">現金のときは「預かり」を打つと、お釣りが出ます。</span></li>
+        <li><b>「会計する」を押す</b>
+          <span class="sm">レシートはそのまま印刷されます。</span></li>
+      </ol>
+
+      <div class="h4">商品の入れかた</div>
+      <ul class="ul">
+        <li><b>番号</b>　値札の番号を打って「かごに入れる」。ふだんはこれ。</li>
+        <li><b>カテゴリー</b>　種類から選ぶ。番号が読めないときに。</li>
+        <li><b>名前</b>　名前の一部でさがす。ひらがなでも漢字でも、入っていれば出ます。</li>
+        <li><b>金額</b>　<span class="sm">商品に登録していないものを、値段だけ打って入れる。「その他 ¥450」という名前になります。</span></li>
+        <li><b>お持ち帰り袋・飲み物</b>　<span class="sm">右上のボタン。よく出るので、番号を打たずに選べます。</span></li>
+      </ul>
+
+      <div class="h4">数を直す・消す</div>
+      <ul class="ul">
+        <li>かごの中の <span class="key">−</span> <span class="key">＋</span> で数を直します。</li>
+        <li>0にすると、その行は消えます。</li>
+      </ul>
+
+      <div class="tip warn"><b>打ち間違えてお会計してしまったら</b><br>
+        お会計のすぐあとの画面にある <b>「この会計を取り消す」</b> を押してください。
+        取り消しの控えも印刷されます。<br>
+        <b>「次のお会計」に進むと、もう取り消せません。</b>そのときは店長に伝えてください。</div>
+    </div>
+  </details>
+
+  <!-- ========== 来店 ========== -->
+  <details class="sect" id="s-visit">
+    <summary><span class="ic">👥</span>
+      <span class="ti">来店を数える<i>買わなかったお客様も数える</i></span><span class="ar">›</span></summary>
+    <div class="body">
+      <ol class="steps">
+        <li><b>レジの上の「来店」を押す</b></li>
+        <li><b>あてはまるところを押す</b>
+          <span class="sm">欧米／アジア／日本人 × 男／女／子供 の枠を押すと、1人ずつ増えます。</span></li>
+      </ol>
+      <div class="tip">数えまちがえたら <b>「数を直す」</b> を押してから、減らしたい枠を押してください。</div>
+      <div class="tip">ここで数えたぶんが、集計の <b>「来場数」</b> に出ます。</div>
+    </div>
+  </details>
+
+  <!-- ========== 集計 ========== -->
+  <details class="sect" id="s-sum">
+    <summary><span class="ic">📋</span>
+      <span class="ti">集計<i>売上を見る</i></span><span class="ar">›</span></summary>
+    <div class="body">
+      <ol class="steps">
+        <li><b>「日別」か「月別」をえらぶ</b></li>
+        <li><b>年と月をえらぶ</b></li>
+        <li><b>「表示する」を押す</b></li>
+      </ol>
+      <div class="h4">3つのタブ</div>
+      <ul class="ul">
+        <li><b>日別売上</b>　日ごと・月ごとの売上とグラフ。</li>
+        <li><b>商品別売上</b>　どの商品が何点売れたか。</li>
+        <li><b>来場数</b>　何人が来たか。区分と男女・子供のうちわけも出ます。</li>
+      </ul>
+      <div class="tip">「置き場所につないでいません」と出ているときは、
+        <b>その iPad で打ったぶんだけ</b>の数字です。お店ぜんぶの売上ではありません。</div>
+    </div>
+  </details>
+
+  <!-- ========== こまったとき ========== -->
+  <details class="sect" id="s-help">
+    <summary><span class="ic">🛟</span>
+      <span class="ti">こまったとき<i>よくあること</i></span><span class="ar">›</span></summary>
+    <div class="body">
+      <div class="h4">直したはずの画面が、古いまま</div>
+      <ul class="ul">
+        <li><a class="go" href="../settings/">設定</a> → <b>このアプリの版</b> → <b>「最新にする」</b> を押してください。</li>
+        <li>それでも直らないときは、アプリをいちど完全に閉じて（画面の下から上にスワイプして、カードを上に払う）、開き直してください。</li>
+        <li class="sm">ホーム画面のアプリと、Safari で開いたものは、別々に中身を持っています。</li>
+      </ul>
+
+      <div class="h4">レシートが出てこない</div>
+      <ul class="ul">
+        <li>プリンタの電源と、Wi-Fi につながっているかを見てください。</li>
+        <li><a class="go" href="../settings/">設定</a> → <b>レジ</b> → <b>レシート</b> で、出す・出さないを切り替えられます。</li>
+      </ul>
+
+      <div class="h4">スタッフの名前が出てこない</div>
+      <ul class="ul">
+        <li><a class="go" href="../settings/">設定</a> → <b>スタッフ</b> に登録すると、レジと朝の日課に出ます。</li>
+      </ul>
+
+      <div class="h4">商品が見つからない</div>
+      <ul class="ul">
+        <li>「名前」のタブで、名前の一部を打ってさがしてください。</li>
+        <li>それでも無いときは、レジの <b>「金額」</b> のタブで、値段だけ打って会計できます。
+          あとで店長に伝えてください。</li>
+      </ul>
+
+      <div class="tip"><b>わからないことは、そのままにしないでください。</b>
+        <a class="go" href="../box/">ご意見箱</a> から送れます。</div>
+    </div>
+  </details>
+
+  <p class="foot">お店のきまりごとも、ここに足せます。<br>
+    足したいことがあれば、店長に伝えてください。</p>
+</main>
+
+<script>
+/* 目次から飛んだとき、閉じている段は開いてから飛ぶ。
+   details は閉じていると中身の位置が出ないので、先に開けておく必要がある。2026-11-27 */
+(function(){
+"use strict";
+document.querySelector(".toc").addEventListener("click",function(e){
+  var a=e.target.closest("a[href^='#']"); if(!a) return;
+  var el=document.querySelector(a.getAttribute("href")); if(!el) return;
+  e.preventDefault();
+  el.open=true;
+  el.scrollIntoView({block:"start",behavior:"smooth"});
+});
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){
+  var hadSW=!!navigator.serviceWorker.controller, swReloading=false;
+  window.addEventListener("load",function(){ navigator.serviceWorker.register("../sw.js").catch(function(){}) });
+  navigator.serviceWorker.addEventListener("controllerchange",function(){
+    if(!hadSW||swReloading) return;
+    swReloading=true; location.reload();
+  });
+}
+</script>
+</body>
+</html>
