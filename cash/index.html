@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>朝の日課</title>
-<meta name="description" content="レジの中の現金を、お札と硬貨の枚数で数えて合計を出す画面。記録は1週間だけ残る。">
+<meta name="description" content="お店を開けるときの日課を、担当を選んでチェックしていく画面。レジ金を数える機能も入っている。記録は1週間だけ残る。">
 <meta name="theme-color" content="#2BA55F">
 <link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
 <link rel="stylesheet" href="../shared/theme.css">
@@ -23,6 +23,52 @@ html,body{touch-action:pan-x pan-y}
 main{max-width:620px;margin:0 auto;padding:14px 14px calc(120px + env(safe-area-inset-bottom,0px))}
 [data-off]{display:none!important}
 .note{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin:10px 2px 0}
+
+/* ---- 担当を選ぶ（開いていちばんはじめ） ---- */
+.pick{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  min-height:58vh;text-align:center}
+.pick h2{font-size:19px}
+.pick .opts{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.pick .opts button{border:1px solid var(--line-2);background:var(--surface);border-radius:14px;
+  padding:18px 26px;font-size:19px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--ink);
+  box-shadow:var(--shadow);min-width:118px}
+.pick .opts button:active{transform:translateY(1px)}
+.pick .opts button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.pick .opts button.sk{font-size:14px;padding:14px 18px;min-width:0;color:var(--ink-2);box-shadow:none;font-weight:600}
+.pick .sub{font-size:13px;color:var(--ink-2);line-height:1.8}
+.pick .sub a{color:var(--accent)}
+
+/* ---- 日課のチェック ---- */
+.who{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-2);margin:0 2px 11px}
+.who b{color:var(--ink);font-size:15.5px}
+.who .ch{margin-left:auto;border:1px solid var(--line-2);background:var(--surface);border-radius:999px;
+  padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--ink-2)}
+.tasks{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);overflow:hidden}
+.task{display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;
+  border:none;border-bottom:1px solid var(--line);background:transparent;
+  padding:16px 15px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.task:last-child{border-bottom:none}
+.task:active{background:var(--surface-2)}
+.task .bx{display:flex;flex:0 0 30px;width:30px;height:30px;border:2px solid var(--line-2);border-radius:9px;
+  display:flex;align-items:center;justify-content:center;font-size:17px;color:transparent;margin-top:2px}
+.task .tx{flex:1 1 auto;min-width:0}
+.task .nm{display:block;font-size:17px;font-weight:700;line-height:1.4}
+.task .ds{display:block;font-size:13px;color:var(--ink-2);line-height:1.7;margin-top:3px}
+.task .ds.warn{color:var(--ng);font-weight:700}
+.task .go{display:block;font-size:12.5px;color:var(--accent);font-weight:700;margin-top:5px}
+.task .tm{display:block;flex:0 0 auto;font-size:12px;color:var(--ink-3);font-family:var(--mono);
+  white-space:nowrap;margin-top:6px}
+.task.on .bx{border-color:var(--ok);background:var(--ok);color:#fff}
+.task.on .nm{color:var(--ink-3);text-decoration:line-through}
+.allok{margin-top:14px;background:var(--ok);color:#fff;border-radius:12px;padding:15px;
+  text-align:center;font-weight:700;font-size:15px;line-height:1.7}
+.backb{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;
+  padding:9px 15px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;
+  color:var(--ink-2);margin-bottom:12px}
+.backb:active{transform:translateY(1px)}
+/* 担当を選んでいるあいだは、タブも合計の帯も出さない */
+body[data-view="staff"] .top{display:none}
 
 /* ---- 前の日の現金売上・5万円の目安 ---- */
 .prev{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
@@ -129,13 +175,37 @@ body[data-pad="1"] main{padding-bottom:calc(var(--footh,96px) + var(--padh,330px
 <body>
 <a class="homebar" href="../">← ホーム<span>店舗管理</span></a>
 <header class="top"><div class="top-in"><div class="tabs" id="tabs">
-  <button class="tab" data-v="count" aria-selected="true">🧮 数える</button>
+  <button class="tab" data-v="list" aria-selected="true">☑️ 朝の日課</button>
   <button class="tab" data-v="log" aria-selected="false">📋 記録</button>
 </div></div></header>
 
 <main>
-  <!-- ========== 数える ========== -->
-  <div id="v-count">
+  <!-- ========== ① 担当を選ぶ ========== -->
+  <div class="pick" id="v-staff">
+    <h2>今朝の担当は どなたですか</h2>
+    <div class="opts" id="staffOpts"></div>
+    <div class="sub" id="staffSub"></div>
+  </div>
+
+  <!-- ========== ② 日課をチェックする ========== -->
+  <div id="v-list" data-off>
+    <div class="who">
+      <span>今朝の担当</span><b id="whoNm">—</b>
+      <button type="button" class="ch" id="whoCh">変える</button>
+    </div>
+    <div class="tasks" id="tasks"></div>
+    <div class="allok" id="allok" hidden></div>
+    <p class="note">
+      押すとチェックが付きます。もう一度押すと外れます。<br>
+      <b>「レジ金を計算する」は、押すと数える画面になります。</b>
+      保存するとチェックが付きます。<br>
+      チェックは日ごと・この端末だけ。<b>1週間より古いものは自動で消えます。</b>
+    </p>
+  </div>
+
+  <!-- ========== ③ 数える ========== -->
+  <div id="v-count" data-off>
+    <button type="button" class="backb" id="backList">← 朝の日課にもどる</button>
     <!-- 前の日に現金で受け取った金額。レジ金が合っているか見るときの手がかり。
          レジ金は常に5万円で合わせる決め（竹本さんの指示・2026-11-26）。 -->
     <div class="prev" id="prev">
@@ -178,13 +248,15 @@ body[data-pad="1"] main{padding-bottom:calc(var(--footh,96px) + var(--padh,330px
     <p class="note">
       <b>段を押してから、テンキーで枚数を打ってください。</b>「次の段へ」で下の段に移ります。<br>
       枚数は空のままで構いません。<br>
+      <b>「保存する」を押すと、朝の日課にチェックが付いて、日課の画面にもどります。</b><br>
       <b>記録は1週間だけ残ります。</b>それより古いものは、この画面を開いたときに自動で消えます。<br>
       記録はこの端末の中だけにあります。ほかの端末とは合わせていません。
     </p>
   </div>
 
-  <!-- ========== 記録 ========== -->
+  <!-- ========== ④ 記録 ========== -->
   <div id="v-log" data-off>
+    <div id="dayLogs"></div>
     <div id="logs"></div>
     <p class="note" id="logNote"></p>
   </div>
@@ -217,7 +289,8 @@ var COINS=[500,100,50,10,5,1];
 
 var K="storecash.v1";
 /* 置き場所の中身
-   { logs:[ {id, at:"2026-11-25T10:41", counts:{"10000":3,…}, total} ] }
+   { logs:[ {id, at:"2026-11-25T10:41", counts:{"10000":3,…}, total} ],
+     days:{ "2026-11-27":{ staff:"ケイキ", done:{ light:"08:12", music:"08:14", cash:"08:21" } } } }
    記録はこの端末だけ。ほかの端末とは合わせていない（レジ金は端末ごとに違うため）。 */
 var KEEP_DAYS=7;
 
@@ -226,23 +299,126 @@ function load(){
   try{ v=JSON.parse(localStorage.getItem(K)) }catch(e){}
   if(!v||typeof v!=="object") v={};
   if(!Array.isArray(v.logs)) v.logs=[];
+  if(!v.days||typeof v.days!=="object") v.days={};
   return v;
 }
 var DB=load();
 function save(){ try{ localStorage.setItem(K,JSON.stringify(DB)) }catch(e){} }
 
 /* 1週間より古い記録を捨てる。開くたびに1回。
-   お金の記録をいつまでも端末に残さない、という竹本さんの決め。 */
+   お金の記録をいつまでも端末に残さない、という竹本さんの決め。
+   日課のチェックも同じあつかいにしてある（2026-11-27）。 */
 function sweep(){
   var limit=Date.now()-KEEP_DAYS*24*60*60*1000;
-  var before=DB.logs.length;
+  var before=DB.logs.length, n=0;
   DB.logs=DB.logs.filter(function(x){
     var t=Date.parse(x&&x.at);
     return isFinite(t) ? t>=limit : false;     /* 日付が読めないものも捨てる */
   });
-  if(DB.logs.length!==before) save();
+  Object.keys(DB.days).forEach(function(d){
+    var t=Date.parse(d+"T00:00");
+    if(!isFinite(t)||t<limit){ delete DB.days[d]; n++ }
+  });
+  if(DB.logs.length!==before||n) save();
 }
 sweep();
+
+/* ---------- 朝の日課 ---------- */
+/* お店を開ける人が、毎朝この順でやることになっている（竹本さんの指示・2026-11-27）。
+   やることを足したり文言を直したりするときは、この3つを直す。
+   k は置き場所に残る印なので、いちど決めたら変えない（変えると昔のチェックが消える）。 */
+var TASKS=[
+  {k:"light", nm:"電気をつける",       ds:"商品棚のスイッチも忘れずに！", warn:1},
+  {k:"music", nm:"音楽をかける",       ds:""},
+  {k:"cash",  nm:"レジ金を計算する",   ds:"", go:"count"}
+];
+function ymdNow(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()) }
+function hhmm(){ var d=new Date(); return pad(d.getHours())+":"+pad(d.getMinutes()) }
+function today(){
+  var k=ymdNow();
+  if(!DB.days[k]) DB.days[k]={staff:"", done:{}};
+  if(!DB.days[k].done) DB.days[k].done={};
+  return DB.days[k];
+}
+var who="";                                    /* 今朝の担当。選ぶまでは空 */
+
+/* 名簿はシフト管理と同じものを使う。レジの担当選びと同じ出かた。 */
+function staffList(){
+  var db=null;
+  try{ db=JSON.parse(localStorage.getItem("shiftadmin.v1")) }catch(e){}
+  db=db||{};
+  var hid=db.hidden||[];
+  return (db.staff||[]).filter(function(s){ return hid.indexOf(s.name)<0 })
+    .map(function(s){ return String((s&&(s.disp||s.name))||"").trim() })
+    .filter(function(n){ return n });
+}
+function renderStaffOpts(){
+  var list=staffList(), t=today();
+  $("#staffOpts").innerHTML=list.map(function(n){
+    return '<button type="button" data-s="'+esc(n)+'" aria-pressed="'+(t.staff===n)+'">'+esc(n)+'</button>';
+  }).join("")+'<button type="button" data-s="" class="sk">名前を出さずに進む</button>';
+  $("#staffSub").innerHTML=list.length
+    ? "だれが開けたか、1週間だけ残ります。"
+    : '名簿がありません。<a href="../settings/">設定 → スタッフ</a>で登録すると、ここに出ます。';
+}
+$("#staffOpts").addEventListener("click",function(e){
+  var b=e.target.closest("[data-s]"); if(!b) return;
+  who=b.dataset.s;
+  var t=today(); t.staff=who; save();
+  show("list");
+});
+$("#whoCh").addEventListener("click",function(){ show("staff") });
+
+function renderTasks(){
+  var t=today(), n=0;
+  $("#whoNm").textContent=t.staff||"（名前なし）";
+  $("#tasks").innerHTML=TASKS.map(function(x){
+    var at=t.done[x.k]; if(at) n++;
+    return '<button type="button" class="task'+(at?" on":"")+'" data-k="'+x.k+'">'+
+      '<span class="bx">✓</span>'+
+      '<span class="tx"><span class="nm">'+esc(x.nm)+'</span>'+
+        (x.ds?'<span class="ds'+(x.warn?" warn":"")+'">'+esc(x.ds)+'</span>':"")+
+        (x.go&&!at?'<span class="go">押すと数える画面になります →</span>':"")+
+      '</span>'+
+      (at?'<span class="tm">'+esc(at)+'</span>':"")+
+    '</button>';
+  }).join("");
+  var all=$("#allok");
+  all.hidden=(n<TASKS.length);
+  all.textContent="今朝の日課は ぜんぶ終わりました。おつかれさまです。";
+}
+$("#tasks").addEventListener("click",function(e){
+  var b=e.target.closest(".task[data-k]"); if(!b) return;
+  var k=b.dataset.k, x=TASKS.filter(function(y){ return y.k===k })[0], t=today();
+  /* 「レジ金を計算する」は、押したら数える画面へ。チェックは保存したときに付く。
+     まちがって付けたときに外せるよう、もう一度押せば外れるのは3つとも同じ。 */
+  if(x&&x.go&&!t.done[k]){ show(x.go); return }
+  if(t.done[k]) delete t.done[k]; else t.done[k]=hhmm();
+  save(); renderTasks();
+});
+$("#backList").addEventListener("click",function(){ show("list") });
+
+/* ---------- 画面の出し分け ---------- */
+var view="staff";
+function show(v){
+  view=v;
+  document.body.dataset.view=v;
+  ["staff","list","count","log"].forEach(function(x){
+    $("#v-"+x).toggleAttribute("data-off",x!==v);
+  });
+  $("#tabs").querySelectorAll(".tab").forEach(function(t){
+    /* 数えているあいだは「朝の日課」のタブを光らせておく（日課の続きなので） */
+    var on = t.dataset.v===v || (v==="count"&&t.dataset.v==="list");
+    t.setAttribute("aria-selected",String(on));
+  });
+  $("#foot").hidden = (v!=="count");           /* 合計の帯は数えるときだけ */
+  document.body.dataset.pad=(v==="count"&&sel!=null)?"1":"";
+  if(v==="staff") renderStaffOpts();
+  if(v==="list")  renderTasks();
+  if(v==="count"){ renderRows(); renderTotal(); renderPad(); loadPrev() }
+  if(v==="log")   renderLogs();
+  window.scrollTo({top:0});
+}
 
 /* ---------- 数える ---------- */
 var cnt={};                                    /* {"10000":3, …} いま打っている枚数 */
@@ -362,9 +538,12 @@ $("#save").addEventListener("click",function(){
     at:d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes()),
     counts:JSON.parse(JSON.stringify(cnt)), total:t
   });
+  /* 保存できたら、日課の「レジ金を計算する」にもチェックを付ける（2026-11-27） */
+  var td=today(); if(!td.done.cash) td.done.cash=hhmm();
   sweep(); save(); renderLogs();
   cnt={}; sel=wide()?ALL[0]:null; renderRows(); renderTotal(); renderPad();   /* 次の人がそのまま数えられるよう、空に戻す */
   toast(yen(t)+" を記録しました");
+  show("list");
 });
 
 /* ---------- 前日の現金売上 ---------- */
@@ -415,9 +594,30 @@ async function loadPrev(){
 }
 
 /* ---------- 記録 ---------- */
+/* 日課のほうの記録。だれが・何時にやったかを、日ごとに1行ずつ。 */
+function renderDays(){
+  var keys=Object.keys(DB.days).filter(function(d){
+    return TASKS.some(function(x){ return DB.days[d].done&&DB.days[d].done[x.k] });
+  }).sort().reverse();
+  if(!keys.length){ $("#dayLogs").innerHTML=""; return }
+  $("#dayLogs").innerHTML='<div class="sec">朝の日課</div>'+keys.map(function(d){
+    var v=DB.days[d], done=v.done||{};
+    var n=TASKS.filter(function(x){ return done[x.k] }).length;
+    var lines=TASKS.map(function(x){
+      return '<div class="ln"><span>'+(done[x.k]?"✅ ":"⬜️ ")+esc(x.nm)+'</span>'+
+        '<b>'+esc(done[x.k]||"—")+'</b></div>';
+    }).join("");
+    return '<details class="log">'+
+      '<summary>'+
+        '<span class="when"><b>'+esc(dayLabel(d))+'</b>'+esc(v.staff||"（名前なし）")+'</span>'+
+        '<span class="tot">'+n+'/'+TASKS.length+'</span>'+
+      '</summary><div class="in">'+lines+'</div></details>';
+  }).join("")+'<div class="sec">レジ金</div>';
+}
 function renderLogs(){
+  renderDays();
   if(!DB.logs.length){
-    $("#logs").innerHTML='<div class="empty">まだ記録がありません。<br>「数える」で枚数を入れて保存してください。</div>';
+    $("#logs").innerHTML='<div class="empty">まだレジ金の記録がありません。<br>「レジ金を計算する」から枚数を入れて保存してください。</div>';
     $("#logNote").textContent="";
     return;
   }
@@ -454,11 +654,7 @@ $("#logs").addEventListener("click",function(e){
 /* ---------- 共通 ---------- */
 $("#tabs").addEventListener("click",function(e){
   var b=e.target.closest(".tab[data-v]"); if(!b) return;
-  ["count","log"].forEach(function(v){ $("#v-"+v).toggleAttribute("data-off",v!==b.dataset.v) });
-  this.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected",String(t===b)) });
-  $("#foot").hidden = b.dataset.v!=="count";   /* 記録を見ているときは、合計の帯も鍵盤も出さない */
-  document.body.dataset.pad=(b.dataset.v==="count"&&sel!=null)?"1":"";
-  window.scrollTo({top:0});
+  show(b.dataset.v);
 });
 var toastEl=null,tt=null;
 function toast(m){
@@ -467,11 +663,17 @@ function toast(m){
   clearTimeout(tt); tt=setTimeout(function(){ toastEl.hidden=true },3000);
 }
 document.addEventListener("visibilitychange",function(){
-  if(document.visibilityState==="visible"){ sweep(); renderLogs(); loadPrev() }
+  if(document.visibilityState!=="visible") return;
+  sweep();
+  /* 日をまたいでいたら、今日のぶんは白紙から。けさの日課と昨日のチェックが混ざらないように。 */
+  if(view==="list") renderTasks();
+  if(view==="log")  renderLogs();
+  if(view==="count") loadPrev();
 });
 
-renderRows(); renderTotal(); renderLogs(); renderPad();
-loadPrev();
+/* 開いたら、まず担当をえらぶところから（竹本さんの指示・2026-11-27） */
+renderRows(); renderTotal(); renderPad();
+show("staff");
 
 /* 狭い画面では、テンキーを合計の帯の上に乗せる。帯の高さは中身で変わるので測る。 */
 function syncFootH(){
