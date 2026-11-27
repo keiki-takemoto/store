@@ -204,8 +204,10 @@ function venById(id){ return VEN.list.filter(function(x){ return x.id===id&&!x.d
 function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
 
 /* ---------- 足りないもの ---------- */
-/* 「足りない数（alert）」を下回ったら注文。
-   注文する数は「いつもの数（par）」まで戻す分で、1箱の数（lot）に切り上げる。
+/* 「いつもの数（par）」より少なくなったら注文。
+   注文する数は いつもの数 まで戻す分（＝足りない数）で、1箱の数（lot）に切り上げる。
+   むかしは手で入れる「足りない数（alert）」を合図にしていたが、
+   竹本さんの指示で 足りない数＝いつもの数−店舗にある数 にした。alert はもう見ない。2026-11-28
    すでに出していて届いていないぶん（発注中）は引く。 */
 var sent=[];            /* 出したまま届いていない注文 */
 function onOrder(){
@@ -221,13 +223,13 @@ function onOrder(){
 function needList(){
   var oo=onOrder(), out=[];
   live().forEach(function(it){
-    var st=numOf(it.stock), al=numOf(it.alert), par=numOf(it.par);
+    var st=numOf(it.stock), par=numOf(it.par);
     if(st===null) return;                       /* 在庫を入れていないものは出さない */
-    var line=(al!==null)?al:(par!==null?par:null);
-    if(line===null) return;                     /* いつ頼むかが決まっていない */
+    if(par===null) return;                      /* いつもの数が決まっていない */
+    var line=par;
     var pend=oo[it.id]||0;
-    if(st+pend>line) return;                    /* 発注中もふくめて足りている */
-    var want=(par!==null?par:line)-(st+pend);
+    if(st+pend>=par) return;                    /* 発注中もふくめて足りている */
+    var want=par-(st+pend);
     if(want<=0) return;
     var lot=numOf(it.lot)||1; if(lot<1) lot=1;
     var boxes=Math.ceil(want/lot);
@@ -248,7 +250,7 @@ function renderNeed(){
   }
   if(!list.length){
     $("#needBody").innerHTML='<div class="empty">いまのところ足りないものはありません。<br>'+
-      '<a href="../settings/#item">設定 → 商品</a> の「足りない数」と「いつもの数」で決まります。</div>';
+      '<a href="../settings/#item">設定 → 商品</a> の「いつもの数」より少なくなったものが出ます。</div>';
     return;
   }
   /* 仕入先ごとにまとめる */
@@ -526,7 +528,7 @@ async function pullItems(){
     if(sr.cat) it.cat=String(sr.cat);
     if(sr.vendor) it.vendor=String(sr.vendor);
     if(sr.vno) it.vno=String(sr.vno);
-    ["price","cost","stock","alert","par","lot"].forEach(function(f){
+    ["price","cost","stock","par","lot"].forEach(function(f){
       if(typeof sr[f]==="number") it[f]=sr[f];
     });
     byId[sr.id]=it;

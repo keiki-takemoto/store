@@ -93,6 +93,11 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
 .catTag{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border-radius:7px;padding:2px 8px}
 .rate{font-family:var(--mono);color:var(--ink-2)}
 .low{color:var(--warn);font-weight:700}
+/* 足りない数（いつもの数 − 店舗にある数）。打ちこむ欄ではなく、出すだけ */
+.need{display:inline-block;min-width:2.4em;padding:6px 10px;border-radius:8px;
+  background:var(--surface-2);font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:15px;font-weight:700;color:var(--ink-2);text-align:right}
+.need.low{background:var(--warn-bg);color:var(--warn)}
 /* 仕入先 */
 .ven{border:1px solid var(--line);border-radius:12px;padding:12px}
 .ven+.ven{margin-top:10px}
@@ -222,7 +227,6 @@ details.cat .in{padding:2px 12px 10px}
           </div>
           <div class="nf-row">
             <span class="fg">店舗にある数 <input type="number" id="nStock" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
-            <span class="fg">足りない数 <input type="number" id="nAlert" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
             <span class="fg">いつもの数 <input type="number" id="nPar" class="num" min="0" step="1" inputmode="numeric" placeholder="—"></span>
           </div>
           <div class="nf-row end"><button class="btn primary" id="addItem">保存</button></div>
@@ -238,11 +242,10 @@ details.cat .in{padding:2px 12px 10px}
           付けた商品はレシートで8%として計算され、明細に <b>※</b> が付きます。
           付けないものは、ぜんぶ10%になります。この印も次の登録に残ります。<br>
           <b>原価率</b>は売価と仕入れ値から自動で出します（仕入れ値 ÷ 売価）。<br>
-          <b>店舗にある数</b>が<b>足りない数</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
-          そのとき<a href="../order/">発注</a>の画面に出て、<b>いつもの数</b>まで戻る分を注文します。<br>
-          <b>足りない数を空にしておくと、いつもの数が合図になります。</b>
-          「いつも200置いておきたい」だけなら、いつもの数に200と入れておけば足ります。
-          「150を切ったら注文したい」というときだけ、足りない数に150と入れてください。
+          <b>いつもの数</b>は、お店に<b>常にないといけない数</b>です。<br>
+          <b>足りない数</b>は自動で出ます（<b>いつもの数 − 店舗にある数</b>）。
+          1つ以上になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
+          そのとき<a href="../order/">発注</a>の画面に出て、足りない数のぶんを注文します。
           <b>1箱の数</b>を入れておくと、箱の単位に切り上げます。<br>
           登録したあとは、下の一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
       </div>
@@ -673,6 +676,11 @@ function loadItems(){
   try{ v=JSON.parse(localStorage.getItem(K_ITEM)) }catch(e){}
   if(!v||!Array.isArray(v.items)) v={items:[]};
   if(!Array.isArray(v.cats)) v.cats=[];
+  /* 足りない数（alert）は自動で出すことにしたので、端末に残っているぶんは捨てる。
+     ここでは送り直さない（794点をいっぺんに送ると、ほかの端末の新しい在庫を
+     古い数で上書きしかねないため）。置き場所のほうは、その商品を次に送るときに空になる。
+     どの画面も alert はもう見ていないので、残っていても動きは変わらない。2026-11-28 */
+  v.items.forEach(function(x){ if(x&&"alert" in x) delete x.alert });
   return v;
 }
 function saveItems(v){ try{ localStorage.setItem(K_ITEM,JSON.stringify(v)) }catch(e){ toast("保存できませんでした") } }
@@ -992,13 +1000,17 @@ function renderCatPickers(){
   $("#catFilter").value=cur||"";
 }
 function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
-/* 赤くする合図。「足りない数」を入れていないときは「いつもの数」を合図にする。
-   発注の画面も同じ順番で見ている（order/index.html の needList）。2026-11-28 */
-function isLow(it){
-  var st=numOf(it.stock), al=numOf(it.alert), par=numOf(it.par);
-  var line=(al!==null)?al:par;
-  return (st!==null&&line!==null&&st<=line);
+/* 足りない数 ＝ いつもの数 − 店舗にある数。打ちこむ欄ではなく、ここで出す。
+   どちらかが空なら出さない（null）。マイナス（多すぎる）は 0 にする。
+   むかしは「足りない数（alert）」を手で入れていたが、竹本さんの指示で
+   自動で出すことにした。alert はもう見ない。2026-11-28
+   在庫管理・発注の画面も同じ考え方（stock / order の isLow・needList）。 */
+function needOf(it){
+  var st=numOf(it.stock), par=numOf(it.par);
+  if(st===null||par===null) return null;
+  return Math.max(0,par-st);
 }
+function isLow(it){ var n=needOf(it); return n!==null&&n>0 }
 function rateText(it){
   var p=numOf(it.price), c=numOf(it.cost);
   if(p===null||c===null||p<=0) return "—";
@@ -1112,8 +1124,10 @@ function row(it){
         (it.t8?" checked":"")+'> 8%</label>'+
         '<span class="fg rate">原価率 '+rateText(it)+'</span></div>'+
       '<div class="ri-sub">'+fld(it,"price","売価","円")+fld(it,"cost","仕入れ","円")+'</div>'+
-      '<div class="ri-sub">'+fld(it,"stock","店舗にある数","",1)+fld(it,"alert","足りない数","",1)+
+      '<div class="ri-sub">'+fld(it,"stock","店舗にある数","",1)+
         fld(it,"par","いつもの数","",1)+
+        '<span class="fg">足りない数 <b class="need'+(isLow(it)?" low":"")+'">'+
+          (needOf(it)===null?"—":needOf(it))+'</b></span>'+
         (isLow(it)?'<span class="fg low">少なくなっています</span>':'')+'</div>'+
       '<div class="ri-sub"><span class="fg">仕入先 <select data-ven="'+esc(it.id)+'">'+
         venOpts(it.vendor||"")+'</select></span>'+
@@ -1182,7 +1196,7 @@ $("#addItem").addEventListener("click",function(){
   if(no) it.no=no;
   var cat=$("#nCat").value;
   if(cat&&cat!==NEWCAT) it.cat=cat;
-  [["price","#nPrice"],["cost","#nCost"],["stock","#nStock"],["alert","#nAlert"],
+  [["price","#nPrice"],["cost","#nCost"],["stock","#nStock"],
    ["par","#nPar"]].forEach(function(pair){
     var v=parseInt($(pair[1]).value,10);
     if(!isNaN(v)&&v>=0) it[pair[0]]=v;
@@ -1192,12 +1206,12 @@ $("#addItem").addEventListener("click",function(){
   touch(it); IT.items.push(it); saveItems(IT); queueSync();
   justAdded=it.id;
   openCat[it.cat||""]=true;                /* 入れたカテゴリーを開いて見せる */
-  ["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){ $(sel).value="" });
+  ["#nNo","#nName","#nPrice","#nCost","#nStock"].forEach(function(sel){ $(sel).value="" });
   fillNextNo();                          /* 続けて登録できるよう、次の番号を入れておく */
   renderItems(); $("#nName").focus();    /* カテゴリーは続けて登録しやすいよう残す */
   toast(name+" を登録しました（No "+(it.no||"—")+"）");
 });
-["#nNo","#nName","#nPrice","#nCost","#nStock","#nAlert"].forEach(function(sel){
+["#nNo","#nName","#nPrice","#nCost","#nStock","#nPar"].forEach(function(sel){
   $(sel).addEventListener("keydown",function(e){ if(e.key==="Enter") $("#addItem").click() });
 });
 
@@ -1388,7 +1402,7 @@ function pushDirty(){
   if(!dirty.length && !cats) return Promise.resolve(0);
   var pay=dirty.map(function(x){
     return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
-      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:numOf(x.alert),
+      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:null,
       vendor:String(x.vendor||""), vno:String(x.vno||""),
       par:numOf(x.par), lot:numOf(x.lot),
       deleted:!!x.del};
@@ -1494,9 +1508,10 @@ function pullItems(){
       if(sr.cat) it.cat=String(sr.cat); else delete it.cat;
       if(sr.vendor) it.vendor=String(sr.vendor); else delete it.vendor;
       if(sr.vno) it.vno=String(sr.vno); else delete it.vno;
-      ["price","cost","stock","alert","par","lot"].forEach(function(f){
+      ["price","cost","stock","par","lot"].forEach(function(f){
         if(typeof sr[f]==="number") it[f]=sr[f]; else delete it[f];
       });
+      delete it.alert;                    /* 足りない数は自動で出すので、持たない */
       if(!cur){ IT.items.push(it); byId[sr.id]=it }
       n++;
     });
@@ -2142,8 +2157,7 @@ $("#csvRes").addEventListener("click",function(e){
     if(doStock&&(it.stock||0)!==x.stock){ it.stock=x.stock; ch=true }
     /* エアレジの「在庫通知数」は、お店が“常にないといけない数”として使っている。
        アプリでいう「いつもの数（par）」にあたるので、そちらに入れる。
-       「足りない数（alert）」は、いつ注文するかを店長が決める欄なのでさわらない。
-       alert が空のときは、いつもの数が注文の合図になる。2026-11-28 */
+       足りない数は、いつもの数 − 店舗にある数 で自動で出る。2026-11-28 */
     if(doAlert&&x.alert!==null&&(it.par||0)!==x.alert){ it.par=x.alert; ch=true }
     if(ch){ touch(it); n++ }
   });
@@ -2514,7 +2528,7 @@ $("#demoBtn").addEventListener("click",function(){
               "お試し用の中身です。この端末の中だけに入ります。\nよろしいですか？")) return;
   DEMO_ITEMS.forEach(function(d){
     var it={id:uid(),no:d.no,name:d.name,cat:d.cat,
-            price:d.price,cost:d.cost,stock:d.stock,alert:5};
+            price:d.price,cost:d.cost,stock:d.stock,par:d.stock+5};
     if(d.t8) it.t8=1;                       /* 送る印（d=1）は付けない */
     IT.items.push(it);
     if(IT.cats.indexOf(d.cat)<0) IT.cats.push(d.cat);
@@ -2612,7 +2626,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v143";
+var APPVER="v144";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");

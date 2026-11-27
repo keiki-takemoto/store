@@ -181,7 +181,7 @@ function pullItems(){
       if(sr.cat) it.cat=String(sr.cat); else delete it.cat;
       if(sr.vendor) it.vendor=String(sr.vendor); else delete it.vendor;
       if(sr.vno) it.vno=String(sr.vno); else delete it.vno;
-      ["price","cost","stock","alert","par","lot"].forEach(function(f){
+      ["price","cost","stock","par","lot"].forEach(function(f){
         if(typeof sr[f]==="number") it[f]=sr[f]; else delete it[f];
       });
       if(!cur){ IT.items.push(it); byId[sr.id]=it }
@@ -208,7 +208,7 @@ function pushDirty(){
   pushing=true; state("送っています…");
   var pay=dirty.map(function(x){
     return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
-      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:numOf(x.alert),
+      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:null,
       vendor:String(x.vendor||""), vno:String(x.vno||""),
       par:numOf(x.par), lot:numOf(x.lot), deleted:!!x.del};
   });

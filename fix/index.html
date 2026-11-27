@@ -130,7 +130,7 @@ $("#go").addEventListener("click",async function(){
   var b=this; b.disabled=true; b.textContent="送っています…";
   var pay=live.map(function(x){
     return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
-      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:numOf(x.alert),
+      price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:null,
       vendor:String(x.vendor||""), vno:String(x.vno||""),
       par:numOf(x.par), lot:numOf(x.lot), deleted:false};
   });

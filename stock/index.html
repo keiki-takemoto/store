@@ -126,7 +126,7 @@ textarea.cp{width:100%;margin-top:10px;font-family:var(--mono);font-size:12px;li
           <b>在庫</b>は<a href="../settings/#item">設定 → 商品</a>の「店舗にある数」です。
           お会計をすると自動で減ります。数え直したときは設定の画面で直してください。<br>
           <b>売れた数</b>と<b>売上</b>は、上で選んでいる月のぶんです。打ち消したお会計は入っていません。<br>
-          赤い行は<b>足りない数</b>（入れていなければ<b>いつもの数</b>）以下になっているものです。
+          赤い行は、<b>いつもの数</b>より少なくなっているもの（<b>足りない数</b>が1つ以上）です。
           注文は<a href="../order/">発注</a>の画面からできます。</p>
       </div>
     </div>
@@ -236,7 +236,7 @@ async function pullItems(){
   (r.items||[]).forEach(function(sr){
     if(sr.deleted) return;
     var it={id:sr.id, name:String(sr.name||""), no:String(sr.no||""), cat:String(sr.cat||"")};
-    ["price","cost","stock","alert","par"].forEach(function(f){ if(typeof sr[f]==="number") it[f]=sr[f] });
+    ["price","cost","stock","par"].forEach(function(f){ if(typeof sr[f]==="number") it[f]=sr[f] });
     out.push(it);
   });
   if(!out.length) return localItems();
@@ -286,12 +286,11 @@ function unitOf(s,it){
   if(s){ var ks=Object.keys(s.pr); if(ks.length===1) return +ks[0] }
   return numOf(it.price);
 }
-/* 「足りない数」を入れていないときは「いつもの数」を合図にする。
-   設定・発注の画面と同じ順番。2026-11-28 */
+/* 足りない数 ＝ いつもの数 − 店舗にある数。1つ以上なら赤くする。
+   設定・発注の画面と同じ考え方。2026-11-28 */
 function isLow(it){
-  var s=numOf(it.stock), a=numOf(it.alert), par=numOf(it.par);
-  var line=(a!==null)?a:par;
-  return s!==null&&line!==null&&s<=line;
+  var s=numOf(it.stock), par=numOf(it.par);
+  return s!==null&&par!==null&&par-s>0;
 }
 function byNo(a,b){
   var na=String(a.no||"").trim(), nb=String(b.no||"").trim();
