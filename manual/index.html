@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>マニュアル</title>
-<meta name="description" content="このアプリの使い方。朝の日課・レジ・来店・集計の手順と、こまったときの直し方。">
+<meta name="description" content="このアプリの使い方。質問を打つと答えをさがす。カテゴリーごとの質問と答えも読める。">
 <meta name="theme-color" content="#2BA55F">
 <link rel="icon" href="../icons/favicon-32.png" sizes="32x32">
 <link rel="stylesheet" href="../shared/theme.css">
@@ -14,17 +14,101 @@
 .homebar span{opacity:.85;font-weight:500;font-size:13px;margin-left:auto}
 main{max-width:720px;margin:0 auto;padding:14px 14px calc(30px + env(safe-area-inset-bottom,0px))}
 [data-off]{display:none!important}
+.backb{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;
+  padding:9px 15px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;
+  color:var(--ink-2);margin-bottom:13px}
+.backb:active{transform:translateY(1px)}
+.hd2{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em;margin:20px 2px 8px}
 
-/* 上のタブ */
-.top{position:sticky;top:0;z-index:9;background:var(--bg);border-bottom:1px solid var(--line)}
-.top-in{max-width:720px;margin:0 auto;padding:8px 12px}
-.tabs{display:flex;gap:6px;background:var(--surface-2);border-radius:11px;padding:4px}
-.tab{flex:1;border:none;background:transparent;border-radius:9px;padding:10px 4px;cursor:pointer;
-  font-size:14px;font-weight:700;color:var(--ink-2);font-family:inherit}
-.tab[aria-selected="true"]{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+/* ---- いちばん上のチャット欄 ---- */
+.askrow{display:flex;align-items:center;gap:13px;width:100%;text-align:left;
+  border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);
+  border-radius:14px;padding:17px 16px;cursor:pointer;font-family:inherit;
+  box-shadow:var(--shadow)}
+.askrow:active{transform:translateY(1px)}
+.askrow .ic{font-size:26px;line-height:1}
+.askrow .nm{display:block;font-size:18px;font-weight:700;line-height:1.4}
+.askrow .ds{display:block;font-size:12.5px;opacity:.85;line-height:1.7;margin-top:2px}
+.askrow .ar{margin-left:auto;font-size:20px;opacity:.8}
+
+/* ---- カテゴリー ---- */
+.cats{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);overflow:hidden}
+.cats button{display:flex;align-items:center;gap:13px;width:100%;text-align:left;
+  border:none;border-bottom:1px solid var(--line);background:transparent;
+  padding:16px 16px;cursor:pointer;font-family:inherit;color:var(--ink)}
+.cats button:last-child{border-bottom:none}
+.cats button:active{background:var(--surface-2)}
+.cats .ic{font-size:22px;line-height:1}
+.cats .nm{font-size:16.5px;font-weight:700}
+.cats .n{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--ink-3)}
+.cats .ar{color:var(--ink-3);font-size:15px}
+.cats .none{padding:22px 14px;font-size:13.5px;color:var(--ink-3);text-align:center;line-height:1.9}
+.readrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin-top:12px;
+  border:1px solid var(--line-2);background:var(--surface);border-radius:12px;
+  padding:14px 15px;cursor:pointer;font-family:inherit;color:var(--ink-2);font-size:14.5px;font-weight:700}
+.readrow:active{transform:translateY(1px)}
+.readrow .ar{margin-left:auto;color:var(--ink-3)}
+
+/* ---- カテゴリーの中の質問 ---- */
+.cathd{display:flex;align-items:center;gap:10px;margin:0 2px 12px}
+.cathd .ic{font-size:24px}
+.cathd h2{font-size:19px}
+.cathd .n{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--ink-3)}
+.qa{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  box-shadow:var(--shadow);margin-bottom:9px;overflow:hidden}
+.qa>summary{list-style:none;display:flex;align-items:flex-start;gap:10px;padding:14px 15px;cursor:pointer;
+  font-size:15.5px;font-weight:700;line-height:1.6}
+.qa>summary::-webkit-details-marker{display:none}
+.qa>summary .ar{margin-left:auto;color:var(--ink-3);font-size:13px;flex:0 0 auto}
+.qa[open]>summary{border-bottom:1px solid var(--line);color:var(--accent)}
+.qa .in{padding:12px 15px 15px;font-size:14.5px;line-height:1.9;white-space:pre-wrap}
+.qa .in b{font-weight:700}
+.qa .in .go{display:inline-block;margin-top:11px;border:1px solid var(--line-2);background:var(--surface-2);
+  border-radius:999px;padding:8px 13px;font-size:12.5px;font-weight:700;cursor:pointer;
+  font-family:inherit;color:var(--ink-2)}
+
+/* ---- 読む ---- */
+.lead{font-size:13.5px;color:var(--ink-2);line-height:1.9;margin:2px 2px 14px}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.toc a{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;
+  padding:9px 14px;font-size:13.5px;font-weight:700;color:var(--ink-2);text-decoration:none}
+.toc a:active{transform:translateY(1px)}
+.sect{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;scroll-margin-top:12px}
+.sect>summary{list-style:none;display:flex;align-items:center;gap:11px;padding:15px 16px;cursor:pointer}
+.sect>summary::-webkit-details-marker{display:none}
+.sect>summary .ic{font-size:22px;line-height:1}
+.sect>summary .ti{font-size:17px;font-weight:700}
+.sect>summary .ti i{display:block;font-style:normal;font-size:12.5px;color:var(--ink-3);
+  font-weight:500;margin-top:2px}
+.sect>summary .ar{margin-left:auto;color:var(--ink-3);font-size:13px}
+.sect[open]>summary{border-bottom:1px solid var(--line)}
+.sect[open]>summary .ar{transform:rotate(90deg)}
+.body{padding:4px 16px 16px}
+.steps{list-style:none;counter-reset:st;margin:8px 0 0;padding:0}
+.steps>li{counter-increment:st;position:relative;padding:0 0 14px 38px;font-size:14.5px;line-height:1.85}
+.steps>li::before{content:counter(st);position:absolute;left:0;top:1px;width:26px;height:26px;
+  border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:var(--mono);
+  font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
+.steps>li:last-child{padding-bottom:2px}
+.steps b{font-weight:700}
+.steps .sm{display:block;font-size:13px;color:var(--ink-2);line-height:1.8;margin-top:3px}
+.h4{font-size:13.5px;font-weight:700;margin:16px 0 6px;color:var(--ink)}
+.ul{margin:0;padding-left:20px;font-size:14px;line-height:1.95;color:var(--ink)}
+.ul li{margin-bottom:5px}
+.ul .sm{color:var(--ink-2);font-size:13px}
+.tip{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+  padding:11px 13px;font-size:13.5px;line-height:1.85;margin-top:13px;color:var(--ink-2)}
+.tip b{color:var(--ink)}
+.warn{border-color:var(--ng);color:var(--ng)}
+.warn b{color:var(--ng)}
+.key{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:6px;padding:1px 6px;white-space:nowrap}
+a.go{color:var(--accent);font-weight:700;text-decoration:none}
+.foot{font-size:12.5px;color:var(--ink-3);line-height:1.9;margin:18px 2px 0;text-align:center}
 
 /* ---- 質問のチャット ---- */
-/* 下の入力欄のぶんだけ、中身の下をあけておく */
 #v-ask{padding-bottom:calc(var(--askh,86px) + 10px)}
 .chat{display:flex;flex-direction:column;gap:11px;margin-top:4px}
 .bb{max-width:88%;border-radius:14px;padding:12px 14px;font-size:14.5px;line-height:1.85;
@@ -45,8 +129,6 @@ main{max-width:720px;margin:0 auto;padding:14px 14px calc(30px + env(safe-area-i
 .bb .acts button:disabled{opacity:.45;cursor:default}
 .bb .acts button.pri{border-color:var(--accent);color:var(--accent);background:var(--surface)}
 .bb .sent{font-size:12.5px;color:var(--ok);font-weight:700;margin-top:10px}
-
-/* よく聞かれること */
 .sug{margin-top:4px}
 .sug .hd{font-size:12px;color:var(--ink-3);letter-spacing:.06em;margin:0 2px 8px}
 .sug .in{display:flex;flex-wrap:wrap;gap:8px}
@@ -54,8 +136,6 @@ main{max-width:720px;margin:0 auto;padding:14px 14px calc(30px + env(safe-area-i
   padding:9px 14px;font-size:13.5px;cursor:pointer;font-family:inherit;color:var(--ink-2);
   text-align:left;line-height:1.4}
 .sug button:active{transform:translateY(1px)}
-
-/* 下にはりつく入力欄 */
 .askbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);
   border-top:1px solid var(--line);box-shadow:0 -2px 14px rgba(0,0,0,.08);
   padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}
@@ -64,66 +144,41 @@ main{max-width:720px;margin:0 auto;padding:14px 14px calc(30px + env(safe-area-i
   border:1px solid var(--line-2);border-radius:10px;padding:12px 13px;font-family:inherit}
 .askbar input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-2)}
 .askbar .btn{flex:0 0 auto;padding:12px 17px;font-size:15px}
-body[data-view="read"] .askbar{display:none}
-
-
-.lead{font-size:13.5px;color:var(--ink-2);line-height:1.9;margin:2px 2px 14px}
-
-/* 目次 */
-.toc{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
-.toc a{border:1px solid var(--line-2);background:var(--surface);border-radius:999px;
-  padding:9px 14px;font-size:13.5px;font-weight:700;color:var(--ink-2);text-decoration:none}
-.toc a:active{transform:translateY(1px)}
-
-/* ひとまとまり */
-.sect{background:var(--surface);border:1px solid var(--line);border-radius:14px;
-  box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;scroll-margin-top:12px}
-.sect>summary{list-style:none;display:flex;align-items:center;gap:11px;padding:15px 16px;cursor:pointer}
-.sect>summary::-webkit-details-marker{display:none}
-.sect>summary .ic{font-size:22px;line-height:1}
-.sect>summary .ti{font-size:17px;font-weight:700}
-.sect>summary .ti i{display:block;font-style:normal;font-size:12.5px;color:var(--ink-3);
-  font-weight:500;margin-top:2px}
-.sect>summary .ar{margin-left:auto;color:var(--ink-3);font-size:13px}
-.sect[open]>summary{border-bottom:1px solid var(--line)}
-.sect[open]>summary .ar{transform:rotate(90deg)}
-.body{padding:4px 16px 16px}
-
-/* 手順 */
-.steps{list-style:none;counter-reset:st;margin:8px 0 0;padding:0}
-.steps>li{counter-increment:st;position:relative;padding:0 0 14px 38px;font-size:14.5px;line-height:1.85}
-.steps>li::before{content:counter(st);position:absolute;left:0;top:1px;width:26px;height:26px;
-  border-radius:50%;background:var(--accent);color:var(--accent-ink);font-family:var(--mono);
-  font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center}
-.steps>li:last-child{padding-bottom:2px}
-.steps b{font-weight:700}
-.steps .sm{display:block;font-size:13px;color:var(--ink-2);line-height:1.8;margin-top:3px}
-
-.h4{font-size:13.5px;font-weight:700;margin:16px 0 6px;color:var(--ink)}
-.ul{margin:0;padding-left:20px;font-size:14px;line-height:1.95;color:var(--ink)}
-.ul li{margin-bottom:5px}
-.ul .sm{color:var(--ink-2);font-size:13px}
-.tip{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
-  padding:11px 13px;font-size:13.5px;line-height:1.85;margin-top:13px;color:var(--ink-2)}
-.tip b{color:var(--ink)}
-.warn{border-color:var(--ng);color:var(--ng)}
-.warn b{color:var(--ng)}
-.key{font-family:var(--mono);font-size:13px;background:var(--surface-2);border:1px solid var(--line);
-  border-radius:6px;padding:1px 6px;white-space:nowrap}
-a.go{color:var(--accent);font-weight:700;text-decoration:none}
-.foot{font-size:12.5px;color:var(--ink-3);line-height:1.9;margin:18px 2px 0;text-align:center}
+body:not([data-view="ask"]) .askbar{display:none}
 </style>
 </head>
 <body>
 <a class="homebar" href="../">← ホーム<span>マニュアル</span></a>
-<header class="top"><div class="top-in"><div class="tabs" id="tabs">
-  <button class="tab" data-v="ask" aria-selected="true">💬 質問する</button>
-  <button class="tab" data-v="read" aria-selected="false">📖 読む</button>
-</div></div></header>
 
 <main>
+  <!-- ========== 入口 ========== -->
+  <div id="v-home">
+    <button type="button" class="askrow" id="goAsk">
+      <span class="ic">💬</span>
+      <span class="tx"><span class="nm">質問する</span>
+        <span class="ds">聞きたいことを打つと、答えをさがします</span></span>
+      <span class="ar">›</span>
+    </button>
+
+    <div class="hd2">カテゴリー</div>
+    <div class="cats" id="cats"></div>
+
+    <button type="button" class="readrow" id="goRead">
+      <span>📖　手順をまとめて読む</span><span class="ar">›</span>
+    </button>
+  </div>
+
+  <!-- ========== カテゴリーの中 ========== -->
+  <div id="v-cat" data-off>
+    <button type="button" class="backb" data-back="1">← もどる</button>
+    <div class="cathd"><span class="ic" id="catIc"></span><h2 id="catNm"></h2>
+      <span class="n" id="catN"></span></div>
+    <div id="catList"></div>
+  </div>
+
   <!-- ========== 質問する ========== -->
-  <div id="v-ask">
+  <div id="v-ask" data-off>
+    <button type="button" class="backb" data-back="1">← もどる</button>
     <div class="chat" id="chat"></div>
     <div class="sug" id="sug">
       <div class="hd">よく聞かれること</div>
@@ -131,8 +186,9 @@ a.go{color:var(--accent);font-weight:700;text-decoration:none}
     </div>
   </div>
 
-  <!-- ========== 読む ========== -->
+  <!-- ========== 手順をまとめて読む ========== -->
   <div id="v-read" data-off>
+  <button type="button" class="backb" data-back="1">← もどる</button>
   <p class="lead">
     このアプリの使い方です。わからなくなったら、ここを開いてください。<br>
     知りたいところを押すと開きます。
@@ -310,14 +366,80 @@ a.go{color:var(--accent);font-weight:700;text-decoration:none}
 
 <script src="../shared/sync.js"></script>
 <script src="./faq.js"></script>
+<script src="../shared/faqdb.js"></script>
 <script>
 (function(){
 "use strict";
 var $=function(s){return document.querySelector(s)};
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+/* 答えの中では <b> だけ通す。ほかは字として出す（辞書の打ち間違いで画面が崩れないように） */
+function body(a){ return esc(a).replace(/&lt;b&gt;/g,"<b>").replace(/&lt;\/b&gt;/g,"</b>") }
 
-/* ================= 目次 =================
-   details は閉じていると中身の位置が出ないので、先に開けてから飛ぶ。 */
+FaqDB.load();
+
+/* ================= 画面の出し分け ================= */
+var view="home", back="home";
+function show(v){
+  view=v;
+  document.body.dataset.view=v;
+  ["home","cat","ask","read"].forEach(function(x){ $("#v-"+x).toggleAttribute("data-off",x!==v) });
+  if(v==="home") renderCats();
+  if(v==="ask") syncAskH();
+  window.scrollTo({top:0});
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-back]"); if(!b) return;
+  show(view==="read"&&back!=="home"?back:"home");
+  back="home";
+});
+$("#goAsk").addEventListener("click",function(){ show("ask") });
+$("#goRead").addEventListener("click",function(){ back="home"; show("read") });
+
+/* ================= カテゴリー ================= */
+function renderCats(){
+  var cs=FaqDB.cats().filter(function(c){ return c.n>0 });
+  $("#cats").innerHTML = cs.length
+    ? cs.map(function(c){
+        return '<button type="button" data-c="'+esc(c.k)+'">'+
+          '<span class="ic">'+esc(c.ic)+'</span>'+
+          '<span class="nm">'+esc(c.nm)+'</span>'+
+          '<span class="n">'+c.n+'</span><span class="ar">›</span></button>';
+      }).join("")
+    : '<div class="none">まだカテゴリーがありません。<br>'+
+      '<a class="go" href="../settings/#man">設定 → マニュアル</a>で足せます。</div>';
+}
+$("#cats").addEventListener("click",function(e){
+  var b=e.target.closest("[data-c]"); if(!b) return;
+  openCat(b.dataset.c);
+});
+function openCat(k){
+  var c=FaqDB.cats().filter(function(x){ return x.k===k })[0]||{k:k,nm:k,ic:"📄"};
+  var list=FaqDB.list(k);
+  $("#catIc").textContent=c.ic;
+  $("#catNm").textContent=c.nm;
+  $("#catN").textContent=list.length+"問";
+  $("#catList").innerHTML=list.length
+    ? list.map(function(e){
+        return '<details class="qa"><summary>'+esc(e.q)+'<span class="ar">›</span></summary>'+
+          '<div class="in">'+body(e.a)+
+          (e.go?'<button type="button" class="go" data-go="'+esc(e.go)+'">くわしく読む</button>':"")+
+          '</div></details>';
+      }).join("")
+    : '<div class="cats"><div class="none">この中にはまだ質問がありません。</div></div>';
+  show("cat");
+}
+$("#catList").addEventListener("click",function(e){
+  var b=e.target.closest("[data-go]"); if(!b) return;
+  goRead(b.dataset.go,"cat");
+});
+function goRead(sel,from){
+  back=from||"home";
+  show("read");
+  var el=document.querySelector(sel);
+  if(el){ el.open=true; el.scrollIntoView({block:"start",behavior:"smooth"}) }
+}
+
+/* 目次。details は閉じていると中身の位置が出ないので、先に開けてから飛ぶ。 */
 $(".toc").addEventListener("click",function(e){
   var a=e.target.closest("a[href^='#']"); if(!a) return;
   var el=document.querySelector(a.getAttribute("href")); if(!el) return;
@@ -327,84 +449,8 @@ $(".toc").addEventListener("click",function(e){
 });
 
 /* ================= 質問する =================
-   AIは使っていない。打たれた言葉と、辞書（faq.js）の言葉が
-   どれだけ重なるかを数えて、点数の高いものを出しているだけ。
-   だから通信もお金もかからず、電波がなくても答える。2026-11-27 */
-var FAQ=(window.FAQ||[]);
-
-/* 字をそろえる。カタカナ・全角・記号のちがいで外さないようにするため。 */
-function norm(s){
-  s=String(s==null?"":s).toLowerCase();
-  s=s.replace(/[Ａ-Ｚａ-ｚ０-９]/g,function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0) });
-  s=s.replace(/[\u30a1-\u30f6]/g,function(c){ return String.fromCharCode(c.charCodeAt(0)-0x60) }); /* カタカナ→ひらがな */
-  s=s.replace(/[\s、。，．・！？!?\-ー－~〜「」『』（）()【】]/g,"");
-  return s;
-}
-/* 日本語は単語の切れ目がないので、2文字ずつに切って重なりを見る。
-   形態素解析の辞書（10MB以上）を積まずに済ませるための工夫。 */
-function grams(s){
-  if(s.length<2) return s?[s]:[];
-  var a=[]; for(var i=0;i<s.length-1;i++) a.push(s.substr(i,2));
-  return a;
-}
-/* 辞書をいちど下ごしらえしておく（開くたびに作り直さない） */
-var IDX=FAQ.map(function(e){
-  var words=[e.q].concat(e.k||[]).map(norm).filter(Boolean);
-  var hay=words.join("|"), g={};
-  words.forEach(function(w){ grams(w).forEach(function(x){ g[x]=1 }) });
-  return {e:e, words:words, hay:hay, g:g};
-});
-var HIT=4;                                     /* これ未満は「当たっていない」とみなす */
-function search(raw){
-  var nq=norm(raw);
-  if(!nq) return [];
-  var qg=grams(nq), out=[];
-  IDX.forEach(function(x,i){
-    var sc=0;
-    /* 言いかえが丸ごと入っていたら、強く当たったとみなす。
-       いちばん強く当たったものを採る（はじめに当たったもの、ではない）。 */
-    var best=0;
-    for(var j=0;j<x.words.length;j++){
-      var w=x.words[j];
-      if(w.length>=2&&nq.indexOf(w)>=0) best=5;                            /* 「取り消し」がそのまま入っている */
-      else if(w.indexOf(nq)>=0&&best<4) best=4;                            /* 「レシート」と打って「レシートが出ない」 */
-      else if(w.length===1&&nq.indexOf(w)>=0&&best<3) best=3;             /* 「紙」「朝」など1字の手がかり */
-      if(best===5) break;
-    }
-    sc+=best;
-    /* 2文字ずつの重なり */
-    var m=0;
-    for(var k=0;k<qg.length;k++) if(x.g[qg[k]]) m++;
-    sc+=m;
-    if(sc>0) out.push({e:x.e, sc:sc, i:i});
-  });
-  out.sort(function(a,b){ return b.sc-a.sc || a.i-b.i });
-  return out;
-}
-
-/* ---- 答えられなかった質問をためる ---- */
-/* この端末の中だけ。文字しか入らないので、レジ金のように1週間で消したりはしない。
-   設定 → マニュアル から見て、辞書に足していくための材料。 */
-var KF="storefaq.v1";
-function loadF(){
-  var v=null; try{ v=JSON.parse(localStorage.getItem(KF)) }catch(e){}
-  if(!v||typeof v!=="object") v={};
-  if(!Array.isArray(v.miss)) v.miss=[];
-  return v;
-}
-var FDB=loadF();
-function saveF(){ try{ localStorage.setItem(KF,JSON.stringify(FDB)) }catch(e){} }
-function remember(raw){
-  var key=norm(raw);
-  var cur=FDB.miss.filter(function(x){ return x.key===key })[0];
-  if(cur){ cur.n=(cur.n||1)+1; cur.last=new Date().toISOString() }
-  else FDB.miss.unshift({key:key, t:String(raw).slice(0,120), n:1,
-                         last:new Date().toISOString(), done:0});
-  if(FDB.miss.length>500) FDB.miss.length=500;   /* 念のための上限 */
-  saveF();
-}
-
-/* ---- 吹き出し ---- */
+   AIは使っていない。打たれた言葉と辞書の言葉が、どれだけ重なるかを
+   数えているだけ（くわしくは shared/faqdb.js）。2026-11-27 */
 var chat=$("#chat");
 function bubble(cls,html){
   var d=document.createElement("div");
@@ -413,10 +459,6 @@ function bubble(cls,html){
   chat.appendChild(d);
   d.scrollIntoView({block:"end",behavior:"smooth"});
   return d;
-}
-/* 答えの中では <b> だけ通す。ほかは字として出す（辞書の打ち間違いで画面が崩れないように） */
-function body(a){
-  return esc(a).replace(/&lt;b&gt;/g,"<b>").replace(/&lt;\/b&gt;/g,"</b>");
 }
 function answer(hit,others){
   var h='<span class="qq">'+esc(hit.q)+'</span>'+body(hit.a)+'<div class="acts">';
@@ -427,11 +469,9 @@ function answer(hit,others){
   h+='<button type="button" data-miss="1">これじゃない</button></div>';
   bubble("ai",h);
 }
-function byId(id){ for(var i=0;i<FAQ.length;i++) if(FAQ[i].id===id) return FAQ[i]; return null }
-
 var lastAsked="";
 function noAnswer(raw){
-  remember(raw);
+  FaqDB.remember(raw);
   bubble("ai ng",
     "<b>わかりませんでした。</b>\nちがう言いかたで、もう一度打ってみてください。\n"+
     "（「レシート」「取り消し」など、短い言葉のほうが当たりやすいです）"+
@@ -447,29 +487,20 @@ function ask(raw){
   $("#q").value="";
   $("#sug").hidden=true;
   bubble("me",esc(raw));
-  var r=search(raw);
-  if(!r.length||r[0].sc<HIT){ noAnswer(raw); return }
-  answer(r[0].e, r.slice(1,3).filter(function(x){ return x.sc>=HIT }).map(function(x){ return x.e }));
+  var r=FaqDB.search(raw);
+  if(!r.length||r[0].sc<FaqDB.HIT){ noAnswer(raw); return }
+  answer(r[0].e, r.slice(1,3).filter(function(x){ return x.sc>=FaqDB.HIT }).map(function(x){ return x.e }));
 }
 $("#ask").addEventListener("click",function(){ ask($("#q").value) });
 $("#q").addEventListener("keydown",function(e){ if(e.key==="Enter") ask(this.value) });
 
 chat.addEventListener("click",function(e){
   var b=e.target.closest("[data-go],[data-id],[data-miss],[data-send]"); if(!b) return;
-  if(b.dataset.go){
-    e.preventDefault();
-    show("read");
-    var el=document.querySelector(b.dataset.go);
-    if(el){ el.open=true; el.scrollIntoView({block:"start",behavior:"smooth"}) }
-    return;
-  }
-  if(b.dataset.id){
-    var it=byId(b.dataset.id); if(it) answer(it,[]);
-    return;
-  }
+  if(b.dataset.go){ e.preventDefault(); goRead(b.dataset.go,"ask"); return }
+  if(b.dataset.id){ var it=FaqDB.byId(b.dataset.id); if(it) answer(it,[]); return }
   if(b.dataset.miss){                       /* 出た答えが見当ちがいだったとき */
     b.disabled=true;
-    if(lastAsked) remember(lastAsked);
+    if(lastAsked) FaqDB.remember(lastAsked);
     noAnswer(lastAsked||"");
     return;
   }
@@ -503,8 +534,8 @@ async function sendToBox(btn){
     btn.textContent="送りました";
     btn.parentNode.parentNode.insertAdjacentHTML("beforeend",
       '<div class="sent">店長に送りました。返事はご意見箱に届きます。</div>');
-    var m=FDB.miss.filter(function(x){ return x.key===norm(txt) })[0];
-    if(m){ m.sent=1; saveF() }
+    var m=FaqDB.db().miss.filter(function(x){ return x.key===FaqDB.norm(txt) })[0];
+    if(m){ m.sent=1; FaqDB.save() }
   }catch(err){
     btn.disabled=false; btn.textContent="もう一度送る";
     btn.parentNode.parentNode.insertAdjacentHTML("beforeend",
@@ -513,7 +544,7 @@ async function sendToBox(btn){
   }
 }
 
-/* ---- よく聞かれること（最初に出すボタン） ---- */
+/* ---- よく聞かれること ---- */
 var SUG=["レシートが出てこない","打ち間違えてしまった","商品が見つからない",
          "レジ金が合わない","朝の日課は何をする","画面が古いまま"];
 $("#sugIn").innerHTML=SUG.map(function(t){
@@ -524,22 +555,6 @@ $("#sugIn").addEventListener("click",function(e){
   ask(b.textContent);
 });
 
-/* ---- 画面の出し分け ---- */
-function show(v){
-  document.body.dataset.view=v;
-  ["ask","read"].forEach(function(x){ $("#v-"+x).toggleAttribute("data-off",x!==v) });
-  $("#tabs").querySelectorAll(".tab").forEach(function(t){
-    t.setAttribute("aria-selected",String(t.dataset.v===v));
-  });
-  if(v==="ask") syncAskH();
-  window.scrollTo({top:0});
-}
-$("#tabs").addEventListener("click",function(e){
-  var b=e.target.closest(".tab[data-v]"); if(!b) return;
-  show(b.dataset.v);
-});
-
-/* 下の入力欄の高さぶん、中身の下をあける */
 function syncAskH(){
   var h=$("#askbar").offsetHeight;
   if(h) document.documentElement.style.setProperty("--askh",h+"px");
@@ -547,9 +562,16 @@ function syncAskH(){
 window.addEventListener("resize",syncAskH);
 
 bubble("ai","<b>聞きたいことを、下に打ってください。</b>\n"+
-  "朝の日課・レジ・来店・集計の、よくある質問に答えます。\n"+
   "答えられなかったときは、店長に送れます。");
-show("ask");
+show("home");
+
+/* 店長が足したぶんを置き場所から受け取る。取れなくても、手元のぶんで動く。 */
+(async function(){
+  try{ if(await FaqDB.pull()&&view==="home") renderCats() }catch(e){}
+})();
+document.addEventListener("visibilitychange",function(){
+  if(document.visibilityState==="visible"&&view==="home") renderCats();
+});
 })();
 </script>
 <script>
