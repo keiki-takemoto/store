@@ -19,7 +19,7 @@ window.FAQGROUPS = [
 
 /* はじめから入っているカテゴリー。どれも大項目「お店について」の下。 */
 window.FAQCATS = [
-  { k:"asa",   g:"store", nm:"朝の日課について", ic:"🪙" },
+  { k:"asa",   g:"store", nm:"朝の日課について", ic:"🌅" },
   { k:"reg",   g:"store", nm:"レジについて",     ic:"🧾" },
   { k:"visit", g:"store", nm:"来店について",     ic:"👥" },
   { k:"sum",   g:"store", nm:"集計について",     ic:"📋" },
