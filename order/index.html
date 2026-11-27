@@ -113,6 +113,13 @@ details.vbox:not([open]) .vhd{border-bottom:none}
 .ord .st.void{background:var(--surface-2);color:var(--ink-3)}
 .ord .body{margin-top:9px;font-size:12.5px;color:var(--ink-2);line-height:1.9}
 .ord .act{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}
+.rv .or{font-size:11.5px;color:var(--ink-3);font-family:var(--mono);white-space:nowrap}
+.rv .rest{font-size:11.5px;font-weight:800;color:var(--warn);font-family:var(--mono);min-width:4.2em;text-align:right;white-space:nowrap}
+.bunno{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 11px;border-radius:10px;
+  background:var(--warn-bg);font-size:12.5px;line-height:1.7;color:var(--ink)}
+.bunno input{width:20px;height:20px;flex:0 0 auto;margin-top:2px}
+.bunno[hidden]{display:none}
+.ord .memo{margin-top:6px;font-size:11.5px;font-weight:700;color:var(--warn)}
 .rv{display:flex;align-items:center;gap:9px;padding:8px 0}
 .rv+.rv{border-top:1px solid var(--line)}
 .rv .nm{flex:1;min-width:0;font-size:13px;font-weight:600}
@@ -530,6 +537,7 @@ function renderSent(){
       '<div class="oh"><span class="nm">'+esc(o.vname||"（仕入先）")+'</span>'+
       '<span class="at">'+esc(atText(o.at))+'</span>'+
       '<span class="st sent">発注中</span></div>'+
+      (o.note?'<div class="memo">'+esc(o.note)+'</div>':'')+
       '<div class="body">'+(o.lines||[]).map(function(l){
         return esc((l.vno||l.no?"["+(l.vno||l.no)+"] ":"")+l.name)+' <b>'+(l.qty||0)+'</b>';
       }).join("<br>")+'</div>'+
@@ -539,6 +547,22 @@ function renderSent(){
       '</div>';
   }).join("");
 }
+/* 届いた数を打つたびに、注文との差（残り）と、分納のチェックを出し直す */
+function restShow(rv){
+  var short=false;
+  rv.querySelectorAll("[data-rid]").forEach(function(i){
+    var v=parseInt(i.value,10); if(isNaN(v)||v<0) v=0;
+    var left=(Number(i.dataset.oq)||0)-v;
+    var sp=rv.querySelector('[data-rest="'+i.dataset.rid+'"]');
+    if(sp) sp.textContent=left>0?"残り "+left:"";
+    if(left>0) short=true;
+  });
+  var b=rv.querySelector(".bunno"); if(b) b.hidden=!short;
+}
+$("#sentBody").addEventListener("input",function(e){
+  var i=e.target.closest("[data-rid]"); if(!i) return;
+  restShow(i.closest(".rvbox"));
+});
 $("#sentBody").addEventListener("click",async function(e){
   var rb=e.target.closest("[data-recv]");
   if(rb){
@@ -547,13 +571,21 @@ $("#sentBody").addEventListener("click",async function(e){
     var rv=box.querySelector(".rvbox");
     if(rv.hidden){
       rv.innerHTML='<div class="note" style="margin-bottom:6px">届いた数を確かめてください。'+
-        'ちがっていれば直せます。</div>'+
+        'ちがっていれば直せます。<b>この数だけ在庫に足します。</b></div>'+
         (o.lines||[]).map(function(l){
           return '<div class="rv"><span class="nm">'+esc(l.name)+'</span>'+
-            '<input type="number" min="0" inputmode="numeric" data-rid="'+esc(l.id)+'" value="'+(l.qty||0)+'"></div>';
+            '<span class="or">注文 '+(l.qty||0)+'</span>'+
+            '<input type="number" min="0" inputmode="numeric" data-rid="'+esc(l.id)+'" data-oq="'+(l.qty||0)+'" value="'+(l.qty||0)+'">'+
+            '<span class="rest" data-rest="'+esc(l.id)+'"></span></div>';
         }).join("")+
+        /* 分納：足りないぶんが後から届くなら、残りを発注中のまま残す。2026-11-28 */
+        '<label class="bunno" hidden><input type="checkbox" data-bunno checked>'+
+          '<span><b>足りないぶんは、あとから届く（分納）</b><br>'+
+          '残りは「発注中」のまま残します。届かないと分かっているときは、チェックを外してください'+
+          '（この注文はここで終わりにします）。</span></label>'+
         '<div class="act"><button class="btn sm primary" data-ok="'+esc(o.id)+'">在庫に足す</button></div>';
       rv.hidden=false; rb.textContent="やめる";
+      restShow(rv);
     }else{ rv.hidden=true; rb.textContent="届いた" }
     return;
   }
@@ -564,10 +596,33 @@ $("#sentBody").addEventListener("click",async function(e){
       var v=parseInt(i.value,10);
       return {id:i.dataset.rid, qty:(isNaN(v)||v<0)?0:v};
     });
+    var o2=sent.filter(function(x){ return x.id===ok.dataset.ok })[0];
+    var got={}; ls.forEach(function(x){ got[x.id]=x.qty });
+    var bn=box2.querySelector("[data-bunno]");
+    var keep=!!(bn&&bn.checked&&!bn.closest(".bunno").hidden);
+    /* 残り（注文した数 − 届いた数）。分納のときは、これを新しい「発注中」にする */
+    var rest=[];
+    if(keep&&o2) (o2.lines||[]).forEach(function(l){
+      var left=(Number(l.qty)||0)-(got[l.id]||0);
+      if(left<=0) return;
+      var nl={}; for(var k in l) nl[k]=l[k];
+      nl.qty=left;
+      var lot=Number(l.lot)||1; nl.boxes=Math.ceil(left/lot);
+      rest.push(nl);
+    });
     ok.disabled=true;
+    var restId=null;
     try{
-      await Sync.orderRecv(ok.dataset.ok,ls);
-      toast("在庫に足しました");
+      /* 先に残りの注文を作る。あとの「届いた」が失敗したら、作った残りは取り消す
+         （順番を逆にすると、届いたあとに残りを作りそこねて、残りが消えてしまうため） */
+      if(rest.length){
+        restId=oid();
+        await Sync.orderPut([{id:restId, at:o2.at, vendor:o2.vendor, vname:o2.vname, how:o2.how,
+          lines:rest, note:"分納の残り（"+atText(o2.at)+" の注文）"}]);
+      }
+      try{ await Sync.orderRecv(ok.dataset.ok,ls) }
+      catch(e1){ if(restId){ try{ await Sync.orderVoid(restId) }catch(e9){} } throw e1 }
+      toast(rest.length?"在庫に足しました。残りは発注中のままです":"在庫に足しました");
       await pullItems();
       await load();
     }catch(e2){ toast("できませんでした"); ok.disabled=false }
@@ -595,6 +650,7 @@ function renderLog(){
     return '<div class="ord"><div class="oh"><span class="nm">'+esc(o.vname||"（仕入先）")+'</span>'+
       '<span class="at">'+esc(atText(o.at))+'</span>'+
       '<span class="st '+st[0]+'">'+st[1]+'</span></div>'+
+      (o.note?'<div class="memo">'+esc(o.note)+'</div>':'')+
       '<div class="body">'+(o.lines||[]).map(function(l){
         return esc(l.name)+' <b>'+(l.qty||0)+'</b>';
       }).join("　/　")+'<br>仕入れ '+yen(amt)+
