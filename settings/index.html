@@ -239,7 +239,10 @@ details.cat .in{padding:2px 12px 10px}
           付けないものは、ぜんぶ10%になります。この印も次の登録に残ります。<br>
           <b>原価率</b>は売価と仕入れ値から自動で出します（仕入れ値 ÷ 売価）。<br>
           <b>店舗にある数</b>が<b>足りない数</b>以下になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
-          そのとき<a href="../order/">発注</a>の画面に出て、<b>いつもの数</b>まで戻る分を注文します。
+          そのとき<a href="../order/">発注</a>の画面に出て、<b>いつもの数</b>まで戻る分を注文します。<br>
+          <b>足りない数を空にしておくと、いつもの数が合図になります。</b>
+          「いつも200置いておきたい」だけなら、いつもの数に200と入れておけば足ります。
+          「150を切ったら注文したい」というときだけ、足りない数に150と入れてください。
           <b>1箱の数</b>を入れておくと、箱の単位に切り上げます。<br>
           登録したあとは、下の一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
       </div>
@@ -989,9 +992,12 @@ function renderCatPickers(){
   $("#catFilter").value=cur||"";
 }
 function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
+/* 赤くする合図。「足りない数」を入れていないときは「いつもの数」を合図にする。
+   発注の画面も同じ順番で見ている（order/index.html の needList）。2026-11-28 */
 function isLow(it){
-  var st=numOf(it.stock), al=numOf(it.alert);
-  return (st!==null&&al!==null&&st<=al);
+  var st=numOf(it.stock), al=numOf(it.alert), par=numOf(it.par);
+  var line=(al!==null)?al:par;
+  return (st!==null&&line!==null&&st<=line);
 }
 function rateText(it){
   var p=numOf(it.price), c=numOf(it.cost);
@@ -2087,7 +2093,7 @@ function renderCsvPlan(){
   if(p.hit.length){
     h+='<div class="row" style="gap:14px;margin-top:12px;flex-wrap:wrap">'+
       '<label class="chk"><input type="checkbox" id="csvStock" checked> 在庫数を入れる</label>'+
-      (p.hasAlert?'<label class="chk"><input type="checkbox" id="csvAlert" checked> 在庫通知数（足りない数）も入れる</label>':"")+
+      (p.hasAlert?'<label class="chk"><input type="checkbox" id="csvAlert" checked> 在庫通知数を<b>いつもの数</b>に入れる</label>':"")+
     '</div>'+
     '<div class="row" style="margin-top:12px"><button class="btn primary" id="csvGo">'+
       'この内容で入れる</button></div>';
@@ -2134,7 +2140,11 @@ $("#csvRes").addEventListener("click",function(e){
   p.hit.forEach(function(x){
     var it=x.it, ch=false;
     if(doStock&&(it.stock||0)!==x.stock){ it.stock=x.stock; ch=true }
-    if(doAlert&&x.alert!==null&&(it.alert||0)!==x.alert){ it.alert=x.alert; ch=true }
+    /* エアレジの「在庫通知数」は、お店が“常にないといけない数”として使っている。
+       アプリでいう「いつもの数（par）」にあたるので、そちらに入れる。
+       「足りない数（alert）」は、いつ注文するかを店長が決める欄なのでさわらない。
+       alert が空のときは、いつもの数が注文の合図になる。2026-11-28 */
+    if(doAlert&&x.alert!==null&&(it.par||0)!==x.alert){ it.par=x.alert; ch=true }
     if(ch){ touch(it); n++ }
   });
   saveItems(IT); queueSync(); renderItems();
@@ -2602,7 +2612,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v142";
+var APPVER="v143";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
