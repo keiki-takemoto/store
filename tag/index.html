@@ -206,15 +206,23 @@ function pushDirty(){
   var cats=IT.catsDirty?(IT.cats||[]):null;
   if(!dirty.length&&!cats) return Promise.resolve();
   pushing=true; state("送っています…");
-  var pay=dirty.map(function(x){
+  var rows=dirty.map(function(x){
     return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
       price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:null,
       vendor:String(x.vendor||""), vno:String(x.vno||""),
       par:numOf(x.par), lot:numOf(x.lot), deleted:!!x.del};
   });
-  var parts=pay.length?chunk(pay,200):[[]], p=Promise.resolve(), first=true;
-  parts.forEach(function(part){
-    p=p.then(function(){ var c=first?cats:null; first=false; return Sync.itemsPut(part,c) });
+  /* 値札の画面では在庫を直さない。在庫は置き場所の今の数で送る（売れたぶんを戻さないため）2026-11-28 */
+  var p=Sync.freshStock(rows).then(function(pay){
+    var byId={}; pay.forEach(function(r){ byId[r.id]=r });
+    dirty.forEach(function(x){
+      if(byId[x.id]){ if(byId[x.id].stock===null) delete x.stock; else x.stock=byId[x.id].stock }
+    });
+    var parts=pay.length?chunk(pay,200):[[]], q=Promise.resolve(), first=true;
+    parts.forEach(function(part){
+      q=q.then(function(){ var c=first?cats:null; first=false; return Sync.itemsPut(part,c) });
+    });
+    return q;
   });
   return p.then(function(){
     dirty.forEach(function(x){ delete x.d });

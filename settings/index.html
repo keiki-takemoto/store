@@ -1285,6 +1285,7 @@ $("#itemTbl").addEventListener("change",function(e){
   else{
     var v=parseInt(el.value,10);
     if(el.value===""||isNaN(v)||v<0){ delete it[f]; el.value="" } else { it[f]=v }
+    if(f==="stock") it.ds=1;              /* 在庫を手で直した印。送るときにこの数を使う */
   }
   touch(it); saveItems(IT); queueSync(); renderItems();
 });
@@ -1457,15 +1458,22 @@ function pushDirty(){
   var dirty=IT.items.filter(function(x){ return x.d });
   var cats=IT.catsDirty?(IT.cats||[]):null;
   if(!dirty.length && !cats) return Promise.resolve(0);
-  var pay=dirty.map(function(x){
+  var rows=dirty.map(function(x){
     return {id:x.id, no:String(x.no||""), name:String(x.name||""), cat:String(x.cat||""),
       price:numOf(x.price), cost:numOf(x.cost), stock:numOf(x.stock), alert:null,
       vendor:String(x.vendor||""), vno:String(x.vno||""),
       par:numOf(x.par), lot:numOf(x.lot),
-      deleted:!!x.del};
+      deleted:!!x.del, keepStock:!!x.ds};
   });
-  return putChunks(pay,cats).then(function(){
-    dirty.forEach(function(x){ delete x.d });
+  /* 在庫を手で直していない行は、置き場所の今の在庫で送る（売れたぶんを戻さないため） */
+  return Sync.freshStock(rows).then(function(pay){
+    var byId={}; pay.forEach(function(r){ byId[r.id]=r });
+    dirty.forEach(function(x){
+      if(!x.ds&&byId[x.id]){ if(byId[x.id].stock===null) delete x.stock; else x.stock=byId[x.id].stock }
+    });
+    return putChunks(pay,cats);
+  }).then(function(){
+    dirty.forEach(function(x){ delete x.d; delete x.ds });
     delete IT.catsDirty;
     IT.items=IT.items.filter(function(x){ return !x.del });   /* 消したことは伝えたので手元から外す */
     saveItems(IT);
@@ -2212,7 +2220,7 @@ $("#csvRes").addEventListener("click",function(e){
   var n=0;
   p.hit.forEach(function(x){
     var it=x.it, ch=false;
-    if(doStock&&(it.stock||0)!==x.stock){ it.stock=x.stock; ch=true }
+    if(doStock&&(it.stock||0)!==x.stock){ it.stock=x.stock; it.ds=1; ch=true }
     /* エアレジの「在庫通知数」は、お店が“常にないといけない数”として使っている。
        アプリでいう「いつもの数（par）」にあたるので、そちらに入れる。
        足りない数は、いつもの数 − 店舗にある数 で自動で出る。2026-11-28 */
@@ -2684,7 +2692,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v146";
+var APPVER="v147";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");

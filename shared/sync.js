@@ -147,6 +147,26 @@
     itemsGet: function (since) {
       return rpc("store_items_get", { p_key: (CFG && CFG.key) || "", p_since: since || null });
     },
+    /* 商品を書き込む前に、在庫だけは置き場所の「今の数」にそろえる。
+       レジで売れると置き場所の在庫は減るが、設定や値札の画面が手元に持っている数は古いまま。
+       そのまま送ると、売れて減ったぶんが元に戻ってしまう（2026-11-28 に見つけた穴）。
+       在庫を手で直した行（keepStock:true）と、置き場所にまだ無い新しい商品だけは手元の数を送る。
+       返すのは、そろえたあとの行（keepStock は外してある）。 */
+    freshStock: function (rows) {
+      rows = rows || [];
+      var need = rows.some(function (x) { return !x.keepStock });
+      var p = need ? root.Sync.itemsGet(null) : Promise.resolve(null);
+      return p.then(function (r) {
+        var cur = {};
+        ((r && r.items) || []).forEach(function (s) { cur[s.id] = s });
+        return rows.map(function (x) {
+          var o = {};
+          for (var k in x) if (k !== "keepStock") o[k] = x[k];
+          if (!x.keepStock && cur[x.id]) o.stock = (typeof cur[x.id].stock === "number") ? cur[x.id].stock : null;
+          return o;
+        });
+      });
+    },
     itemsPut: function (items, cats) {
       return rpc("store_items_put", { p_key: (CFG && CFG.key) || "", p_items: items || [], p_cats: cats || null });
     },
