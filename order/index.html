@@ -263,8 +263,12 @@ function needList(){
     var want=par-(st+pend);
     if(want<=0) return;
     var lot=numOf(it.lot)||1; if(lot<1) lot=1;
-    var boxes=Math.ceil(want/lot);
-    out.push({it:it, stock:st, line:line, par:par, pend:pend, lot:lot,
+    /* 最低ロット数より少なくは頼めないので、足りない数がそれより少なければ最低ロットまで上げる。
+       そのあと1箱の数に切り上げる。2026-11-28 */
+    var moq=(window.OrderCfg&&OrderCfg.moqOf&&OrderCfg.moqOf(it.id))||0;
+    var base=Math.max(want,moq);
+    var boxes=Math.ceil(base/lot);
+    out.push({it:it, stock:st, line:line, par:par, pend:pend, lot:lot, moq:moq,
       boxes:boxes, qty:boxes*lot});
   });
   return out;
@@ -328,7 +332,7 @@ function renderNeed(){
             esc(x.it.name||"（名前なし）")+'</div>'+
           '<div class="sub">'+
             ['いま '+x.stock, 'いつも '+x.par, '<b>足りない '+short+'</b>',
-             x.pend?'発注中 '+x.pend:'', x.lot>1?x.boxes+'箱×'+x.lot:'',
+             x.pend?'発注中 '+x.pend:'', x.moq>1?'最低ロット '+x.moq:'', x.lot>1?x.boxes+'箱×'+x.lot:'',
              x.it.vno?'先方No '+esc(x.it.vno):'']
             .filter(Boolean).map(function(t){ return '<span>'+t+'</span>' }).join("")+
           '</div></div>'+

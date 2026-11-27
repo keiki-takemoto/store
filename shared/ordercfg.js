@@ -1,7 +1,9 @@
 /* 発注のきまり（カテゴリーごとの仕入先・仕入先ごとの頼み方の追加ぶん）。
    設定 → 仕入先 と 発注 の画面の両方が使う。2026-11-28
 
-   中身 { cat:{ "夜長堂":"v…（仕入先のid）" }, xl:{ "v…":1 }, at:最後に直した時刻(ms) }
+   中身 { cat:{ "夜長堂":"v…（仕入先のid）" }, xl:{ "v…":1 }, moq:{ "商品id":5 }, at:最後に直した時刻(ms) }
+     moq … 商品ごとの「最低ロット数」（これより少なくは頼めない数）。2026-11-28
+           商品の表（store_items）に欄を足すには SQL が要るので、ここに持つ。
      cat … カテゴリーごとの仕入先。このお店はカテゴリーがほぼ仕入先なので、
            1つ決めれば中の商品ぜんぶに付く。商品ごとの仕入先（it.vendor）があれば、そちらが先。
      xl  … 「メール＋Excel」で頼む仕入先の印。
@@ -20,6 +22,7 @@
     if (!v || typeof v !== "object") v = {};
     if (!v.cat || typeof v.cat !== "object") v.cat = {};
     if (!v.xl || typeof v.xl !== "object") v.xl = {};
+    if (!v.moq || typeof v.moq !== "object") v.moq = {};
     v.at = Number(v.at) || 0;
     return v;
   }
@@ -30,7 +33,7 @@
   /* 置き場所に送る。失敗しても端末には残っているので、次に直したときにまた送る */
   function push() {
     if (!on()) return Promise.resolve(false);
-    return root.Sync.metaPut(MK, { cat: C.cat, xl: C.xl, at: C.at })
+    return root.Sync.metaPut(MK, { cat: C.cat, xl: C.xl, moq: C.moq, at: C.at })
       .then(function () { return true }).catch(function () { return false });
   }
   /* 受け取る。置き場所のほうが新しいときだけ入れかえる */
@@ -45,6 +48,7 @@
       }
       C.cat = (v.cat && typeof v.cat === "object") ? v.cat : {};
       C.xl = (v.xl && typeof v.xl === "object") ? v.xl : {};
+      C.moq = (v.moq && typeof v.moq === "object") ? v.moq : {};
       C.at = Number(v.at) || 0;
       save();
       return true;
@@ -76,6 +80,17 @@
       Object.keys(C.cat).forEach(function (k) { if (C.cat[k] === vid) { delete C.cat[k]; ch = true } });
       if (C.xl[vid]) { delete C.xl[vid]; ch = true }
       return ch ? touch() : Promise.resolve(false);
+    },
+    /* 最低ロット数。決めていなければ null */
+    moqOf: function (id) {
+      var n = C.moq[String(id || "")];
+      return (typeof n === "number" && n > 0) ? n : null;
+    },
+    setMoq: function (id, n) {
+      id = String(id || ""); if (!id) return Promise.resolve(false);
+      n = Math.floor(Number(n));
+      if (n > 0) C.moq[id] = n; else delete C.moq[id];
+      return touch();
     },
     cats: function () { return C.cat },
     pull: pull, push: push

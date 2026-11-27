@@ -252,7 +252,9 @@ details.cat .in{padding:2px 12px 10px}
           <b>足りない数</b>は自動で出ます（<b>いつもの数 − 店舗にある数</b>）。
           1つ以上になると、その行が色付きになり、上に「在庫少」の数が出ます。<br>
           そのとき<a href="../order/">発注</a>の画面に出て、足りない数のぶんを注文します。
-          <b>1箱の数</b>を入れておくと、箱の単位に切り上げます。<br>
+          <b>1箱の数</b>を入れておくと、箱の単位に切り上げます（5個入りなら 5・10・15…）。<br>
+          <b>最低ロット</b>は、<b>これより少なくは頼めない数</b>です。足りない数がそれより少ないときは、
+          最低ロットの数で注文します（足りない 2・最低ロット 5 なら 5）。足りない数のほうが多ければ、その数のままです。<br>
           登録したあとは、下の一覧の欄を直して画面のどこかを押せばその場で保存されます。</p>
       </div>
     </div>
@@ -1040,6 +1042,12 @@ function venOpts(cur){
     return '<option value="'+esc(v.id)+'"'+(v.id===cur?" selected":"")+'>'+esc(v.name||"（名前なし）")+'</option>';
   }).join("");
 }
+/* 最低ロット数。商品の表ではなく OrderCfg（発注のきまり）に持つので、別の欄にしてある */
+function moqFld(it){
+  var n=(window.OrderCfg&&OrderCfg.moqOf)?OrderCfg.moqOf(it.id):null;
+  return '<span class="fg">最低ロット <input type="number" class="num" data-moq="'+esc(it.id)+'" min="0" step="1" '+
+    'inputmode="numeric" value="'+(n!==null?n:"")+'" placeholder="—"></span>';
+}
 function fld(it,f,label,unit,step){
   return '<span class="fg">'+label+
     ' <input type="number" class="num" data-f="'+f+'" data-id="'+esc(it.id)+'" min="0" step="'+(step||10)+'" '+
@@ -1150,7 +1158,8 @@ function row(it){
         venOpts(it.vendor||"")+'</select></span>'+
         '<span class="fg">先方のNo <input type="text" class="no" data-f="vno" data-id="'+esc(it.id)+
         '" value="'+esc(it.vno||"")+'" placeholder="—"></span>'+
-        fld(it,"lot","1箱の数","",1)+'</div>'+
+        fld(it,"lot","1箱の数","",1)+
+        moqFld(it)+'</div>'+
       '</div>';
 }
 /* プルダウンを開け閉めしたとき。開いたところだけ中身を作る。
@@ -1276,6 +1285,13 @@ $("#itemTbl").addEventListener("change",function(e){
     var itv=IT.items.filter(function(x){ return x.id===vs.dataset.ven })[0]; if(!itv) return;
     if(vs.value) itv.vendor=vs.value; else delete itv.vendor;
     touch(itv); saveItems(IT); queueSync(); renderItems(); return;
+  }
+  var mq=e.target.closest("[data-moq]");
+  if(mq){
+    var nv=parseInt(mq.value,10);
+    if(mq.value===""||isNaN(nv)||nv<=0){ nv=0; mq.value="" }
+    if(window.OrderCfg&&OrderCfg.setMoq) OrderCfg.setMoq(mq.dataset.moq, nv);
+    return;
   }
   var el=e.target.closest("[data-f]"); if(!el) return;
   var it=IT.items.filter(function(x){ return x.id===el.dataset.id })[0]; if(!it) return;
@@ -2693,7 +2709,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v148";
+var APPVER="v149";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
