@@ -43,6 +43,11 @@ details.vbox:not([open]) .vhd{border-bottom:none}
 .oline .sub b{color:var(--warn)}
 .oline .sub{display:flex;flex-wrap:wrap;gap:0 10px}
 .oline .sub span{white-space:nowrap}
+.vft .vsel{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3);font-weight:600}
+.vft .vsel select{font-size:13.5px;max-width:190px;border:1px solid var(--line-2);border-radius:8px;
+  padding:6px 8px;background:var(--surface);font-family:inherit;color:var(--ink)}
+.vft .hw{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;
+  background:var(--accent-2);color:var(--accent);white-space:nowrap}
 .needtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;
   font-size:12.5px;color:var(--ink-2)}
 .needtop b{font-family:var(--mono);color:var(--ink)}
@@ -180,6 +185,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 </div></div>
 
 <script src="../shared/sync.js"></script>
+<script src="../shared/ordercfg.js"></script>
 <script>
 (function(){
 "use strict";
@@ -216,6 +222,15 @@ function on(){ return !!(window.Sync&&DB.sync&&DB.sync.url&&DB.sync.anon&&DB.syn
 
 function live(){ return IT.items.filter(function(x){ return !x.del }) }
 function venById(id){ return VEN.list.filter(function(x){ return x.id===id&&!x.del })[0]||null }
+/* その商品をどこに頼むか。商品ごとに決めてあればそれ、無ければカテゴリーの仕入先。2026-11-28 */
+function vendorOf(it){ return window.OrderCfg?OrderCfg.vendorOf(it):(it.vendor||"") }
+/* 頼み方は3通り（メール／メール＋Excel／ホームページ） */
+function howOf(v){
+  if(!v) return "";
+  if(v.how==="web") return "web";
+  return (window.OrderCfg&&OrderCfg.isXl(v.id))?"excel":"mail";
+}
+var HOWNM={mail:"メール", excel:"メール＋Excel", web:"ホームページ"};
 function numOf(v){ return (typeof v==="number"&&isFinite(v))?v:null }
 
 /* ---------- 足りないもの ---------- */
@@ -295,7 +310,7 @@ function renderNeed(){
     allN+=cnt; allAmt+=amt;
     /* 仕入先がひとつにそろっているカテゴリーだけ、今までどおりその仕入先に注文できる */
     var vs={};
-    lines.forEach(function(x){ if(!skip[x.it.id]) vs[x.it.vendor||""]=1 });
+    lines.forEach(function(x){ if(!skip[x.it.id]) vs[vendorOf(x.it)]=1 });
     var vk=Object.keys(vs), one=(vk.length===1&&vk[0])?venById(vk[0]):null;
     return '<details class="vbox" data-c="'+esc(k)+'"'+(openC[k]?" open":"")+'>'+
       '<summary class="vhd"><span class="mk">›</span>'+
@@ -321,8 +336,11 @@ function renderNeed(){
           '</div>';
       }).join("")+
       '<div class="vft"><span class="amt">'+cnt+'点　仕入れ '+yen(amt)+'</span>'+
-      (one?'<button class="btn primary sm" data-go="'+esc(vk[0])+'" data-gc="'+esc(k)+'">'+
-             esc(one.name||"仕入先")+' に注文する</button>':'')+
+      venPick(k)+
+      (one?'<span class="hw">'+esc(HOWNM[howOf(one)]||"")+'</span>'+
+           '<button class="btn primary sm" data-go="'+esc(vk[0])+'" data-gc="'+esc(k)+'">'+
+             esc(one.name||"仕入先")+' に注文する</button>':
+        (vk.length>1?'<span class="note" style="margin:0">仕入先が分かれています</span>':''))+
       '</div></details>';
   }).join("");
 
@@ -331,6 +349,17 @@ function renderNeed(){
     '<span class="sp"></span>'+
     '<button class="btn sm ghost" id="openAll">'+(order.every(function(k){ return openC[k] })?"ぜんぶ閉じる":"ぜんぶ開く")+'</button></div>'+
     body;
+}
+/* カテゴリーの仕入先を、ここで選べるようにする（設定 → 仕入先 と同じものを直す） */
+function venPick(c){
+  var vs=VEN.list.filter(function(x){ return !x.del });
+  if(!vs.length) return '<a class="btn sm" href="../settings/#ven">仕入先を足す</a>';
+  var cur=(window.OrderCfg&&OrderCfg.catVendor(c))||"";
+  return '<label class="vsel">仕入先<select data-cv="'+esc(c)+'">'+
+    '<option value="">（決めていない）</option>'+
+    vs.map(function(v){
+      return '<option value="'+esc(v.id)+'"'+(v.id===cur?" selected":"")+'>'+esc(v.name||"（名前なし）")+'</option>';
+    }).join("")+'</select></label>';
 }
 /* 開いているカテゴリーを覚えておく（数を直すたびに描き直しても、閉じないように） */
 var openC={};
@@ -346,6 +375,13 @@ function byNo(a,b){
 }
 
 $("#needBody").addEventListener("change",function(e){
+  var cv=e.target.closest("[data-cv]");
+  if(cv){
+    if(window.OrderCfg) OrderCfg.setCatVendor(cv.dataset.cv, cv.value);
+    renderNeed();
+    toast(cv.dataset.cv+" の仕入先を"+(cv.value?"決めました":"外しました"));
+    return;
+  }
   var c=e.target.closest("[data-skip]");
   if(c){ if(c.checked) delete skip[c.dataset.skip]; else skip[c.dataset.skip]=1; renderNeed(); return }
   var q=e.target.closest("[data-q]");
@@ -372,7 +408,7 @@ var draft=null;
 function linesFor(vid,cat){
   var out=[];
   needList().forEach(function(x){
-    if((x.it.vendor||"")!==vid) return;
+    if(vendorOf(x.it)!==vid) return;
     if(cat!=null&&String(x.it.cat||"")!==cat) return;   /* 押したカテゴリーのぶんだけ */
     var id=x.it.id;
     if(skip[id]) return;
@@ -402,13 +438,16 @@ function openSheet(vid,cat){
   var lines=linesFor(vid,cat);
   if(!lines.length){ toast("注文するものがありません"); return }
   draft={vendor:vid, vname:v.name||"", how:(v.how==="web"?"web":"mail"), lines:lines};
+  var xl=(howOf(v)==="excel");
 
   var web=(draft.how==="web");
   $("#shTitle").textContent=(v.name||"仕入先")+" に注文";
   $("#shPre").textContent=web?listText(lines):mailBody(v,lines);
   $("#shLead").innerHTML=web
     ? 'このまま<b>ホームページで注文</b>します。下の中身を見ながら打ち込んでください。'
-    : '<b>メールアプリが開きます。</b>中身を見て、送信を押してください。';
+    : '<b>メールアプリが開きます。</b>中身を見て、送信を押してください。'+
+      (xl?'<br><span style="color:var(--warn)">この仕入先は<b>メール＋Excel</b>です。'+
+          'Excelの書式はまだ登録していないので、いまは本文に一覧を入れて作ります（準備中）。</span>':'');
   $("#shRow").innerHTML=web
     ? (v.url?'<button class="btn primary" id="shOpen">注文ページを開く</button>':
              '<span class="note" style="margin:0">注文ページが決まっていません（<a href="../settings/#ven">設定 → 仕入先</a>）。</span>')+
@@ -615,6 +654,7 @@ async function load(){
   $("#st").textContent="受け取っています…";
   try{
     await pullVen();
+    if(window.OrderCfg) await OrderCfg.pull();
     await pullItems();
     var r=await Sync.ordersGet(null,null);     /* 出したまま届いていないもの */
     sent=r.items||[];

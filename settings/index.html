@@ -116,6 +116,11 @@ select:focus{outline:2px solid var(--accent);outline-offset:1px}
   flex:1;min-width:150px;border:1px solid var(--line);border-radius:9px;padding:8px 10px;
   font-family:inherit;font-size:13.5px;background:var(--surface);color:var(--ink)}
 .rc .vrow textarea{min-height:60px;line-height:1.7;resize:vertical}
+.cv{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.cv:last-child{border-bottom:none}
+.cv .cn{flex:1;min-width:0;font-size:14px;font-weight:700;overflow-wrap:anywhere}
+.cv .cn small{display:block;font-size:11px;color:var(--ink-3);font-weight:600;font-family:var(--mono)}
+.cv select{max-width:58%;font-size:14px}
 .ven .hows{display:flex;gap:6px;background:var(--surface-2);border-radius:9px;padding:3px}
 .ven .hows button{border:none;background:transparent;border-radius:7px;padding:7px 12px;cursor:pointer;
   font-family:inherit;font-size:12.5px;font-weight:700;color:var(--ink-2)}
@@ -489,9 +494,19 @@ details.cat .in{padding:2px 12px 10px}
         <button class="btn sm primary" id="venAdd">ふやす</button></div>
       <div class="sec">
         <p class="note" style="margin-top:0">発注の画面は、ここで決めた<b>頼み方</b>で分かれます。<br>
-          <b>メール</b>なら文面を作ってメールアプリが開きます。
+          <b>メール</b>なら文面を作ってメールアプリが開きます。<br>
+          <b>メール＋Excel</b>は、先方の書式のExcelを付けて送る仕入先です
+          （書式を登録すると、数を書き込んだExcelを自動で作ります。<b>準備中</b>）。<br>
           <b>ホームページ</b>ならそのページを開いて、注文する中身を横に出します。</p>
         <div id="venList"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <div class="card-h"><h2>カテゴリーごとの仕入先</h2></div>
+      <div class="sec">
+        <p class="note" style="margin-top:0">カテゴリーに仕入先を<b>1つ決めると、中の商品ぜんぶ</b>がその仕入先に頼む扱いになります。<br>
+          発注の画面でも、カテゴリーの下から選べます（どちらで選んでも同じです）。</p>
+        <div id="catVenList"></div>
       </div>
     </div>
   </section>
@@ -645,6 +660,7 @@ details.cat .in{padding:2px 12px 10px}
 </main>
 
 <script src="../shared/sync.js"></script>
+<script src="../shared/ordercfg.js"></script>
 <script src="../shared/receipt.js"></script>
 <script src="../manual/faq.js"></script>
 <script src="../shared/faqdb.js"></script>
@@ -1310,24 +1326,59 @@ function venName(id){ var v=venById(id); return v?(v.name||"（名前なし）")
 function venId(){ return "v"+Date.now().toString(36)+Math.random().toString(36).slice(2,6) }
 var BODY0="いつもお世話になっております。\n下記のとおり発注いたします。\n\n{明細}\n\nよろしくお願いいたします。";
 
+/* 頼み方は3通り。置き場所の仕入先の表は mail と web しか持てないので、
+   「メール＋Excel」は how を mail のままにして、OrderCfg の印（xl）で見分ける。2026-11-28 */
+var HOW3=[{k:"mail",nm:"メール"},{k:"excel",nm:"メール＋Excel"},{k:"web",nm:"ホームページ"}];
+function how3(v){
+  if(v.how==="web") return "web";
+  return (window.OrderCfg&&OrderCfg.isXl(v.id))?"excel":"mail";
+}
+function renderCatVen(){
+  var box=$("#catVenList"); if(!box) return;
+  var vs=liveVen();
+  var n={};
+  live().forEach(function(x){ var c=x.cat||""; n[c]=(n[c]||0)+1 });
+  var cs=catKeys().filter(function(c){ return c });
+  if(!cs.length){ box.innerHTML='<div class="note">カテゴリーがまだありません。</div>'; return }
+  if(!vs.length){ box.innerHTML='<div class="note">先に上の「ふやす」で仕入先を足してください。</div>'; return }
+  box.innerHTML=cs.map(function(c){
+    var cur=(window.OrderCfg&&OrderCfg.catVendor(c))||"";
+    return '<div class="cv"><span class="cn">'+esc(c)+'<small>'+(n[c]||0)+'点</small></span>'+
+      '<select data-cv="'+esc(c)+'"><option value="">（決めていない）</option>'+
+      vs.map(function(v){
+        return '<option value="'+esc(v.id)+'"'+(v.id===cur?" selected":"")+'>'+esc(v.name||"（名前なし）")+'</option>';
+      }).join("")+'</select></div>';
+  }).join("");
+}
+$("#catVenList").addEventListener("change",function(e){
+  var sel=e.target.closest("[data-cv]"); if(!sel||!window.OrderCfg) return;
+  OrderCfg.setCatVendor(sel.dataset.cv, sel.value);
+  renderVen();
+  toast(sel.dataset.cv+" の仕入先を"+(sel.value?"「"+venName(sel.value)+"」にしました":"外しました"));
+});
 function renderVen(){
+  renderCatVen();
   var list=liveVen();
   if(!list.length){
     $("#venList").innerHTML='<div class="note">まだありません。右上の「ふやす」で足してください。</div>';
     return;
   }
   var cnt={};
-  IT.items.forEach(function(it){ if(!it.del&&it.vendor) cnt[it.vendor]=(cnt[it.vendor]||0)+1 });
+  IT.items.forEach(function(it){
+    if(it.del) return;
+    var vid=window.OrderCfg?OrderCfg.vendorOf(it):it.vendor;
+    if(vid) cnt[vid]=(cnt[vid]||0)+1;
+  });
   $("#venList").innerHTML=list.map(function(v){
-    var mail=(v.how!=="web");
+    var mail=(v.how!=="web"), hw=how3(v);
     return '<div class="ven" data-v="'+esc(v.id)+'">'+
       '<div class="vh"><input class="vn" type="text" data-vf="name" value="'+esc(v.name||"")+
         '" placeholder="仕入先の名前">'+
         '<button class="btn sm ghost" data-vdel="'+esc(v.id)+'">削除</button></div>'+
       '<div class="vrow"><div class="hows">'+
-        ((window.Sync&&Sync.HOWS)||[]).map(function(h){
+        HOW3.map(function(h){
           return '<button type="button" data-vhow="'+esc(h.k)+'" aria-pressed="'+
-            String((v.how||"mail")===h.k)+'">'+esc(h.nm)+'</button>';
+            String(hw===h.k)+'">'+esc(h.nm)+'</button>';
         }).join("")+'</div>'+
         '<span class="cnt">'+(cnt[v.id]||0)+'点</span></div>'+
       (mail
@@ -1338,7 +1389,9 @@ function renderVen(){
           '<div class="vrow"><label style="width:100%">本文のひな形</label>'+
           '<textarea data-vf="body" placeholder="'+esc(BODY0)+'">'+esc(v.body||"")+'</textarea></div>'+
           '<p class="note" style="margin:7px 0 0">本文の <b>{明細}</b> のところに、'+
-          '注文する商品の一覧が入ります。空のままなら決まった文で作ります。</p>'
+          '注文する商品の一覧が入ります。空のままなら決まった文で作ります。</p>'+
+          (hw==="excel"?'<p class="note" style="margin:7px 0 0"><b>Excelの書式：まだ登録していません（準備中）。</b>'+
+            'それまでは、ふつうのメールと同じく本文に一覧を入れて作ります。</p>':"")
         : '<div class="vrow"><label>注文するページ</label>'+
           '<input type="text" data-vf="url" value="'+esc(v.url||"")+'" placeholder="https://..."></div>'+
           '<p class="note" style="margin:7px 0 0">発注のときに、このページを開くボタンが出ます。'+
@@ -1363,7 +1416,10 @@ $("#venList").addEventListener("click",function(e){
   var hb=e.target.closest("[data-vhow]");
   if(hb){
     var box=hb.closest(".ven"), v=venById(box.dataset.v); if(!v) return;
-    v.how=hb.dataset.vhow; v.d=1; saveVen(); queueSync(); renderVen(); return;
+    var h=hb.dataset.vhow;
+    v.how=(h==="web")?"web":"mail"; v.d=1;
+    if(window.OrderCfg) OrderCfg.setXl(v.id, h==="excel");
+    saveVen(); queueSync(); renderVen(); return;
   }
   var db=e.target.closest("[data-vdel]");
   if(db){
@@ -1372,6 +1428,7 @@ $("#venList").addEventListener("click",function(e){
     if(!confirm((v2.name||"この仕入先")+" を消しますか？"+
       (used?"\n"+used+"点の商品から、仕入先が外れます。":""))) return;
     IT.items.forEach(function(x){ if(x.vendor===v2.id){ delete x.vendor; touch(x) } });
+    if(window.OrderCfg) OrderCfg.dropVendor(v2.id);
     v2.del=1; v2.d=1; saveVen(); saveItems(IT); queueSync(); renderVen(); renderItems();
   }
 });
@@ -1542,7 +1599,8 @@ function syncNow(quiet){
   clearTimeout(syncT);
   syncBusy=true; renderSync();
   return pushDirty().then(pushVen).then(pushRep).then(pushT8)
-    .then(pullItems).then(pullRep).then(pullT8).then(pullVen).then(pullStaff).then(function(){
+    .then(pullItems).then(pullRep).then(pullT8).then(pullVen).then(pullStaff)
+    .then(function(){ return window.OrderCfg?OrderCfg.pull():null }).then(function(){
     syncBusy=false; syncErr=""; syncMsg="ほかの端末と同じです（"+hhmm()+" に確認）";
     renderItems(); renderVen();
     return true;
@@ -2626,7 +2684,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v145";
+var APPVER="v146";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
