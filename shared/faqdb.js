@@ -13,7 +13,10 @@
 
   var K = "storefaq.v1";
   var MK = "faq";                                   /* 置き場所の meta の名前 */
-  var CAT0 = { k: "app", nm: "アプリについて", ic: "📱" };   /* はじめからあるカテゴリー */
+  /* 作りは3段。大項目（お店について）→ カテゴリー（レジについて）→ 質問。
+     はじめのぶんは manual/faq.js の FAQGROUPS / FAQCATS にある。2026-11-27 */
+  var G0 = { k: "store", nm: "お店について" };
+  var CAT0 = { k: "app", g: "store", nm: "アプリについて", ic: "📱" };
 
   var DB = null;
 
@@ -21,6 +24,7 @@
     var v = null;
     try { v = JSON.parse(localStorage.getItem(K)) } catch (e) {}
     if (!v || typeof v !== "object") v = {};
+    if (!Array.isArray(v.groups)) v.groups = [];
     if (!Array.isArray(v.cats)) v.cats = [];
     if (!Array.isArray(v.qa))   v.qa   = [];
     if (!Array.isArray(v.miss)) v.miss = [];
@@ -69,21 +73,48 @@
     return { id: x.id, c: x.c || CAT0.k, q: String(x.q || ""), a: String(x.a || ""),
              k: Array.isArray(x.k) ? x.k : [], go: x.go || "", mine: !!x.mine };
   }
+  /* 大項目。店長が足したぶんが、おなじ k なら勝つ（名前を変えられる）。 */
+  function groups() {
+    /* カテゴリーと同じで、名前は店長が直したものを使い、ならび順ははじめのまま。 */
+    var mine = {}, out = [], seen = {};
+    (db().groups || []).forEach(function (g) { if (g && g.k) mine[g.k] = g });
+    ([G0].concat((w.FAQGROUPS) || []).concat(db().groups || [])).forEach(function (g0) {
+      if (!g0 || !g0.k || seen[g0.k]) return;
+      seen[g0.k] = 1;
+      var g = mine[g0.k] || g0;
+      if (g.off) return;
+      out.push({ k: g.k, nm: g.nm || g.k });
+    });
+    return out;
+  }
   function cats() {
     var n = {};
     all().forEach(function (e) { n[e.c] = (n[e.c] || 0) + 1 });
     var out = [], seen = {};
-    [CAT0].concat(db().cats || []).forEach(function (c) {
-      if (!c || !c.k || seen[c.k]) return;
-      seen[c.k] = 1;
+    /* 名前・印・大項目は店長が直したものを使い、ならび順ははじめの一覧のまま。
+       直したとたんに順番が入れかわる、ということが起きないようにしてある。 */
+    var mine = {};
+    (db().cats || []).forEach(function (c) { if (c && c.k) mine[c.k] = c });
+    ((w.FAQCATS) || []).concat([CAT0]).concat(db().cats || []).forEach(function (c0) {
+      if (!c0 || !c0.k || seen[c0.k]) return;
+      seen[c0.k] = 1;
+      var c = mine[c0.k] || c0;
       if (c.off) return;
-      out.push({ k: c.k, nm: c.nm || c.k, ic: c.ic || "📄", n: n[c.k] || 0 });
+      out.push({ k: c.k, g: c.g || G0.k, nm: c.nm || c.k, ic: c.ic || "📄", n: n[c.k] || 0 });
     });
     /* カテゴリーの控えに無い名前が質問に付いていても、消えないように出す */
     Object.keys(n).forEach(function (k) {
-      if (!seen[k]) out.push({ k: k, nm: k, ic: "📄", n: n[k] });
+      if (!seen[k]) out.push({ k: k, g: G0.k, nm: k, ic: "📄", n: n[k] });
     });
     return out;
+  }
+  /* 大項目ごとに、中のカテゴリーをぶら下げて返す。空の大項目は出さない。 */
+  function tree(withEmpty) {
+    var cs = cats();
+    return groups().map(function (g) {
+      return { k: g.k, nm: g.nm,
+               cats: cs.filter(function (c) { return c.g === g.k && (withEmpty || c.n > 0) }) };
+    }).filter(function (g) { return withEmpty || g.cats.length });
   }
   function list(c) {
     return all().filter(function (e) { return e.c === c });
@@ -167,9 +198,20 @@
     d.at = new Date().toISOString();
     save();
   }
+  function groupPut(g) {
+    var d = db();
+    if (!g.k) g.k = "g" + Date.now().toString(36);
+    var i = -1;
+    for (var j = 0; j < d.groups.length; j++) if (d.groups[j].k === g.k) { i = j; break }
+    if (i >= 0) d.groups[i] = g; else d.groups.push(g);
+    d.at = new Date().toISOString();
+    save();
+    return g.k;
+  }
   function catPut(c) {
     var d = db();
     if (!c.k) c.k = "c" + Date.now().toString(36);
+    if (!c.g) c.g = G0.k;
     var i = -1;
     for (var j = 0; j < d.cats.length; j++) if (d.cats[j].k === c.k) { i = j; break }
     if (i >= 0) d.cats[i] = c; else d.cats.push(c);
@@ -198,8 +240,9 @@
     var d = db();
     /* 置き場所のほうが新しいときだけ入れ替える */
     if (v.at && d.at && String(v.at) <= String(d.at)) return false;
-    d.cats = Array.isArray(v.cats) ? v.cats : [];
-    d.qa   = Array.isArray(v.qa)   ? v.qa   : [];
+    d.groups = Array.isArray(v.groups) ? v.groups : [];
+    d.cats   = Array.isArray(v.cats)   ? v.cats   : [];
+    d.qa     = Array.isArray(v.qa)     ? v.qa     : [];
     d.at   = v.at || new Date().toISOString();
     save();
     return true;
@@ -209,17 +252,18 @@
     w.Sync.configure(cfg());
     var d = db();
     d.at = new Date().toISOString();
-    await w.Sync.metaPut(MK, { cats: d.cats, qa: d.qa, at: d.at });
+    await w.Sync.metaPut(MK, { groups: d.groups, cats: d.cats, qa: d.qa, at: d.at });
     save();
     return true;
   }
 
   w.FaqDB = {
-    HIT: HIT, CAT0: CAT0,
+    HIT: HIT, CAT0: CAT0, G0: G0,
     load: load, save: save, db: db,
-    norm: norm, all: all, cats: cats, list: list, byId: byId, search: search,
+    norm: norm, all: all, groups: groups, cats: cats, tree: tree, list: list,
+    byId: byId, search: search,
     remember: remember, missDone: missDone, missDel: missDel,
-    put: put, hide: hide, catPut: catPut,
+    put: put, hide: hide, catPut: catPut, groupPut: groupPut,
     on: on, pull: pull, push: push
   };
 })(window);

@@ -18,7 +18,8 @@ main{max-width:720px;margin:0 auto;padding:14px 14px calc(30px + env(safe-area-i
   padding:9px 15px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;
   color:var(--ink-2);margin-bottom:13px}
 .backb:active{transform:translateY(1px)}
-.hd2{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em;margin:20px 2px 8px}
+.hd2{font-size:12px;color:var(--ink-3);letter-spacing:.06em;font-weight:700;margin:20px 2px 8px}
+#cats .hd2:first-child{margin-top:18px}
 
 /* ---- いちばん上のチャット欄 ---- */
 .askrow{display:flex;align-items:center;gap:13px;width:100%;text-align:left;
@@ -54,6 +55,7 @@ main{max-width:720px;margin:0 auto;padding:14px 14px calc(30px + env(safe-area-i
 .cathd{display:flex;align-items:center;gap:10px;margin:0 2px 12px}
 .cathd .ic{font-size:24px}
 .cathd h2{font-size:19px}
+.cathd .g{display:block;font-size:11.5px;color:var(--ink-3);letter-spacing:.06em;font-weight:700}
 .cathd .n{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--ink-3)}
 .qa{background:var(--surface);border:1px solid var(--line);border-radius:12px;
   box-shadow:var(--shadow);margin-bottom:9px;overflow:hidden}
@@ -160,8 +162,7 @@ body:not([data-view="ask"]) .askbar{display:none}
       <span class="ar">›</span>
     </button>
 
-    <div class="hd2">カテゴリー</div>
-    <div class="cats" id="cats"></div>
+    <div id="cats"></div>
 
     <button type="button" class="readrow" id="goRead">
       <span>📖　手順をまとめて読む</span><span class="ar">›</span>
@@ -171,7 +172,8 @@ body:not([data-view="ask"]) .askbar{display:none}
   <!-- ========== カテゴリーの中 ========== -->
   <div id="v-cat" data-off>
     <button type="button" class="backb" data-back="1">← もどる</button>
-    <div class="cathd"><span class="ic" id="catIc"></span><h2 id="catNm"></h2>
+    <div class="cathd"><span class="ic" id="catIc"></span>
+      <span><span class="g" id="catG"></span><h2 id="catNm"></h2></span>
       <span class="n" id="catN"></span></div>
     <div id="catList"></div>
   </div>
@@ -396,17 +398,21 @@ $("#goAsk").addEventListener("click",function(){ show("ask") });
 $("#goRead").addEventListener("click",function(){ back="home"; show("read") });
 
 /* ================= カテゴリー ================= */
+/* 大項目（お店について）ごとに、カテゴリーをぶら下げて出す。2026-11-27 */
 function renderCats(){
-  var cs=FaqDB.cats().filter(function(c){ return c.n>0 });
-  $("#cats").innerHTML = cs.length
-    ? cs.map(function(c){
-        return '<button type="button" data-c="'+esc(c.k)+'">'+
-          '<span class="ic">'+esc(c.ic)+'</span>'+
-          '<span class="nm">'+esc(c.nm)+'</span>'+
-          '<span class="n">'+c.n+'</span><span class="ar">›</span></button>';
+  var gs=FaqDB.tree();
+  $("#cats").innerHTML = gs.length
+    ? gs.map(function(g){
+        return '<div class="hd2">'+esc(g.nm)+'</div><div class="cats">'+
+          g.cats.map(function(c){
+            return '<button type="button" data-c="'+esc(c.k)+'">'+
+              '<span class="ic">'+esc(c.ic)+'</span>'+
+              '<span class="nm">'+esc(c.nm)+'</span>'+
+              '<span class="n">'+c.n+'</span><span class="ar">›</span></button>';
+          }).join("")+'</div>';
       }).join("")
-    : '<div class="none">まだカテゴリーがありません。<br>'+
-      '<a class="go" href="../settings/#man">設定 → マニュアル</a>で足せます。</div>';
+    : '<div class="cats"><div class="none">まだカテゴリーがありません。<br>'+
+      '<a class="go" href="../settings/#man">設定 → マニュアル</a>で足せます。</div></div>';
 }
 $("#cats").addEventListener("click",function(e){
   var b=e.target.closest("[data-c]"); if(!b) return;
@@ -415,7 +421,9 @@ $("#cats").addEventListener("click",function(e){
 function openCat(k){
   var c=FaqDB.cats().filter(function(x){ return x.k===k })[0]||{k:k,nm:k,ic:"📄"};
   var list=FaqDB.list(k);
+  var g=FaqDB.groups().filter(function(x){ return x.k===(c.g||FaqDB.G0.k) })[0];
   $("#catIc").textContent=c.ic;
+  $("#catG").textContent=(g&&g.nm)||"";
   $("#catNm").textContent=c.nm;
   $("#catN").textContent=list.length+"問";
   $("#catList").innerHTML=list.length

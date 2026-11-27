@@ -591,10 +591,21 @@ details.cat .in{padding:2px 12px 10px}
         <div class="addbox">
           <input type="text" id="mCatIc" placeholder="印" style="flex:0 0 64px;text-align:center" maxlength="4">
           <input type="text" id="mCatNm" placeholder="カテゴリーの名前（例）接客" autocomplete="off">
+          <select id="mCatG" aria-label="どの大項目に入れるか" style="flex:0 0 auto"></select>
           <button class="btn sm primary" id="mCatAdd">追加</button>
         </div>
-        <p class="note">「アプリについて」は、はじめから入っているものです。名前は変えられます。<br>
-          印は絵文字です（空のままでも構いません）。</p>
+        <p class="note">印は絵文字です（空のままでも構いません）。<br>
+          名前と、どの大項目に入れるかは、あとから直せます。</p>
+      </div>
+      <div class="sec">
+        <h3>大項目</h3>
+        <div id="grpTbl"></div>
+        <div class="addbox">
+          <input type="text" id="mGrpNm" placeholder="大項目の名前（例）お店について" autocomplete="off">
+          <button class="btn sm primary" id="mGrpAdd">追加</button>
+        </div>
+        <p class="note">カテゴリーをまとめる、いちばん上の見出しです。<br>
+          マニュアルでは <b>大項目 → カテゴリー → 質問</b> の順にならびます。</p>
       </div>
       <div class="sec">
         <div class="row" style="gap:9px"><button class="btn sm" id="mPush">置き場所に送る</button>
@@ -1937,7 +1948,7 @@ function pullGuests(){
    くわしい作りは shared/faqdb.js の頭に書いてある。2026-11-27 */
 var mEdit="";                                  /* 直している質問の id。"" なら新しく足す */
 
-function renderMan(){ renderMiss(); renderQA(); renderCatTbl(); fillMCat(); renderMSync() }
+function renderMan(){ renderMiss(); renderQA(); renderCatTbl(); renderGrpTbl(); fillMCat(); fillMCatG(); renderMSync() }
 
 function renderMSync(){
   $("#mSync").textContent = FaqDB.on() ? "" : "置き場所につないでいないので、この端末だけに入ります。";
@@ -1986,21 +1997,32 @@ $("#missTbl").addEventListener("click",function(e){
 
 /* ---- 質問と答え ---- */
 function fillMCat(){
-  var cs=FaqDB.cats();
   var cur=$("#mCat").value;
-  $("#mCat").innerHTML=cs.map(function(c){
-    return '<option value="'+esc(c.k)+'">'+esc(c.ic)+' '+esc(c.nm)+'</option>';
+  $("#mCat").innerHTML=FaqDB.tree(true).map(function(g){
+    return '<optgroup label="'+esc(g.nm)+'">'+g.cats.map(function(c){
+      return '<option value="'+esc(c.k)+'">'+esc(c.ic)+' '+esc(c.nm)+'</option>';
+    }).join("")+'</optgroup>';
   }).join("");
   if(cur) $("#mCat").value=cur;
 }
+function fillMCatG(){
+  var cur=$("#mCatG").value;
+  $("#mCatG").innerHTML=FaqDB.groups().map(function(g){
+    return '<option value="'+esc(g.k)+'">'+esc(g.nm)+'</option>';
+  }).join("");
+  if(cur) $("#mCatG").value=cur;
+}
 function renderQA(){
-  var cs=FaqDB.cats(), hidden=(FaqDB.db().qa||[]).filter(function(x){ return x.off });
+  var gs=FaqDB.tree(), hidden=(FaqDB.db().qa||[]).filter(function(x){ return x.off });
   var h="";
-  cs.forEach(function(c){
-    var li=FaqDB.list(c.k);
-    if(!li.length) return;
-    h+='<h3 style="margin-top:14px">'+esc(c.ic)+' '+esc(c.nm)+'</h3>';
-    h+=li.map(qaRow).join("");
+  gs.forEach(function(g){
+    h+='<div class="hint" style="margin-top:16px;letter-spacing:.06em">'+esc(g.nm)+'</div>';
+    g.cats.forEach(function(c){
+      var li=FaqDB.list(c.k);
+      if(!li.length) return;
+      h+='<h3 style="margin-top:10px">'+esc(c.ic)+' '+esc(c.nm)+'</h3>';
+      h+=li.map(qaRow).join("");
+    });
   });
   if(hidden.length){
     h+='<h3 style="margin-top:14px">隠してあるもの</h3>';
@@ -2066,22 +2088,64 @@ $("#mAdd").addEventListener("click",function(){
 
 /* ---- カテゴリー ---- */
 function renderCatTbl(){
-  var cs=FaqDB.cats();
-  $("#catTbl").innerHTML=cs.map(function(c){
-    return '<div class="row" style="gap:9px;padding:9px 0;border-bottom:1px solid var(--line)">'+
+  var gs=FaqDB.groups();
+  $("#catTbl").innerHTML=FaqDB.cats().map(function(c){
+    return '<div class="row" style="gap:9px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap">'+
       '<span style="flex:0 0 28px;text-align:center;font-size:18px">'+esc(c.ic)+'</span>'+
       '<input type="text" class="cnm" data-ck="'+esc(c.k)+'" value="'+esc(c.nm)+'" '+
-        'style="flex:1 1 auto;min-width:0" aria-label="カテゴリーの名前">'+
+        'style="flex:1 1 140px;min-width:0" aria-label="カテゴリーの名前">'+
+      '<select class="cg" data-ck="'+esc(c.k)+'" aria-label="どの大項目に入れるか">'+
+        gs.map(function(g){
+          return '<option value="'+esc(g.k)+'"'+(g.k===c.g?" selected":"")+'>'+esc(g.nm)+'</option>';
+        }).join("")+'</select>'+
       '<span class="hint mono">'+c.n+'問</span>'+
-      (c.k===FaqDB.CAT0.k?"":'<button class="btn sm ghost" data-cdel="'+esc(c.k)+'">消す</button>')+
+      '<button class="btn sm ghost" data-cdel="'+esc(c.k)+'">消す</button>'+
     '</div>';
   }).join("");
 }
-$("#catTbl").addEventListener("change",function(e){
-  var i=e.target.closest(".cnm"); if(!i) return;
+function renderGrpTbl(){
+  var cs=FaqDB.cats();
+  $("#grpTbl").innerHTML=FaqDB.groups().map(function(g){
+    var n=cs.filter(function(c){ return c.g===g.k }).length;
+    return '<div class="row" style="gap:9px;padding:9px 0;border-bottom:1px solid var(--line)">'+
+      '<input type="text" class="gnm" data-gk="'+esc(g.k)+'" value="'+esc(g.nm)+'" '+
+        'style="flex:1 1 auto;min-width:0" aria-label="大項目の名前">'+
+      '<span class="hint mono">'+n+'つ</span>'+
+      '<button class="btn sm ghost" data-gdel="'+esc(g.k)+'">消す</button>'+
+    '</div>';
+  }).join("");
+}
+$("#grpTbl").addEventListener("change",function(e){
+  var i=e.target.closest(".gnm"); if(!i) return;
   var nm=i.value.trim(); if(!nm) return;
-  var cur=FaqDB.cats().filter(function(c){ return c.k===i.dataset.ck })[0]||{};
-  FaqDB.catPut({k:i.dataset.ck, nm:nm, ic:cur.ic||"📄"});
+  FaqDB.groupPut({k:i.dataset.gk, nm:nm});
+  renderMan(); pushMan(); toast("直しました");
+});
+$("#grpTbl").addEventListener("click",function(e){
+  var b=e.target.closest("[data-gdel]"); if(!b) return;
+  var n=FaqDB.cats().filter(function(c){ return c.g===b.dataset.gdel }).length;
+  if(n){ toast("中にカテゴリーが残っています。先にほかの大項目に移してください"); return }
+  if(FaqDB.groups().length<2){ toast("大項目をぜんぶ消すことはできません"); return }
+  if(!confirm("この大項目を消します。よろしいですか。")) return;
+  var g=FaqDB.groups().filter(function(x){ return x.k===b.dataset.gdel })[0];
+  FaqDB.groupPut({k:b.dataset.gdel, nm:(g&&g.nm)||"", off:1});
+  renderMan(); pushMan(); toast("消しました");
+});
+$("#mGrpAdd").addEventListener("click",function(){
+  var nm=$("#mGrpNm").value.trim();
+  if(!nm){ toast("名前を入れてください"); return }
+  var k=FaqDB.groupPut({k:"", nm:nm});
+  $("#mGrpNm").value="";
+  renderMan(); $("#mCatG").value=k; pushMan();
+  toast("追加しました");
+});
+$("#catTbl").addEventListener("change",function(e){
+  var i=e.target.closest(".cnm"), g=e.target.closest(".cg");
+  var ck=(i&&i.dataset.ck)||(g&&g.dataset.ck); if(!ck) return;
+  var cur=FaqDB.cats().filter(function(c){ return c.k===ck })[0]||{};
+  var nm=i?i.value.trim():cur.nm;
+  if(!nm) return;
+  FaqDB.catPut({k:ck, nm:nm, ic:cur.ic||"📄", g:(g?g.value:cur.g)||FaqDB.G0.k});
   renderMan(); pushMan(); toast("直しました");
 });
 $("#catTbl").addEventListener("click",function(e){
@@ -2095,7 +2159,8 @@ $("#catTbl").addEventListener("click",function(e){
 $("#mCatAdd").addEventListener("click",function(){
   var nm=$("#mCatNm").value.trim();
   if(!nm){ toast("名前を入れてください"); return }
-  var k=FaqDB.catPut({k:"", nm:nm, ic:$("#mCatIc").value.trim()||"📄"});
+  var k=FaqDB.catPut({k:"", nm:nm, ic:$("#mCatIc").value.trim()||"📄",
+                      g:$("#mCatG").value||FaqDB.G0.k});
   $("#mCatNm").value=""; $("#mCatIc").value="";
   renderMan(); $("#mCat").value=k; pushMan();
   toast("追加しました");
@@ -2334,7 +2399,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v134";
+var APPVER="v136";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
