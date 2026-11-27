@@ -16,9 +16,14 @@
 /* 上のタブ（集計の画面と同じ作り） */
 .top{position:sticky;top:0;z-index:9;background:var(--bg);border-bottom:1px solid var(--line)}
 .top-in{max-width:980px;margin:0 auto;padding:8px 12px}
-.tabs{display:flex;gap:6px;background:var(--surface-2);border-radius:11px;padding:4px}
-.tab{flex:1;border:none;background:transparent;border-radius:9px;padding:10px 4px;cursor:pointer;
-  font-family:inherit;font-size:13.5px;font-weight:700;color:var(--ink-2);line-height:1.3}
+.tabs{display:flex;gap:6px;background:var(--surface-2);border-radius:11px;padding:4px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+/* せまい画面ではタブ名が2行に折れてしまうので、折らずに横に流す。
+   広い画面（iPad）では今までどおり、ぜんぶが横いっぱいに並ぶ。 */
+.tab{flex:1 0 auto;border:none;background:transparent;border-radius:9px;padding:10px 10px;cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:700;color:var(--ink-2);line-height:1.3;
+  white-space:nowrap}
 .tab[aria-selected="true"]{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
 
 main{max-width:980px;margin:0 auto;padding:12px 12px calc(28px + env(safe-area-inset-bottom,0px))}
@@ -100,6 +105,28 @@ table.gu td.z{color:var(--ink-3)}
   font-weight:800;margin-left:3px}
 .wk .wb{height:6px;border-radius:999px;background:var(--surface-3);margin-top:10px;overflow:hidden}
 .wk .wb i{display:block;height:100%;border-radius:999px;background:var(--accent)}
+
+/* ---- 日次決算（1日ぶん） ---- */
+.dbar{margin-bottom:0}
+.monbar .s0{color:var(--sun)} .monbar .s6{color:var(--sat)}
+.monbar .sm{font-size:11.5px;color:var(--ink-3);font-weight:600}
+.dhint{font-size:11.5px;color:var(--ink-3);text-align:center;padding:7px 0 0;letter-spacing:.06em}
+.drow{display:flex;align-items:baseline;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.drow:last-child{border-bottom:none;padding-bottom:0}
+.drow .nm{font-size:13.5px;font-weight:700}
+.drow .sp{margin-left:auto;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:17px;font-weight:800;color:var(--ink)}
+.drow .sm{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-3)}
+.drow.tot{border-top:1px solid var(--line-2);border-bottom:none;margin-top:4px}
+.drow.tot .nm{color:var(--ink-2)}
+.dtbl{width:100%;border-collapse:collapse;font-size:13px}
+.dtbl th,.dtbl td{padding:9px 4px;border-bottom:1px solid var(--line);text-align:right;
+  font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dtbl th:first-child,.dtbl td:first-child{text-align:left;font-family:var(--ui);font-weight:700}
+.dtbl thead th{font-size:11.5px;color:var(--ink-3);font-weight:600;font-family:var(--ui)}
+.dtbl td.z{color:var(--ink-3)}
+.dtbl .sum{font-weight:800}
+.dtbl tr.tot td{background:var(--surface-2);border-bottom:none;font-weight:800}
 
 /* 表 */
 table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -221,6 +248,7 @@ h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;lette
 <a class="homebar" href="../">← ホーム<span>分析</span></a>
 <header class="top"><div class="top-in"><div class="tabs" id="tabs">
   <button class="tab" data-v="week" aria-selected="true">週次決算</button>
+  <button class="tab" data-v="day" aria-selected="false">日次決算</button>
   <button class="tab" data-v="item" aria-selected="false">商品</button>
   <button class="tab" data-v="guest" aria-selected="false">お客さま</button>
   <button class="tab" data-v="when" aria-selected="false">時間帯</button>
@@ -273,6 +301,48 @@ h4.sub{font-size:12px;color:var(--ink-3);font-weight:600;margin:16px 0 8px;lette
           区分はレジでお会計のときに選んだものです。<br>
           区分を選ばずにしたお会計は、<b>全体の購買率にだけ</b>入ります。<br>
           棒の長さは<b>1日あたり</b>です。日数のちがう週どうしでもくらべられます。</p>
+      </div></div>
+    </section>
+
+    <!-- 日次決算（その日1日ぶん） -->
+    <section class="view" id="v-day" data-off>
+      <div class="monbar dbar">
+        <button type="button" id="dayPrev" aria-label="前の日">&lsaquo;</button>
+        <div class="mon" id="dayLbl">&mdash;</div>
+        <button type="button" id="dayNext" aria-label="次の日">&rsaquo;</button>
+      </div>
+      <div class="dhint" id="dayHint"></div>
+
+      <div class="card"><div class="sec">
+        <h3>売上</h3>
+        <div id="dSales"></div>
+        <p class="note"><b>歴博委託商品</b>は、<a href="../settings/#item">設定 → 商品</a>で
+          <b>種類</b>を「歴博委託商品」にした商品の売上です。<b>売上</b>はそれ以外ぜんぶです。<br>
+          値引きをしたお会計は、明細の金額の割合で2つに分けています。
+          足すとかならず会計の合計と同じになります。<br>
+          打ち消した会計は入っていません。</p>
+      </div></div>
+
+      <div class="card"><div class="sec">
+        <h3>お客様ごとの購入数</h3>
+        <div id="dBuy"></div>
+        <p class="note">レジでお会計のときに選んだ<b>区分</b>ごとの、会計の件数です。
+          右の小さい数字はその区分の売上です。<br>
+          区分を選ばずにしたお会計は<b>区分なし</b>に入ります。</p>
+      </div></div>
+
+      <div class="card"><div class="sec">
+        <h3>来店数</h3>
+        <div id="dVis"></div>
+        <p class="note">レジの<a href="../reg/#visit">来店</a>で数えたぶんです。
+          買わずに帰られた方も入っています。</p>
+      </div></div>
+
+      <div class="card"><div class="sec">
+        <h3>支払い方法</h3>
+        <div id="dPay"></div>
+        <p class="note">お会計のときに選んだ支払い方法ごとの売上です。
+          <b>歴博委託商品もふくめた</b>金額なので、合計は上の<b>売上</b>の合計と同じになります。</p>
       </div></div>
     </section>
 
@@ -706,6 +776,7 @@ function render(){
   $("#body").hidden=false;
   syncMon();
   renderWeeks();
+  renderDay();
   renderAreaItems();
   renderItems();
   renderGuest();
@@ -982,6 +1053,136 @@ function renderWeeks(){
 
   $("#weeks").innerHTML=list.length?h
     :'<div class="empty">'+pick.m+'月はまだ記録がありません。</div>'+h;
+}
+
+/* ---------- 日次決算（その日1日ぶん） ---------- */
+/* 「月を選ぶ」バーは月をまたげないので、このタブだけは自分の日付バーを持っている。
+   見られるのは、受け取った期間のいちばん古い日から今日まで。 */
+var dsel=null;
+function dMin(){ return range().from }
+function dMax(){ var t=range().to; return t<today?t:today }
+function dShift(s,n){
+  var d=new Date(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10)+n);
+  return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
+}
+function dJp(s){ return (+s.slice(5,7))+"月"+(+s.slice(8,10))+"日" }
+function syncDay(){
+  if(!dsel) dsel=dMax();
+  if(dsel<dMin()) dsel=dMin();
+  if(dsel>dMax()) dsel=dMax();
+  var w=new Date(+dsel.slice(0,4), +dsel.slice(5,7)-1, +dsel.slice(8,10)).getDay();
+  var c=(w===0)?"s0":(w===6)?"s6":"";
+  $("#dayLbl").innerHTML=esc(dJp(dsel))+
+    '<span class="'+c+'">（'+DOW[w]+'）</span>'+
+    (dsel===today?' <span class="sm">きょう</span>':"");
+  $("#dayPrev").disabled=(dsel<=dMin());
+  $("#dayNext").disabled=(dsel>=dMax());
+  $("#dayHint").textContent="‹ › でほかの日に動かせます（"+
+    (+dMin().slice(0,4))+"年"+dJp(dMin())+" 〜 きょう）";
+}
+function stepDay(n){
+  var v=dShift(dsel||dMax(), n);
+  if(v<dMin()||v>dMax()) return;
+  dsel=v; renderDay();
+  window.scrollTo({top:0});
+}
+$("#dayPrev").addEventListener("click",function(){ stepDay(-1) });
+$("#dayNext").addEventListener("click",function(){ stepDay(1) });
+
+function renderDay(){
+  syncDay();
+  var AR=(window.Sync&&Sync.AREAS)||[];
+  var KD=(window.Sync&&Sync.KINDS)||[];
+  var PY=(window.Sync&&Sync.PAYS)||[];
+  var list=ok().filter(function(s){ return String(s.day)===dsel });
+  var vs=visits.filter(function(g){ return String(g.day)===dsel });
+  var none='<div class="empty">'+esc(dJp(dsel))+'はまだ記録がありません。</div>';
+
+  /* ---- 売上（歴博委託ぶんと、それ以外） ---- */
+  var own=0, con=0, n=list.length;
+  list.forEach(function(s){ var sp=splitAmt(s); own+=sp.own; con+=sp.con });
+  var amt=own+con;
+  $("#dSales").innerHTML=
+    '<div class="wk tot"><div class="wg">'+
+      '<div><div class="k">売上</div><div class="v">'+yen(own)+'</div></div>'+
+      '<div class="con"><div class="k">'+esc(CONSIGN)+'</div><div class="v">'+yen(con)+'</div></div>'+
+    '</div><div class="wsub">'+
+      '<span>合計<b>'+yen(amt)+'</b></span>'+
+      '<span>購買数<b>'+n+'件</b></span>'+
+      '<span>客単価<b>'+(n?yen(amt/n):"—")+'</b></span>'+
+    '</div></div>'+
+    (hasConsign()?"":'<div class="stip">まだ<b>「'+esc(CONSIGN)+'」</b>の種類に入れた商品がありません。<br>'+
+      '<a href="../settings/#item">設定 → 商品</a>で、お預かりしている商品の'+
+      '<b>種類</b>を <b>'+esc(CONSIGN)+'</b> にすると、ここで分けて出ます。</div>');
+
+  /* ---- お客様ごとの購入数（会計の件数） ---- */
+  var bn={}, ba={}, noN=0, noA=0, known={};
+  AR.forEach(function(a){ known[a.k]=1; bn[a.k]=0; ba[a.k]=0 });
+  list.forEach(function(s){
+    var sp=splitAmt(s), t=sp.own+sp.con;
+    if(s.area&&known[s.area]){ bn[s.area]++; ba[s.area]+=t }
+    else { noN++; noA+=t }
+  });
+  function row(nm,cnt,sub,cls){
+    return '<div class="drow'+(cls?" "+cls:"")+'"><span class="nm">'+esc(nm)+'</span>'+
+      (sub?'<span class="sm">'+esc(sub)+'</span>':"")+
+      '<span class="sp">'+cnt+'</span></div>';
+  }
+  var hb=AR.map(function(a){
+    return row(a.nm+"系", bn[a.k]+"件", yen(ba[a.k]));
+  }).join("");
+  if(noN) hb+=row("区分なし", noN+"件", yen(noA));
+  hb+=row("合計", n+"件", yen(amt), "tot");
+  $("#dBuy").innerHTML=list.length?hb:(none+hb);
+
+  /* ---- 来店数（区分 × 男・女・子供） ---- */
+  var vm={}, vtot=0, colT={}, rowT={};
+  AR.forEach(function(a){ vm[a.k]={}; rowT[a.k]=0; KD.forEach(function(kk){ vm[a.k][kk.k]=0 }) });
+  KD.forEach(function(kk){ colT[kk.k]=0 });
+  var vOther=0;
+  vs.forEach(function(g){
+    var k=Number(g.n)||0;
+    vtot+=k;
+    if(vm[g.area]&&vm[g.area][g.kind]!=null){
+      vm[g.area][g.kind]+=k; rowT[g.area]+=k; colT[g.kind]+=k;
+    }else vOther+=k;
+  });
+  function cell(v){ return '<td'+(v?"":' class="z"')+'>'+v+'</td>' }
+  var hv='<table class="dtbl"><thead><tr><th></th>'+
+    KD.map(function(kk){ return '<th>'+esc(kk.nm)+'</th>' }).join("")+
+    '<th>計</th></tr></thead><tbody>'+
+    AR.map(function(a){
+      return '<tr><td>'+esc(a.nm)+'系</td>'+
+        KD.map(function(kk){ return cell(vm[a.k][kk.k]) }).join("")+
+        '<td class="sum">'+rowT[a.k]+'</td></tr>';
+    }).join("")+
+    '<tr class="tot"><td>合計</td>'+
+      KD.map(function(kk){ return '<td>'+colT[kk.k]+'</td>' }).join("")+
+      '<td>'+vtot+'</td></tr>'+
+    '</tbody></table>'+
+    (vOther?'<p class="note">区分のついていない来店が'+vOther+'人ありました（合計には入っています）。</p>':"");
+  $("#dVis").innerHTML=vtot?hv:('<div class="empty">'+esc(dJp(dsel))+
+    'は来店を数えた記録がありません。</div>'+hv);
+
+  /* ---- 支払い方法 ---- */
+  /* 支払い方法を選ばずに打った会計は、レジが現金あつかいにしている。ここも同じにする。 */
+  var pa={}, pn={};
+  PY.forEach(function(x){ pa[x.k]=0; pn[x.k]=0 });
+  list.forEach(function(s){
+    var sp=splitAmt(s), t=sp.own+sp.con;
+    var k=(s.pay&&pa[s.pay]!=null)?s.pay:"cash";
+    if(pa[k]==null){ pa[k]=0; pn[k]=0 }
+    pa[k]+=t; pn[k]++;
+  });
+  var hp=PY.map(function(x){
+    return '<div class="drow"><span class="nm">'+esc(x.nm)+'</span>'+
+      '<span class="sm">'+pn[x.k]+'件</span>'+
+      '<span class="sp">'+yen(pa[x.k])+'</span></div>';
+  }).join("")+
+    '<div class="drow tot"><span class="nm">合計</span>'+
+      '<span class="sm">'+n+'件</span>'+
+      '<span class="sp">'+yen(amt)+'</span></div>';
+  $("#dPay").innerHTML=list.length?hp:(none+hp);
 }
 
 /* ---------- お客さま（日ごと・区分ごと） ---------- */
@@ -1289,8 +1490,9 @@ $("#stfList").addEventListener("click",function(e){
 });
 
 /* ---------- 共通 ---------- */
-var VIEWS=["week","item","guest","when","staff"];
+var VIEWS=["week","day","item","guest","when","staff"];
 var BYMON={week:1, guest:1, staff:1};      /* 月を選んで見るタブ */
+var BYDAY={day:1};                         /* 日を選んで見るタブ（自分でバーを持っている） */
 function show(v){
   if(VIEWS.indexOf(v)<0) v="week";
   VIEWS.forEach(function(k){ $("#v-"+k).toggleAttribute("data-off",k!==v) });
@@ -1298,7 +1500,7 @@ function show(v){
     t.setAttribute("aria-selected",String(t.dataset.v===v));
   });
   /* 日付を選ぶところが2つ並ぶと迷うので、そのタブで使うほうだけを出す */
-  $("#target").hidden=!!BYMON[v];
+  $("#target").hidden=!!(BYMON[v]||BYDAY[v]);
   $("#monWrap").hidden=!BYMON[v];
   $("#spanBtn").hidden=false;
 }
