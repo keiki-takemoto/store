@@ -762,7 +762,31 @@ function pushStaff(){
   if(!syncOn()) return;
   DB.staffDirty=1;                /* 送り終えるまでは、受け取りを止める */
   clearTimeout(staffT);
-  staffT=setTimeout(function(){
+  staffT=setTimeout(sendStaff,800);
+}
+/* 送る前に、置き場所にある合言葉（tok）を必ず受け取って、そちらを使う。
+   2026-11-28、スタッフ全員がシフトを見られなくなった（「このリンクはもう使えません」）。
+   受け取る前の端末が自分で合言葉を作って送り、配ってあるリンクを全員ぶん
+   上書きしてしまったのが原因とみられる。置き場所に居る人の合言葉は、端末からは変えない。
+   受け取れないときは送らずに、少し待ってやり直す。 */
+function sendStaff(){
+  Sync.metaGet("staff").then(function(r){
+    var srv={};
+    ((r&&Array.isArray(r.v))?r.v:[]).forEach(function(row){
+      var k=normName(row&&row.name); if(k&&row.tok) srv[k]=row.tok;
+    });
+    var ch=0;
+    DB.staff.forEach(function(x){
+      var t=srv[normName(x.name)];
+      if(t && x.tok!==t){ x.tok=t; ch++ }
+    });
+    if(ch) saveShift(DB);
+    sendStaffRows();
+  }).catch(function(){
+    clearTimeout(staffT); staffT=setTimeout(sendStaff,30000);
+  });
+}
+function sendStaffRows(){
     ensureToks();
     var rows=DB.staff.map(function(x){
       return {name:normName(x.name), disp:x.name, tok:x.tok||"",
@@ -778,7 +802,6 @@ function pushStaff(){
       delete DB.staffDirty; saveShift(DB);
     }).catch(function(){});
     Sync.staffPut(rows).catch(function(){});
-  },800);
 }
 var colorFor=null;   /* 色を選んでいる最中の人 */
 function renderStaff(){
@@ -2709,7 +2732,7 @@ snapTake(false);
    sw.js の CACHE と同じ番号を、ここにも書いておく。直したら両方そろえること。
    この画面そのものが端末にためこまれているときは、ここに古い番号が出る。
    それが狙いで、2台を見くらべれば、どちらが古いかがすぐ分かる。 */
-var APPVER="v150";
+var APPVER="v151";
 $("#appVer").textContent=APPVER;
 $("#verFresh").addEventListener("click",async function(){
   var m=$("#verMsg");
