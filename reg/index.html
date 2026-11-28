@@ -440,7 +440,7 @@ body[data-vfix="1"] .vcell{opacity:.55;pointer-events:none}
   <!-- ⑤ 支払い方法 -->
   <div class="pane pay" id="p-pay">
     <div class="paybox">
-      <div class="amt"><div class="k" id="payWho">—</div><div class="v" id="payTot">¥0</div></div>
+      <div class="amt"><div class="v" id="payTot">¥0</div></div>
       <div class="pays" id="pays"></div>
       <div class="fr">値引き<input type="text" inputmode="numeric" id="disc" placeholder="0"></div>
       <div id="cashBox">
@@ -1116,7 +1116,7 @@ function renderPay(){
   renderPays();
   var s=sums();
   $("#payTot").textContent=yen(s.total);
-  $("#payWho").textContent=[REG.staff,guestName()].filter(Boolean).join("　/　")+"　"+s.qty+"点";
+  /* 会計の画面はお客さまに見せるので、担当・お客さまの種類・点数は出さない（2026-11-28） */
   renderQuick(s.total);
   renderChange();
 }
